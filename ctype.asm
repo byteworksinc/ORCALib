@@ -103,7 +103,7 @@ yes	lda	#1
 
 ****************************************************************
 *
-*  int isctrl (int c)
+*  int iscntrl (int c)
 *
 *  Inputs:
 *	4,S - digit to test
@@ -113,7 +113,7 @@ yes	lda	#1
 *
 ****************************************************************
 *
-isctrl	start
+iscntrl	start
 
 	lda	4,S	fetch the operand
 	tax
