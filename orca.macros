@@ -1,1 +1,46 @@
- MACRO&LAB PH4 &N1 LCLC &C&LAB ANOP&C AMID &N1,1,1 AIF "&C"="#",.D AIF S:LONGA=1,.A REP #%00100000.A AIF "&C"<>"{",.B&C AMID &N1,L:&N1,1 AIF "&C"<>"}",.G&N1 AMID &N1,2,L:&N1-2 LDY #2 LDA (&N1),Y PHA LDA (&N1) PHA AGO .E.B AIF "&C"<>"[",.C LDY #2 LDA &N1,Y PHA LDA &N1 PHA AGO .E.C LDA &N1+2 PHA LDA &N1 PHA AGO .E.D&N1 AMID &N1,2,L:&N1-1 PEA +(&N1)|-16 PEA &N1 AGO .F.E AIF S:LONGA=1,.F SEP #%00100000.F MEXIT.G MNOTE "Missing closing '}'",16 MEND
+ MACRO
+&LAB PH4 &N1
+ LCLC &C
+&LAB ANOP
+&C AMID &N1,1,1
+ AIF "&C"="#",.D
+ AIF S:LONGA=1,.A
+ REP #%00100000
+.A
+ AIF "&C"<>"{",.B
+&C AMID &N1,L:&N1,1
+ AIF "&C"<>"}",.G
+&N1 AMID &N1,2,L:&N1-2
+ LDY #2
+ LDA (&N1),Y
+ PHA
+ LDA (&N1)
+ PHA
+ AGO .E
+.B
+ AIF "&C"<>"[",.C
+ LDY #2
+ LDA &N1,Y
+ PHA
+ LDA &N1
+ PHA
+ AGO .E
+.C
+ LDA &N1+2
+ PHA
+ LDA &N1
+ PHA
+ AGO .E
+.D
+&N1 AMID &N1,2,L:&N1-1
+ PEA +(&N1)|-16
+ PEA &N1
+ AGO .F
+.E
+ AIF S:LONGA=1,.F
+ SEP #%00100000
+.F
+ MEXIT
+.G
+ MNOTE "Missing closing '}'",16
+ MEND
