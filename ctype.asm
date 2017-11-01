@@ -498,6 +498,8 @@ tolower	start
 	pla
 	sta	1,S
 
+	txa
+	bmi	lb2
 	lda	>__ctype+1,X	branch if the character is not uppercase
 	and	#_upper
 	beq	lb1
@@ -506,7 +508,7 @@ tolower	start
 	rtl
 
 lb1	txa		return the input character
-	rtl
+lb2	rtl
 	end
 
 ****************************************************************
@@ -530,6 +532,8 @@ toupper	start
 	pla
 	sta	1,S
 
+	txa
+	bmi	lb2
 	lda	>__ctype+1,X	branch if the character is not lowercase
 	and	#_lower
 	beq	lb1
@@ -538,7 +542,7 @@ toupper	start
 	rtl
 
 lb1	txa		return the input character
-	rtl
+lb2	rtl
 	end
 
 ****************************************************************
