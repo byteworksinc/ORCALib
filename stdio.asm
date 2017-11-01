@@ -1,4 +1,4 @@
-	keep	stdio
+	keep	obj/stdio
 	mcopy stdio.macros
 	case	on
 
