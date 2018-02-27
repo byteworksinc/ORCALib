@@ -71,7 +71,7 @@ FILE_end  gequ FILE_base+4              end of the file buffer
 FILE_size gequ FILE_end+4               size of the file buffer
 FILE_cnt  gequ FILE_size+4              # chars that can be read/writen to buffer
 FILE_pbk  gequ FILE_cnt+4               put back character
-FILE_flag gequ FILE_pbk+4               buffer flags
+FILE_flag gequ FILE_pbk+2               buffer flags
 FILE_file gequ FILE_flag+2              GS/OS file ID
 
 sizeofFILE gequ FILE_file+2             size of the record
