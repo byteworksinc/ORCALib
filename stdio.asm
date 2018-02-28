@@ -4049,11 +4049,17 @@ fm2	jsr	Flag	read and interpret flag characters
 	inc	~precisionSpecified	  note that the precision is specified
 	jsr	GetSize	  get the precision
 	sta	~precision
-	lda	[format]	if *format == 'l' then
+	lda	[format]	if *format in ['l','z','t','j'] then
 	and	#$00FF
 fm3	cmp	#'l'
+	beq	fm3a
+	cmp	#'z'
+	beq	fm3a
+	cmp	#'t'
+	beq	fm3a
+	cmp	#'j'
 	bne	fm4
-	inc	~isLong	  ~isLong = true
+fm3a	inc	~isLong	  ~isLong = true
 	bra	fm5	  ++format
 fm4	cmp	#'L'	else if *format in ['L','h'] then
 	beq	fm5
@@ -5023,11 +5029,17 @@ fm1	inc4	format	skip the '%'
 fm2	jsr	GetSize	get the field width specifier
 	sta	~scanWidth
 
-	lda	[format]	if the character is an 'l' then
+	lda	[format]	if the char is 'l', 'z', 't', or 'j' then
 	and	#$00FF
 	cmp	#'l'
+	beq	fm2a
+	cmp	#'z'
+	beq	fm2a
+	cmp	#'t'
+	beq	fm2a
+	cmp	#'j'
 	bne	fm3
-	inc	~size	  long specifier
+fm2a	inc	~size	  long specifier
 	bra	fm4
 fm3	cmp	#'h'	else if it is an 'h' then
 	bne	fm5
