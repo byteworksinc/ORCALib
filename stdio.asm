@@ -5106,7 +5106,10 @@ fList	dc	c'd',i1'0',a'~Scan_d'		d
 	dc	c's',i1'0',a'~Scan_s'		s
 	dc	c'b',i1'0',a'~Scan_b'		b
 	dc	c'n',i1'0',a'~Scan_n'		n
+	dc	c'a',i1'0',a'~Scan_f'		a
+	dc	c'A',i1'0',a'~Scan_f'		A
 	dc	c'f',i1'0',a'~Scan_f'		f
+	dc	c'F',i1'0',a'~Scan_f'		F
 	dc	c'e',i1'0',a'~Scan_f'		e
 	dc	c'E',i1'0',a'~Scan_f'		E
 	dc	c'g',i1'0',a'~Scan_f'		g
