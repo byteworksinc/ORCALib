@@ -4162,6 +4162,14 @@ val	ds	2	value
 ;  List of format specifiers and the equivalent subroutines
 ;
 fList	dc	c'%',i1'0',a'~Format_Percent'	%
+	dc	c'a',i1'0',a'~Format_e'		a (not formatted correctly)
+	dc	c'A',i1'0',a'~Format_E'		A (not formatted correctly)
+	dc	c'f',i1'0',a'~Format_f'		f
+	dc	c'F',i1'0',a'~Format_f'		F
+	dc	c'e',i1'0',a'~Format_e'		e
+	dc	c'E',i1'0',a'~Format_E'		E
+	dc	c'g',i1'0',a'~Format_g'		g
+	dc	c'G',i1'0',a'~Format_G'		G
 	dc	c'n',i1'0',a'~Format_n'		n
 	dc	c's',i1'0',a'~Format_s'		s
 	dc	c'b',i1'0',a'~Format_b'		b
@@ -4173,11 +4181,6 @@ fList	dc	c'%',i1'0',a'~Format_Percent'	%
 	dc	c'u',i1'0',a'~Format_u'		u
 	dc	c'd',i1'0',a'~Format_d'		d
 	dc	c'i',i1'0',a'~Format_d'		i
-	dc	c'f',i1'0',a'~Format_f'		f
-	dc	c'e',i1'0',a'~Format_e'		e
-	dc	c'E',i1'0',a'~Format_E'		E
-	dc	c'g',i1'0',a'~Format_g'		g
-	dc	c'G',i1'0',a'~Format_G'		G
 fListEnd anop
 	end
 
