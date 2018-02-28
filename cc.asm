@@ -172,8 +172,8 @@ TAB      equ   9                        TAB key code
          plb
          plx
          ply
-         pea   0                        make room for argc, argv
-         pea   0
+         pea   targv|-16                make room for argc, argv
+         per   targv                      (default argv = ptr to targv)
          pea   0
          phy                            put the return addr back on the stack
          phx
@@ -190,9 +190,12 @@ TAB      equ   9                        TAB key code
 
          lda   cLine                    if cLine == 0 then
          ora   cLine+2
-         jeq   rtl                        exit
+         bne   lb0
+         stz   targv                      argv[0] = NULL
+         stz   targv+2
+         brl   rtl                        exit
 
-         add4  cLine,#8                 skip the shell identifier
+lb0      add4  cLine,#8                 skip the shell identifier
          ldx   #0                       count the arguments
          txy
          short M
@@ -348,8 +351,8 @@ start    ds    2                        start of the command line string
          plb
          plx
          ply
-         pea   0                        set argc, argv to 0
-         pea   0
+         pea   targv|-16                set argc = 0, argv to point to targv
+         per   targv
          pea   0
          phy                            put the return addr back on the stack
          phx
@@ -357,8 +360,13 @@ start    ds    2                        start of the command line string
          stz   ~ExitList                no exit routines, yet
          stz   ~ExitList+2
 
+         stz   targv                    argv[0] = NULL
+         stz   targv+2
+
          plb                            return
          rtl
+
+targv    ds    4
          end
 
 ****************************************************************
