@@ -196,27 +196,39 @@ TAB      equ   9                        TAB key code
          ldx   #0                       count the arguments
          txy
          short M
-lb2      lda   [cLine],Y
+* skip over white space
+lb1      lda   [cLine],Y
          beq   lb6
-         cmp   #' '
-         beq   lb3
-         cmp   #'"'
-         beq   lb3
-         cmp   #TAB
-         bne   lb4
-lb3      iny
-         bra   lb2
-lb4      inx
-lb5      lda   [cLine],Y
-         beq   lb6
-         cmp   #' '
-         beq   lb2
-         cmp   #'"'
-         beq   lb2
-         cmp   #TAB
-         beq   lb2
          iny
-         bra   lb5
+         cmp   #' '
+         beq   lb1
+         cmp   #TAB
+         beq   lb1
+         inx
+         cmp   #'"'
+         beq   lb3
+
+* skip to next white space
+lb2      anop
+         lda   [cLine],y
+         beq   lb6
+         iny
+         cmp   #' '
+         beq   lb1
+         cmp   #TAB
+         beq   lb1
+         bra   lb2
+
+* skip to next "
+lb3      anop
+         lda   [cLine],y
+         beq   lb6
+         iny
+         cmp   #'"'
+         beq   lb1
+         bra   lb3
+
+
 lb6      long  M
          txa                            we need (X+1)*4 + strlen(cLine)+1 bytes
          inc   A
