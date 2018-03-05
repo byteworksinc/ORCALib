@@ -36,6 +36,7 @@ _print   gequ  $80                      [' '..'~']
 _csym    gequ  $01                      ['0'..'9','A'..'Z','a'..'z','_']
 _csymf   gequ  $02                      ['A'..'Z','a'..'z'.'_']
 _octal   gequ  $04                      ['0'..'7']
+_blank   gequ  $08                      ['\t', ' ']
 ;
 ;  signal numbers
 ;
