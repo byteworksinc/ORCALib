@@ -2662,6 +2662,14 @@ sprintf	start
 	plb
 	plx		remove the return address
 	ply
+	phd		initialize output to empty string
+	tsc
+	tcd
+	short	M
+	lda	#0
+	sta	[3]
+	long	M
+	pld
 	pla		save the stream
 	sta	string
 	pla
@@ -3143,6 +3151,14 @@ vsprintf	start
 	plb
 	plx		remove the return address
 	ply
+	phd		initialize output to empty string
+	tsc
+	tcd
+	short	M
+	lda	#0
+	sta	[3]
+	long	M
+	pld
 	pla		save the stream
 	sta	string
 	pla
