@@ -2742,6 +2742,132 @@ string	ds	4	string address
 
 ****************************************************************
 *
+*  int snprintf(char * s, size_t n, const char * format, ...)
+*
+*  Print the format string to a string, with length limit.
+*
+****************************************************************
+*
+snprintf start
+	using ~printfCommon
+
+	phb		use local addressing
+	phk
+	plb
+	plx		remove the return address
+	ply
+	lda	5,S	check if n == 0
+	ora	7,S
+	bne	lb1
+	lda	#put2	set up do-nothing output routine
+	sta	>~putchar+4
+	lda	#>put2
+	sta	>~putchar+5
+	bra	lb2
+lb1	phd		initialize output to empty string
+	tsc
+	tcd
+	short	M
+	lda	#0
+	sta	[3]
+	long	M
+	pld
+	lda	#put	set up output routine
+	sta	>~putchar+4
+	lda	#>put
+	sta	>~putchar+5
+lb2	pla		save the destination string
+	sta	string
+	pla
+	sta	string+2
+	pla		save n value
+	sta	count
+	pla
+	sta	count+2
+	phy		restore return address/data bank
+	phx
+	plb
+
+	tsc		find the argument list address
+	clc
+	adc	#8
+	sta	>args
+	pea	0
+	pha   
+	jsl	~printf	call the formatter
+	sec		compute the space to pull from the stack
+	pla
+	sbc	>args
+	clc
+	adc	#4
+	sta	>args
+	pla
+	phb		remove the return address
+	plx
+	ply
+	tsc		update the stack pointer
+	clc
+	adc	>args
+	tcs
+	phy		restore the return address
+	phx
+	plb
+	lda	>~numChars	return the value
+	rtl		return
+		
+put	phb		remove the char from the stack
+	phk
+	plb
+	plx
+	pla
+	ply
+	pha
+	phx
+	lda	count	decrement count
+	bne	pt1
+	dec	count+2
+pt1	dec	count
+	bne	pt2	if count == 0:
+	lda	count+2
+	bne	pt2
+pt1a	lda	#put2	  set up do-nothing output routine
+	sta	>~putchar+4
+	lda	#>put2
+	sta	>~putchar+5
+	bra	pt3	  return without writing
+pt2	ldx	string+2	write to string
+	phx
+	ldx	string
+	phx
+	phd
+	tsc
+	tcd
+	tya
+	and	#$00FF
+	sta	[3]
+	pld
+	pla
+	pla
+	inc4	string
+pt3	plb
+	rtl
+
+put2	phb		remove the char from the stack
+	plx
+	pla
+	ply
+	pha
+	phx
+	plb
+	rtl		return, discarding the character
+
+args	ds	2	original argument address
+string	ds	4	string address
+count	ds	4	chars left to write
+	end
+
+****************************************************************
+*
 *  int sscanf(s, format, additional arguments)
 *     char *s, *format;
 *
@@ -3228,6 +3354,133 @@ put	phb		remove the char from the stack
 	rtl
 
 string	ds	4	string address
+	end
+
+****************************************************************
+*
+*  int vsnprintf(char *s, size_t n, char *format, va_list arg)
+*
+*  Print the format string to a string, with length limit.
+*
+****************************************************************
+*
+vsnprintf	start
+	using ~printfCommon
+
+	phb		use local addressing
+	phk
+	plb
+	plx		remove the return address
+	ply
+	lda	5,S	check if n == 0
+	ora	7,S
+	bne	lb1
+	lda	#put2	set up do-nothing output routine
+	sta	>~putchar+4
+	lda	#>put2
+	sta	>~putchar+5
+	bra	lb2
+lb1	phd		initialize output to empty string
+	tsc
+	tcd
+	short	M
+	lda	#0
+	sta	[3]
+	long	M
+	pld
+	lda	#put	set up output routine
+	sta	>~putchar+4
+	lda	#>put
+	sta	>~putchar+5
+lb2	pla		save the stream
+	sta	string
+	pla
+	sta	string+2
+	pla		save n value
+	sta	count
+	pla
+	sta	count+2
+	phy		restore return address/data bank
+	phx
+	plb
+
+	phd		find the argument list address
+	tsc
+	tcd
+	lda	[10]
+	pld
+	pea	0
+	pha   
+	jsl	~printf	call the formatter
+	ply		update the argument list pointer
+	plx
+	phd
+	tsc
+	tcd
+	tya
+	sta	[10]
+	pld
+	phb		remove the return address
+	plx
+	ply
+	tsc		update the stack pointer
+	clc
+	adc	#8
+	tcs
+	phy		restore the return address
+	phx
+	plb
+	lda	>~numChars	return the value
+	rtl		return
+		
+put	phb		remove the char from the stack
+	phk
+	plb
+	plx
+	pla
+	ply
+	pha
+	phx
+	lda	count	decrement count
+	bne	pt1
+	dec	count+2
+pt1	dec	count
+	bne	pt2	if count == 0:
+	lda	count+2
+	bne	pt2
+pt1a	lda	#put2	  set up do-nothing output routine
+	sta	>~putchar+4
+	lda	#>put2
+	sta	>~putchar+5
+	bra	pt3	  return without writing
+pt2	ldx	string+2	write to string
+	phx
+	ldx	string
+	phx
+	phd
+	tsc
+	tcd
+	tya
+	and	#$00FF
+	sta	[3]
+	pld
+	pla
+	pla
+	inc4	string
+pt3	plb
+	rtl
+
+put2	phb		remove the char from the stack
+	plx
+	pla
+	ply
+	pha
+	phx
+	plb
+	rtl		return, discarding the character
+
+string	ds	4	string address
+count	ds	4	chars left to write
 	end
 
 ****************************************************************
