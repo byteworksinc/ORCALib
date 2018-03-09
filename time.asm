@@ -137,7 +137,10 @@ tm_wday  equ   12
          ldy   #tm_mday                 convert the day to a string
          lda   [timeptr],Y
          jsr   mkstr
-         sta   str+8
+         bit   #$00CF                   check for leading '0'
+         bne   lb1
+         and   #$FFEF                   convert leading '0' to ' '
+lb1      sta   str+8
          ldy   #tm_hour                 convert the hour to a string
          lda   [timeptr],Y
          jsr   mkstr
@@ -151,17 +154,21 @@ tm_wday  equ   12
          jsr   mkstr
          sta   str+17
          ldy   #tm_year                 convert the year to a string
-	lda	#'91'
-	sta	str+20
          lda   [timeptr],Y
-	cmp	#100
-	blt	lb1
-	ldx	#'02'
-	stx	str+20
-	sec
-	sbc	#100
-lb1      jsr   mkstr
+         ldy   #19
+         sec
+yr1      iny
+         sbc   #100
+         bpl   yr1
+         clc
+yr2      dey
+         adc   #100
+         bmi   yr2
+         jsr   mkstr
          sta   str+22
+         tya
+         jsr   mkstr
+         sta   str+20
          lla   timeptr,str
 
          plb
