@@ -424,7 +424,6 @@ temp2    equ   5                        temp variable
          div4  count,#60*60*24
          ldy   #14                      set the days
          lda   count
-         inc   A
          sta   [tmptr],Y
          div4  temp,#60*60*24,temp2     compute the day of week
          add4  temp2,#4
