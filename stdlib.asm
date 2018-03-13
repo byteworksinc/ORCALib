@@ -973,14 +973,28 @@ system   start
          sta   exComm
          pla
          sta   exComm+2
-         phy                            execute the command
+         ora   exComm
+         sta   empty
+         bne   lb1                      if calling system(NULL)
+         lda   #empty                     use empty command string
+         sta   exComm
+         lda   #^empty
+         sta   exComm+2
+lb1      phy                            execute the command
          phx
          plb
          Execute ex
-         rtl
+         ldy   empty
+         bne   ret                      if doing system(NULL)
+         tya
+         bcs   ret                        error => no command processor
+         inc   a                           (& vice versa)                
+ret      rtl
 
 ex       dc    i'$8000'
 exComm   ds    4
+
+empty    ds    2
          end
 
 ****************************************************************
