@@ -748,6 +748,14 @@ cn3      ph4   str                      save the starting string
 ;
          lda   #ERANGE                  errno = ERANGE
          sta   >errno
+         ldx   #$7FFF                   return value = LONG_MAX
+         ldy   #$FFFF
+         lda   negative                 if negative then
+         beq   ov1
+         inx                              return value = LONG_MIN
+         iny
+ov1      sty   val
+         stx   val+2
          lda   ptr                      if ptr <> NULL then
          ora   ptr+2
          bne   rt1
@@ -920,7 +928,9 @@ cn5      lda   foundOne                 if no digits were found, flag the error
 returnERANGE anop
          lda   #ERANGE                  errno = ERANGE
          sta   >errno
-         bra   rt2                      skip setting ptr
+         ldx   #$FFFF                   return value = ULONG_MAX
+         txy
+         bra   rt3                      skip setting ptr
 ;
 ;  return the results
 ;
@@ -934,7 +944,7 @@ rt1      lda   ptr                      if ptr is non-null then
          sta   [ptr],Y
 rt2      ldx   val+2                    get the value
          ldy   val
-         lda   rtl                      fix the stack
+rt3      lda   rtl                      fix the stack
          sta   base-1
          lda   rtl+1
          sta   base
