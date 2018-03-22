@@ -5139,7 +5139,7 @@ read	ds	2	# chars read
 *  Assignment Suppression Flag
 *  ---------------------------
 *
-*  '*'	Do everyting but save the result and remove a pointer from
+*  '*'	Do everything but save the result and remove a pointer from
 *	the stack.
 *
 *  Max Field Width
@@ -5159,13 +5159,14 @@ read	ds	2	# chars read
 *  --------------------
 *
 *  d,i	Signed decimal conversion to type int or long.
-*  u	Signed decmal conversion to type unsigned short, unsigned or
+*  u	Signed decimal conversion to type unsigned short, unsigned or
 *	unsigned long.
 *  o	Octal conversion.
-*  x,X	Hexadecomal conversion.
+*  x,X	Hexadecimal conversion.
 *  c	Character.
 *  s	String.
-*  p	Pascal string.
+*  b	Pascal string.
+*  p	Pointer.
 *  n	The argument is (int *); the number of characters written so
 *	far is written to the location.
 *  f,e,E,g,G Signed floating point conversion.
