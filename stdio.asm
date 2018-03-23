@@ -4732,8 +4732,12 @@ lb4b	lda	~suppress	if input is not suppressed then
 	beq	lb4c
 	sub4	#0,val,val	    negate the value
 lb4c	lda	val	  save the value
-	sta	[arg]
-	dec	~size
+	ldx	~size
+	bpl	lb4d
+	sep	#$20
+lb4d	sta	[arg]
+	rep	#$20
+	dex
 	bmi	lb6
 	ldy	#2
 	lda	val+2
@@ -4883,8 +4887,17 @@ arg	equ	11	argument
 	ldx	~suppress	if output is not suppressed then
 	bne	lb1
 	lda	~scanCount	  save the count
-	sta	[arg]
-	dec	~assignments	  fix assignment count
+	ldx	~size
+	bpl	lb0
+	sep	#$20
+lb0	sta	[arg]
+	rep	#$20
+	dex
+	bmi	lb0a
+	lda	#0
+	ldy	#2
+	sta	[arg],y
+lb0a	dec	~assignments	  fix assignment count
 lb1	ldy	#2	remove the parameter from the stack
 	jsr	~RemoveWord
 	rts
@@ -5117,8 +5130,12 @@ lb4a	lda	read	if no chars read then
 lb4b	lda	~suppress	if input is not suppressed then
 	bne	lb7
 	lda	val	  save the value
-	sta	[arg]
-	dec	~size
+	ldx	~size
+	bpl	lb4c
+	sep	#$20
+lb4c	sta	[arg]
+	rep	#$20
+	dex
 	bmi	lb6
 	ldy	#2
 	lda	val+2
@@ -5346,6 +5363,12 @@ fm2a	inc	~size	  long specifier
 	bra	fm4
 fm3	cmp	#'h'	else if it is an 'h' then
 	bne	fm5
+	inc4	format	  check for 'hh'
+	lda	[format]
+	and	#$00FF
+	cmp	#'h'
+	bne	fm4
+	dec	~size
 fm4	inc4	format	  ignore the character
 
 fm5	lda	[format]	find the proper format character
@@ -5455,7 +5478,7 @@ ch	ds	2	temp storage
 ~scanCount ds	2	# of characters scanned
 ~scanError ds	2	set to 1 by scaners if an error occurs
 ~scanWidth ds	2	max # characters to scan
-~size	 ds	2	size specifier; -1 -> short, 1 -> long,
+~size	 ds	2	size specifier; -1 -> char, 1 -> long,
 !			 0 -> default
 	end
 
