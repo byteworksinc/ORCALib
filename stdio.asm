@@ -3534,7 +3534,7 @@ argp	equ	7	argument pointer
 ;  For signed numbers, if the value is negative, use the sign flag
 ;
 	lda	~isLong	handle long values
-	beq	sn1
+	beq	sn0
 	ldy	#2
 	lda	[argp],Y
 	bpl	cn0
@@ -3546,10 +3546,19 @@ argp	equ	7	argument pointer
 	sbc	[argp],Y
 	sta	[argp],Y
 	bra	sn2
+sn0	lda	~isByte	handle (originally) byte-size values
+	beq	sn1
+	lda	[argp]
+	and	#$00FF
+	sta	[argp]
+	bit	#$0080
+	beq	cn0
+	eor	#$00FF
+	bra	sn1a
 sn1	lda	[argp]	handle int values
 	bpl	cn0
 	eor	#$FFFF
-	inc	a
+sn1a	inc	a
 	sta	[argp]
 sn2	lda	#'-'
 	sta	~sign
@@ -3568,7 +3577,10 @@ cn0	stz	~hexPrefix	don't lead with 0x
 !	pha
 !	bra	cn2	else
 cn1	lda	[argp]	  push an int value
-	pha
+	ldx	~isByte
+	beq	cn1a
+	and	#$00FF
+cn1a	pha
 cn2	ph4	#~str	push the string addr
 	ph2	#l:~str	push the string buffer length
 	ph2	#0	do an unsigned conversion
@@ -3726,7 +3738,11 @@ argp	equ	7	argument pointer
 	sta	argp
 	stx	argp+2
 	lda	~numChars	return the value
-	sta	[argp]
+	ldx	~isByte	if byte, store only low byte
+	beq	lb0
+	sep	#$20
+lb0	sta	[argp]
+	rep	#$20
 	lda	~isLong	if long, set the high word
 	beq	lb1
 	ldy	#2
@@ -3773,7 +3789,10 @@ argp	equ	7	argument pointer
 	lda	[argp],Y
 	sta	~num+2
 cn2	lda	[argp]
-	sta	~num
+	ldx	~isByte
+	beq	cn2a
+	and	#$00FF
+cn2a	sta	~num
 ;
 ;  Convert the number to an ASCII string
 ;
@@ -3938,7 +3957,10 @@ cn0	stz	~sign	ignore the sign flag
 	lda	[argp],Y
 	sta	~num+2
 cn2	lda	[argp]
-	sta	~num
+	ldx	~isByte
+	beq	cn2a
+	and	#$00FF
+cn2a	sta	~num
 	stz	~hexPrefix	assume we won't lead with 0x
 ;
 ;  Convert the number to an ASCII string
@@ -4300,6 +4322,7 @@ fm1	inc4	format	skip the '%'
 	stz	~precision	use the default precision
 	stz	~precisionSpecified
 	stz	~isLong	assume short operands
+	stz	~isByte
 	lda	#' '	use a blank for padding
 	sta	~paddChar
 	stz	~leftJustify	right justify the output
@@ -4334,6 +4357,12 @@ fm4	cmp	#'L'	else if *format in ['L','h'] then
 	beq	fm5
 	cmp	#'h'
 	bne	fm6
+	inc4	format	  check for 'hh'
+	lda	[format]	
+	and	#$00FF
+	cmp	#'h'
+	bne	fm6
+	inc	~isByte
 fm5	inc4	format	  ++format
 	lda	[format]	find the proper format character
 	and	#$00FF
@@ -4472,6 +4501,7 @@ fListEnd anop
 ~fieldWidth ds 2	output field width
 ~hexPrefix ds	2	hex 0x prefix characters (if present)
 ~isLong	 ds	2	is the operand long?
+~isByte	ds	2	is operand byte-size (converted to int)?
 ~leftJustify ds 2	left justify the output?
 ~paddChar ds	2	output padd character
 ~precision ds	2	precision of output
