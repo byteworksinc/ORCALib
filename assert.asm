@@ -34,11 +34,11 @@ __assert start
 
          csubroutine (4:f,2:l,4:s),0
 
-	ph4	s
-         ph2   l
-         ph4   f
+         ph4   <s
+         ph2   <l
+         ph4   <f
          ph4   #msg
-	ph4	>stderr
+         ph4   >stderr
          jsl   fprintf
          jsl   abort
 
