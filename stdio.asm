@@ -5367,13 +5367,13 @@ fm3	cmp	#'h'	else if it is an 'h' then
 	lda	[format]
 	and	#$00FF
 	cmp	#'h'
-	bne	fm4
+	bne	fm6
 	dec	~size
 fm4	inc4	format	  ignore the character
 
 fm5	lda	[format]	find the proper format character
 	and	#$00FF
-	inc4	format
+fm6	inc4	format
 	ldx	#fListEnd-fList-4
 fm7	cmp	fList,X
 	beq	fm8
