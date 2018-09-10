@@ -282,7 +282,7 @@ addr     equ   1
          jsl   ~DIV2
          sta   div_t                    save the results
          stx   div_t+2
-         tay                            if the result is negative then
+         lda   n                        if the numerator is negative then
          bpl   lb1
          sub2  #0,div_t+2,div_t+2         make the remainder negative
 lb1      lla   addr,div_t               return the address
@@ -427,7 +427,7 @@ addr     equ   1
          jsl   ~DIV4
          pl4   div_t
          pl4   div_t+4
-         lda   div_t+2                  if the result is negative then
+         lda   n+2                      if the numerator is negative then
          bpl   lb1
          sub4  #0,div_t+4,div_t+4         make the remainder negative
 lb1      lla   addr,div_t               return the result
