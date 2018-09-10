@@ -2946,7 +2946,7 @@ sys_errlist start
 	dc	a4'EEXISTS'
 	dc	a4'ENOSPC'
 
-! Note: if more errors are added, change maxErr in perror().
+! Note: if more errors are added, change maxErr in perror() and strerror().
 
 EUNDEF	cstr	'invalid error number'
 EDOM	cstr	'domain error'

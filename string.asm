@@ -17,6 +17,7 @@
 ****************************************************************
 *
 String	start		dummy routine
+	copy	equates.asm
 
 	end
 
@@ -888,6 +889,7 @@ lb2	sty	set	set the disp past the current disp
 ****************************************************************
 *
 strerror start
+maxErr	equ	ENOSPC	max error in sys_errlist
 
 	phb		get the error number
 	plx
@@ -897,7 +899,10 @@ strerror start
 	phx
 	phk		use local data bank
 	plb
-	asl	A	compute the index
+	cmp	#maxErr+1
+	blt	lb1
+	lda	#0
+lb1	asl	A	compute the index
 	asl	A
 	tay
 	ldx	sys_errlist+2,Y	load the address
