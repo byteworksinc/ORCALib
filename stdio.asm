@@ -2141,6 +2141,13 @@ s	equ	4	string address
 	tsc		set up DP addressing
 	phd
 	tcd
+	
+	lda	s	skip prefix string if it is NULL/empty
+	ora	s+2
+	beq	lb0
+	lda	[s]
+	and	#$00FF
+	beq	lb0
 
 	ph4	>stderr	write the error string
 	ph4	s
@@ -2151,7 +2158,7 @@ s	equ	4	string address
 	ph4	>stderr
 	pea	' '
 	jsl	fputc
-	ph4	>stderr	write the error message
+lb0	ph4	>stderr	write the error message
 	lda	>errno
 	cmp	#maxErr+1
 	blt	lb1
@@ -2164,11 +2171,8 @@ lb1	asl	A
 	lda	>sys_errlist,X
 	pha
 	jsl	fputs
-	ph4	>stderr	write lf, cr
+	ph4	>stderr	write lf
 	pea	10
-	jsl	fputc
-	ph4	>stderr
-	pea	13
 	jsl	fputc
 
 	pld		remove parm and return
