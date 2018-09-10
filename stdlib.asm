@@ -301,6 +301,9 @@ div_t    ds    4
 *  void _exit(status)
 *        int status;
 *
+*  void _Exit(status)
+*        int status;
+*
 *  Stop the program.  Exit cleans up, _exit does not.  Status
 *  is the status returned to the shell.
 *
@@ -313,6 +316,7 @@ exit     start
 
          jsr   ~EXIT
 _exit    entry
+_Exit    entry
          lda   4,S
          jmp   ~QUIT
          end
