@@ -858,23 +858,23 @@ db1a     lda   base                     if the base is zero then
          lda   [str]                      if the first char is 0 then
          and   #$00FF
          cmp   #'0'
-         bne   db2
+         bne   cn1
          lda   #8                           assume base 8
          sta   base
          ldy   #1                           if the second char is 'X' or 'x' then
          lda   [str],Y
-         and   #$005F
+         and   #$00DF
          cmp   #'X'
-         bne   db2
+         bne   cn1
          asl   base                           base 16
-db2      lda   [str]                    if the first two chars are 0x or 0X then
-         and   #$5F7F
+         bra   db3
+db2      cmp   #16                      if the base is 16 then
+         bne   cn1
+         lda   [str]                      if the first two chars are 0x or 0X then
+         and   #$DFFF
          cmp   #'X0'
          bne   cn1
-         add4  str,#2                     skip them
-         lda   base                       make sure the base is 16
-         cmp   #16
-         bne   returnERANGE
+db3      add4  str,#2                       skip them
 ;
 ;  Convert the number
 ;
@@ -884,7 +884,7 @@ cn1      lda   [str]                    get a (possible) digit
          blt   cn5
          cmp   #'9'+1                   branch if it is a numeric digit
          blt   cn2
-         and   #$005F                   convert lowercase to uppercase
+         and   #$00DF                   convert lowercase to uppercase
          cmp   #'A'                     branch if it is not a digit
          blt   cn5
          cmp   #'Z'+1                   branch if it is not a digit
