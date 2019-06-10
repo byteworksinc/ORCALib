@@ -926,6 +926,9 @@ cn4      inc4  str                      next char
 
 cn5      lda   foundOne                 if no digits were found, flag the error
          bne   rt1
+         lda   #EINVAL
+         sta   >errno
+         bra   rt2
 ;
 ;  flag an error
 ;
