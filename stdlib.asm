@@ -72,6 +72,42 @@ lb1      tay                            return A
 
 ****************************************************************
 *
+* void *aligned_alloc(size_t alignment, size_t size)
+*
+* Allocate memory with specified alignment.
+*
+*  Inputs:
+*        alignment - alignment to use (only value allowed is 1)
+*        size - bytes of memory to allocate
+*
+*  Outputs:
+*        Returns pointer to allocated memory, or NULL on error.
+*
+****************************************************************
+*
+aligned_alloc start
+         csubroutine (4:alignment,4:size),0
+
+         lda   alignment                check that alignment==1
+         dec   a
+         ora   alignment+2
+         beq   good
+         stz   size                     return NULL on error
+         stz   size+2
+         lda   #EINVAL
+         sta   >errno
+         bra   ret
+        
+good     ph4   <size                    call malloc
+         jsl   malloc
+         sta   size
+         stx   size+2
+
+ret      creturn 4:size
+         end
+
+****************************************************************
+*
 *  int atexit(func)
 *        void (*func)();
 *
