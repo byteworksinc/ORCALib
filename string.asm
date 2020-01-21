@@ -1730,15 +1730,17 @@ lb3	lda	isp	  s := internal state pointer
 	ldx	isp+2
 	sta	s
 	stx	s+2
+	ora	s+2	  check if already at end of string
+	beq	lb4a
 lb4	anop		endif
 
 	lda	[s]	if we are at the end of the string then
 	and	#$00FF
 	bne	lb5
-	stz	set	  return NULL
-	stz	set+2
 	stz	isp	  set the isp to NULL
 	stz	isp+2
+lb4a	stz	set	  return NULL
+	stz	set+2
 	bra	lb10	else
 lb5	lda	[s]	  scan to the 1st char not in the set
 	and	#$00FF
