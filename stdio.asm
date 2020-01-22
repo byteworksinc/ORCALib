@@ -5282,9 +5282,10 @@ ps3a	txa
 	bra	ps1
 
 ps4	cpx	#'%'	branch if this is a conversion
-	beq	fm1	 specification
+	bne	ps5	 specification
+	brl	fm1
 
-	stx	ch	make sure the char matches the format
+ps5	stx	ch	make sure the char matches the format
 	inc4	format	 specifier
 	jsl	~getchar
 	cmp	ch
@@ -5298,24 +5299,41 @@ rm1	lda	[format]	if this is a format specifier then
 	beq	rt1
 	cmp	#'%'
 	bne	rm4
-	inc4	format	  if it is not a '%' or '*' then
-	lda	[format]
-	and	#$00FF
+	ldy	#2	  plan to remove 2 words
+	jsr	IncFormat
 	beq	rt1
-	cmp	#'%'
-	beq	rm4
 	cmp	#'*'
+	bne	rm1a
+	dey		  ...but not if '*' found
+	dey
+	jsr	IncFormat
+rm1a	cmp	#'0'	  skip field width, if present
+	blt	rm1b
+	cmp	#'9'+1
+	bge	rm1b
+	jsr	IncFormat
+	bra	rm1a
+rm1b	cmp	#'l'	  skip 'l' length modifier, if present
+	bne	rm1c
+	jsr	IncFormat
+rm1c	cmp	#'%'	  ignore if it is '%%' format specifier
 	beq	rm4
-	cmp	#'['	    if it is a '[' then
+	cmp	#'['	  if it is a '[' then
 	bne	rm3
-rm2	inc4	format	      skip up to the closing ']'
-	lda	[format]
-	and	#$00FF
-	beq	rt1
+	jsr	IncFormat
+	cmp	#'^'	    skip '^', if present
+	bne	rm1d
+	jsr	IncFormat
+rm1d	cmp	#']'	    skip ']' in scanset, if present
+	bne	rm2a
+rm2	jsr	IncFormat
+rm2a	tax
+        beq	rt1	    skip up to the closing ']'
 	cmp	#']'
 	bne	rm2
-rm3	ldy	#2	    remove an addr from the stack
-	jsr	~RemoveWord
+rm3	tyx		  if '*' not found
+	beq	rm4
+	jsr	~RemoveWord	    remove an addr from the stack
 rm4	inc4	format	next format character
 	bra	rm1
 ;
@@ -5416,6 +5434,15 @@ gs2	and	#$000F	  save the ordinal value
 	inc4	format	  skip the character
 	bra	gs1
 gs3	lda	val
+	rts
+
+;
+;  Increment format and load the new character
+;
+IncFormat anop
+	inc4	format
+	lda	[format]
+	and	#$00FF
 	rts
 
 val	ds	2	value
