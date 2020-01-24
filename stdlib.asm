@@ -907,11 +907,12 @@ rt2      ldx   val+2                    get the value
 ****************************************************************
 *
 strtoul  start
-base     equ   18                       base
-ptr      equ   14                       *return pointer
-str      equ   10                       string pointer
-rtl      equ   7                        return address
+base     equ   20                       base
+ptr      equ   16                       *return pointer
+str      equ   12                       string pointer
+rtl      equ   9                        return address
 
+negative equ   7                        was there a minus sign?
 val      equ   3                        value
 foundOne equ   1                        have we found a number?
 
@@ -921,7 +922,8 @@ foundOne equ   1                        have we found a number?
 ~strtoul entry                          alt entry point called from strtol
          ldx   #1
 
-init     pea   0                        make room for & initialize foundOne
+init     pea   0                        make room for & initialize negative
+         pea   0                        make room for & initialize foundOne
          pea   0                        make room for & initialize val
          pea   0
          tsc                            set up direct page addressing
@@ -940,7 +942,7 @@ init     pea   0                        make room for & initialize foundOne
          sta   [ptr],Y
 
 sw0      txa                            just process number if called from strtol
-         bne   db1a
+         bne   db1c
 sw1      lda   [str]                    skip the white space
          and   #$00FF
          tax
@@ -952,12 +954,16 @@ sw1      lda   [str]                    skip the white space
 ;
 ;  Deduce the base
 ;
-db1      lda   [str]                    skip any leading '+'
+db1      lda   [str]                    if the next char is '-' then
          and   #$00FF
-         cmp   #'+'
+         cmp   #'-'
          bne   db1a
-         inc4  str
-db1a     lda   base                     if the base is zero then
+         inc   negative                   negative := true
+         bra   db1b
+db1a     cmp   #'+'                     skip any leading '+'
+         bne   db1c
+db1b     inc4  str
+db1c     lda   base                     if the base is zero then
          bne   db2
          lda   #10                        assume base 10
          sta   base
@@ -1055,7 +1061,10 @@ rt1      lda   ptr                      if ptr is non-null then
          ldy   #2
          lda   str+2
          sta   [ptr],Y
-rt2      ldx   val+2                    get the value
+rt2      lda   negative                 if negative then
+         beq   rt2a
+         sub4  #0,val,val                 val = -val
+rt2a     ldx   val+2                    get the value
          ldy   val
 rt3      lda   rtl                      fix the stack
          sta   base-1
@@ -1064,7 +1073,7 @@ rt3      lda   rtl                      fix the stack
          pld
          tsc
          clc
-         adc   #16
+         adc   #18
          tcs
          tya                            return
          rtl
