@@ -838,7 +838,7 @@ cn3      ph4   str                      save the starting string
          ph2   base                     convert the unsigned number
          ph4   ptr
          ph4   str
-         jsl   strtoul
+         jsl   ~strtoul
          stx   val+2
          sta   val
          txy                            see if we have an overflow
@@ -891,6 +891,8 @@ rt2      ldx   val+2                    get the value
 ****************************************************************
 *
 *  strtoul - convert a string to an unsigned long
+*  ~strtoul - alt entry point that does not parse leading
+*             white space and sign
 *
 *  Inputs:
 *        str - pointer to the string
@@ -913,7 +915,13 @@ rtl      equ   7                        return address
 val      equ   3                        value
 foundOne equ   1                        have we found a number?
 
-         pea   0                        make room for & initialize foundOne
+         ldx   #0
+         bra   init
+
+~strtoul entry                          alt entry point called from strtol
+         ldx   #1
+
+init     pea   0                        make room for & initialize foundOne
          pea   0                        make room for & initialize val
          pea   0
          tsc                            set up direct page addressing
@@ -924,13 +932,15 @@ foundOne equ   1                        have we found a number?
 ;
          lda   ptr                      if ptr in non-null then
          ora   ptr+2
-         beq   sw1
+         beq   sw0
          lda   str                        initialize it to str
          sta   [ptr]
          ldy   #2
          lda   str+2
          sta   [ptr],Y
 
+sw0      txa                            just process number if called from strtol
+         bne   db1a
 sw1      lda   [str]                    skip the white space
          and   #$00FF
          tax
