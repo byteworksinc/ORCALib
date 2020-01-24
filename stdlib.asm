@@ -843,10 +843,16 @@ cn3      ph4   str                      save the starting string
          sta   val
          txy                            see if we have an overflow
          bpl   rt1
+         ldy   negative                   allow -2147483648 as legal value
+         beq   ov0
+         cpx   #$8000
+         bne   ov0
+         tay
+         beq   rt1
 ;
 ;  Overflow - flag the error
 ;
-         lda   #ERANGE                  errno = ERANGE
+ov0      lda   #ERANGE                  errno = ERANGE
          sta   >errno
          ldx   #$7FFF                   return value = LONG_MAX
          ldy   #$FFFF
