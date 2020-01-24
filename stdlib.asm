@@ -795,9 +795,9 @@ rtl      equ   7                        return address
 val      equ   3                        value
 negative equ   1                        is the number negative?
 
-         pea   0                        make room for & initialize negative
          pea   0                        make room for & initialize val
          pea   0
+         pea   0                        make room for & initialize negative
          tsc                            set up direct page addressing
          phd
          tcd
@@ -856,14 +856,6 @@ cn3      ph4   str                      save the starting string
          iny
 ov1      sty   val
          stx   val+2
-         lda   ptr                      if ptr <> NULL then
-         ora   ptr+2
-         bne   rt1
-         lda   1,S                        *ptr = original str
-         sta   [ptr]
-         ldy   #2
-         lda   3,S
-         sta   [ptr],Y
 ;
 ;  return the results
 ;
@@ -907,11 +899,12 @@ rt2      ldx   val+2                    get the value
 ****************************************************************
 *
 strtoul  start
-base     equ   20                       base
-ptr      equ   16                       *return pointer
-str      equ   12                       string pointer
-rtl      equ   9                        return address
+base     equ   22                       base
+ptr      equ   18                       *return pointer
+str      equ   14                       string pointer
+rtl      equ   11                       return address
 
+rangeOK  equ   9                        was the number within range?
 negative equ   7                        was there a minus sign?
 val      equ   3                        value
 foundOne equ   1                        have we found a number?
@@ -922,27 +915,29 @@ foundOne equ   1                        have we found a number?
 ~strtoul entry                          alt entry point called from strtol
          ldx   #1
 
-init     pea   0                        make room for & initialize negative
-         pea   0                        make room for & initialize foundOne
+init     pea   1                        make room for & initialize rangeOK
+         pea   0                        make room for & initialize negative
          pea   0                        make room for & initialize val
          pea   0
+         pea   0                        make room for & initialize foundOne
          tsc                            set up direct page addressing
          phd
          tcd
 ;
 ;  Skip any leading whitespace
 ;
+         txa                            just process number if called from strtol
+         bne   db1c
+
          lda   ptr                      if ptr in non-null then
          ora   ptr+2
-         beq   sw0
+         beq   sw1
          lda   str                        initialize it to str
          sta   [ptr]
          ldy   #2
          lda   str+2
          sta   [ptr],Y
 
-sw0      txa                            just process number if called from strtol
-         bne   db1c
 sw1      lda   [str]                    skip the white space
          and   #$00FF
          tax
@@ -1025,14 +1020,16 @@ cn3      cmp   base                     branch if the digit is too big
          plx
          ply
          tax
-         bne   returnERANGE
-         clc                            add in the new digit
+         beq   cn3a
+         stz   rangeOK
+cn3a     clc                            add in the new digit
          tya
          adc   val
          sta   val
          bcc   cn4
          inc   val+2
-         beq   returnERANGE
+         bne   cn4
+         stz   rangeOK
 cn4      inc4  str                      next char
          bra   cn1
 
@@ -1040,27 +1037,26 @@ cn5      lda   foundOne                 if no digits were found, flag the error
          bne   rt1
          lda   #EINVAL
          sta   >errno
-         bra   rt2
-;
-;  flag an error
-;
-returnERANGE anop
-         lda   #ERANGE                  errno = ERANGE
-         sta   >errno
-         ldx   #$FFFF                   return value = ULONG_MAX
-         txy
-         bra   rt3                      skip setting ptr
+         bra   rt2a
 ;
 ;  return the results
 ;
 rt1      lda   ptr                      if ptr is non-null then
          ora   ptr+2
-         beq   rt2
+         beq   rt1a
          lda   str                        set it to str
          sta   [ptr]
          ldy   #2
          lda   str+2
          sta   [ptr],Y
+
+rt1a     lda   rangeOK                  check if number was out of range
+         bne   rt2
+         lda   #ERANGE                  errno = ERANGE
+         sta   >errno
+         ldx   #$FFFF                   return value = ULONG_MAX
+         txy
+         bra   rt3
 rt2      lda   negative                 if negative then
          beq   rt2a
          sub4  #0,val,val                 val = -val
@@ -1073,7 +1069,7 @@ rt3      lda   rtl                      fix the stack
          pld
          tsc
          clc
-         adc   #18
+         adc   #20
          tcs
          tya                            return
          rtl
