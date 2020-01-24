@@ -37,7 +37,7 @@ abort    start
          ph2   #SIGABRT
          jsl   raise
          lda   #-1
-         jmp   ~QUIT
+         jmp   ~C_QUIT
          end
 
 ****************************************************************
@@ -158,6 +158,60 @@ rval     equ   5                        return value
 
 lb1      creturn 2:rval
          end
+
+****************************************************************
+*
+*  int at_quick_exit(func)
+*        void (*func)();
+*
+*  This function is used to build a list of functions that will
+*  be called as part of the quick exit processing.
+*
+*  Inputs:
+*        func - address of the function to call on quick exit
+*
+*  Outputs:
+*        Returns 0 if successful, -1 if not.
+*
+****************************************************************
+*
+at_quick_exit start
+ptr      equ   1                        work pointer
+rval     equ   5                        return value
+
+         csubroutine (4:func),6
+
+         lda   #-1                      assume we will fail
+         sta   rval                     assume we will fail
+         dec4  func                     we need the addr-1, not the addr
+         ph4   #8                       get space for the record
+         jsl   malloc
+         stx   ptr+2
+         sta   ptr
+         ora   ptr+2                    quit now if we failed
+         beq   lb1
+         ldy   #2                       place the record in the exit list
+         lda   >~QUICKEXITLIST
+         sta   [ptr]
+         lda   >~QUICKEXITLIST+2
+         sta   [ptr],Y
+         lda   ptr
+         sta   >~QUICKEXITLIST
+         lda   ptr+2
+         sta   >~QUICKEXITLIST+2
+         iny                            place the function address in the record
+         iny
+         lda   func
+         sta   [ptr],Y
+         iny
+         iny
+         lda   func+2
+         sta   [ptr],Y
+         inc   rval                     success...
+
+lb1      creturn 2:rval
+         end
+
 
 ****************************************************************
 *
@@ -331,14 +385,13 @@ div_t    ds    4
 
 ****************************************************************
 *
-*  void exit(status)
-*        int status;
+*  void exit(int status);
 *
-*  void _exit(status)
-*        int status;
+*  void _exit(int status);
 *
-*  void _Exit(status)
-*        int status;
+*  void _Exit(int status);
+*
+*  void quick_exit(int status);
 *
 *  Stop the program.  Exit cleans up, _exit does not.  Status
 *  is the status returned to the shell.
@@ -354,7 +407,14 @@ exit     start
 _exit    entry
 _Exit    entry
          lda   4,S
-         jmp   ~QUIT
+         jmp   ~C_QUIT
+         end
+
+quick_exit start
+
+         jsr   ~QUICKEXIT
+         lda   4,S
+         jmp   ~C_QUIT
          end
 
 ****************************************************************

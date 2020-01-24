@@ -184,6 +184,8 @@ TAB      equ   9                        TAB key code
 
          stz   ~ExitList                no exit routines, yet
          stz   ~ExitList+2
+         stz   ~QuickExitList
+         stz   ~QuickExitList+2
          case  on
          jsl   ~InitIO                  reset standard I/O
          case  off
@@ -359,6 +361,10 @@ start    ds    2                        start of the command line string
 
          stz   ~ExitList                no exit routines, yet
          stz   ~ExitList+2
+         stz   ~QuickExitList
+         stz   ~QuickExitList+2
+         lda   #~RTL                    set up so exit(), etc. call ~RTL
+         sta   ~C_Quit+1
 
          stz   targv                    argv[0] = NULL
          stz   targv+2
@@ -441,12 +447,76 @@ lb4      pld                            return
 
 ****************************************************************
 *
+*  ~QuickExit - call quick exit routines
+*
+*  Inputs:
+*        ~QuickExitList - list of quick exit routines
+*
+****************************************************************
+*
+~QuickExit start
+ptr      equ   3                        pointer to exit routines
+;
+;  Set up our stack frame
+;
+         phb
+         phk
+         plb
+         ph4   ~QuickExitList           set up our stack frame
+         phd
+         tsc
+         tcd
+;
+;  Call the quick exit functions
+;
+lb1      lda   ptr                      if the pointer is non-nil then
+         ora   ptr+2
+         beq   lb3
+         pea   +(lb2-1)|-8              call the function
+         pea   +(lb2-1)|8
+         phb
+         pla
+         ldy   #5
+         lda   [ptr],Y
+         pha
+         dey
+         dey
+         lda   [ptr],Y
+         pha
+         phb
+         pla
+         rtl
+lb2      ldy   #2                         dereference the pointer
+         lda   [ptr],Y
+         tax
+         lda   [ptr]
+         sta   ptr
+         stx   ptr+2
+         bra   lb1
+;
+;  return
+;
+lb3      pld                            return
+         pla
+         pla
+         plb
+         rts
+         end
+
+****************************************************************
+*
 *  ~ExitList - list of exit routines
+*  ~QuickExitList - list of quick exit routines
+*  ~C_Quit - call to quit (may be changed to call ~RTL)
 *
 ****************************************************************
 *
 ~ExitList start
          ds    4
+~QuickExitList entry
+         ds    4
+~C_Quit entry
+         jmp   ~QUIT
          end
 
 ****************************************************************
