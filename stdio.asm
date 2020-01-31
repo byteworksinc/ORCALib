@@ -3118,7 +3118,7 @@ f	equ	1	file pointer
 	
 lb1	creturn 4:f
 
-type	cstr	'w+b'
+type	cstr	'w+bx'
 	end
 
 ****************************************************************
