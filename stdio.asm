@@ -3067,9 +3067,10 @@ lb4	long	M	append the two strings
 	ph4	#cname	   move the string
 	ph4	buf
 	jsl	strcpy
+	bra	lb6
 
 lb5	lla	buf,cname	return the string pointer
-	plb
+lb6	plb
 	creturn 4:buf
 
 pr	dc	i'2'	parameter block for OSGet_Prefix
