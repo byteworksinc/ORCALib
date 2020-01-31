@@ -785,6 +785,7 @@ cn1	stx	opAccess	set the access flags
 	stx	OSname+2
 	ora	OSname+2
 	jeq	rt2
+	move4 OSname,opName
 ;
 ;  check for file modifier characters + and b
 ;
@@ -794,15 +795,21 @@ cn1	stx	opAccess	set the access flags
 	lda	[type],Y
 	jsr	Modifier
 	bcc	cm1
-	iny
 	lda	[type],Y
 	jsr	Modifier
+	bcc	cm1
+	lda	fileType	if mode is 'w' or 'a'
+	cmp	#'r'
+	beq	cm1
+	lda	[type],Y	  check for 'x' in type string
+	and	#$00FF
+	cmp	#'x'
+	beq	of1
 cm1	anop
 ;
 ;  open the file
 ;
-	move4 OSname,opName	try to open an existing file
-	OSopen op
+	OSopen op	try to open an existing file
 	bcc	of2
 
 	lda	fileType	if the type is 'r', flag an error
@@ -814,11 +821,15 @@ cm1	anop
 
 of1	move4 OSname,crPathName	create the file
 	OScreate cr
-	bcs	errEIO
+	bcs	of1a
 	OSopen op	open the file
 	bcc	of2
+of1a	cmp	#$0047	check for dupPathname error=>file exists
+	bne	errEIO
+	lda	#EEXIST
+	bra	err1
 errEIO	lda	#EIO
-	sta	>errno
+err1	sta	>errno
 	brl	rt1
 
 of2	lda	fileType	if the file type is 'w' then
@@ -947,12 +958,14 @@ Modifier and	#$00FF
 	bne	md1
 	lda	#$0003
 	sta	opAccess
+	iny
 	sec
 	rts
 md1	cmp	#'b'
 	bne	md2
 	lda	#BIN
 	sta	crFileType
+	iny
 md2	sec
 	rts
 
@@ -1078,6 +1091,7 @@ cn1	ph4	filename	get the length of the name buffer
 	stx	OSname+2
 	ora	OSname+2
 	jeq	rt2
+	move4 OSname,opName
 ;
 ;  open the file
 ;
@@ -1095,9 +1109,17 @@ nl1	cmp	#'b'
 	bne	nl2
 	lda	#BIN
 	sta	crFileType
+	iny
+nl2	lda	fileType	check for 'x' in type string
+	cmp	#'r'
+	beq	nl3
+	lda	[type],Y
+	and	#$00FF
+	cmp	#'x'
+	beq	of1
 
-nl2	move4 OSname,opName	try to open an existing file
-	OSopen op
+	
+nl3	OSopen op	try to open an existing file
 	bcc	of2
 
 	lda	fileType	if the type is 'r', flag an error
@@ -1109,8 +1131,15 @@ errEIO	ph4	stream
 
 of1	move4 OSname,crPathName	create the file
 	OScreate cr
-	bcs	errEIO
-	OSopen op	open the file
+	bcc	of1a
+	cmp	#$0047	check for dupPathname error=>file exists
+	bne	errEIO
+	ph4	stream
+	jsr	~ioerror
+	lda	#EEXIST
+	sta	>errno
+	brl	rt1
+of1a	OSopen op	open the file
 	bcs	errEIO
 
 of2	lda	fileType	if the file type is 'w', reset it
