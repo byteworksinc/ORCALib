@@ -1110,6 +1110,13 @@ nl1	cmp	#'b'
 	lda	#BIN
 	sta	crFileType
 	iny
+	cpy	#2
+	bne	nl2
+	lda	[type],Y
+	and	#$00FF
+	cmp	#'+'
+	bne	nl2
+	iny
 nl2	lda	fileType	check for 'x' in type string
 	cmp	#'r'
 	beq	nl3
@@ -1160,7 +1167,7 @@ ar1	ph4	#BUFSIZ	get space for the file buffer
 	bne	ar3
 	lda	#ENOMEM	memory error
 	sta	>errno
-	bra	rt1
+	brl	rt1
 
 ar3	move4 stream,fileBuff	set the file buffer address
 	lda	buffStart	set the start of the buffer
@@ -1185,10 +1192,12 @@ ar3	move4 stream,fileBuff	set the file buffer address
 	sta	[fileBuff],Y
 	ldy	#1	set the flags
 	lda	[type],Y
+	cmp	#'+b'
+	beq	ar3a
 	and	#$00FF
 	cmp	#'+'
 	bne	ar4
-	lda	#_IOFBF+_IORW+_IOMYBUF
+ar3a	lda	#_IOFBF+_IORW+_IOMYBUF
 	bra	ar6
 ar4	lda	fileType
 	cmp	#'r'
