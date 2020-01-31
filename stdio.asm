@@ -4533,7 +4533,7 @@ fListEnd anop
 
 ****************************************************************
 *
-*  ~RemoveWord - remove Y words from the stack for printf
+*  ~RemoveWord - remove Y words from the stack for scanf
 *
 *  Inputs:
 *	Y - number of words to remove (must be >0)
