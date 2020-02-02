@@ -41,6 +41,9 @@ second   ds    4                        second  0..59
 count    ds    4                        seconds since 1 Jan 1970
 t1       ds    4                        work variable
 t2       ds    4                        work variable
+
+lasttime ds    4                        last time_t value returned by time()
+lastDST  dc    i2'-1'                   tm_isdst value for lasttime
          end
 
 ****************************************************************
@@ -284,6 +287,15 @@ gmtime   entry
          lda   [t]
          sta   t
          stx   t+2
+
+         ldy   #-1                      default DST setting = -1 (unknown)
+         cmp   lasttime                 determine DST setting, if we can
+         bne   lb0
+         cpx   lasttime+2
+         bne   lb0
+         ldy   lastDST
+lb0      sty   tm_isdst
+
          lda   #69                      find the year
          sta   year
          lda   #1
@@ -340,15 +352,6 @@ lb2a     ble   lb2
          sta   tm_mday
          ph4   #tm_sec                  set the day of week/year
          jsl   mktime
-	pha		determine if it's daylight savings
-	ph2	#$5E
-	_ReadBParam
-	pla
-	lsr	A
-	and	#$0001
-	eor	#$0001
-	sta	tm_isdst
-
          lla   t,tm_sec
          plb
          creturn 4:t
@@ -499,7 +502,20 @@ time     start
          lda   count+2
          sta   [tptr],Y
 
-lb1      move4 count,tptr
+lb1      lda   count
+         sta   tptr
+         sta   lasttime
+         lda   count+2
+         sta   tptr+2
+         sta   lasttime+2
+         pha                            determine if it's daylight savings
+         ph2   #$5E
+         _ReadBParam
+         pla
+         lsr   A
+         and   #$0001
+         eor   #$0001
+         sta   lastDST
          plb
          creturn 4:tptr
          end
