@@ -850,7 +850,7 @@ __ctype	start
 *  __ctype2 - character types array
 *
 *  This data area defines a second array of of bit masks.  It
-*  is used to test for character types.	 For example, to
+*  is used to test for character types.  For example, to
 *  determine if a character is allowed as an initial character
 *  in a symbol, and _csym with the array element for the
 *  character being tested.  If the result is non-zero, the

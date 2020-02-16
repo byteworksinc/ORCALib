@@ -742,7 +742,7 @@ lb1	lda	[s1],Y
 	inc	s2+2
 	bra	lb1
 
-lb2	ldx	#0	s1 is finished.	 If s2 is, too, the
+lb2	ldx	#0	s1 is finished.  If s2 is, too, the
 	lda	[s2],Y	 strings are equal.
 	beq	lb4
 less	ldx	#-1	It wasn't, so *s1 < *s2
@@ -1058,7 +1058,7 @@ lb1a	iny
 	inc	s2+2
 	bra	lb1
 
-lb2	ldx	#0	s1 is finished.	 If s2 is, too, the
+lb2	ldx	#0	s1 is finished.  If s2 is, too, the
 	lda	[s2],Y	 strings are equal.
 	beq	lb4
 less	ldx	#-1	It wasn't, so *s1 < *s2

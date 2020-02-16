@@ -61,7 +61,7 @@ _IOMYBUF gequ  $0040                    buffer was allocated by stdio
 _IOEOF   gequ  $0080                    has an EOF been found?
 _IOERR   gequ  $0100                    has an error occurred?
 _IOTEXT  gequ  $0200                    is this file a text file?
-_IOTEMPFILE gequ $0400	was this file created by tmpfile()?
+_IOTEMPFILE gequ $0400                  was this file created by tmpfile()?
 
 !                                       record structure
 !                                       ----------------

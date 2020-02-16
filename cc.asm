@@ -1085,26 +1085,26 @@ dv10     pld                            return
 *  ~Zero - zero an area of direct page memory
 *
 *  Inputs:
-*	addr - address of the memory
-*	size - number of bytes to zero (must be > 1)
+*        addr - address of the memory
+*        size - number of bytes to zero (must be > 1)
 *
 ****************************************************************
 *
-~Zero	start
+~Zero    start
 
          csubroutine (2:size,4:addr),0
 
-	lda	#0
-	sta	[addr]
-	ldx	addr
-	txy
-	iny
-	lda	size
-	dea
-	dea
-	phb
-	mvn	0,0
-	plb
+         lda   #0
+         sta   [addr]
+         ldx   addr
+         txy
+         iny
+         lda   size
+         dea
+         dea
+         phb
+         mvn   0,0
+         plb
             
          creturn
-	end
+         end

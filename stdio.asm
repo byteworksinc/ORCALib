@@ -640,7 +640,7 @@ rdTransferCount ds 4
 *
 *  Outputs:
 *	Returns NULL if an EOF is encountered, placing any
-*	characters read before the EOF into s.	 Returns S if
+*	characters read before the EOF into s.  Returns S if
 *	a line or part of a line is read.
 *
 ****************************************************************
@@ -2064,7 +2064,7 @@ wrTransferCount ds 4
 *
 *  Read a character from standard in.  No errors are possible.
 *
-*  The character read is returned in A.	 The null character
+*  The character read is returned in A.  The null character
 *  is mapped into EOF.
 *
 ****************************************************************
@@ -2273,7 +2273,7 @@ args	ds	2	original argument address
 *  int putchar(c)
 *     char c;
 *
-*  Print the character to standard out.	 The character is
+*  Print the character to standard out.  The character is
 *  returned.  No errors are possible.
 *
 *  The character \n is automatically followed by a $0D, which
@@ -4264,7 +4264,7 @@ lb3	creturn 4:ptr
 *  ------------------------
 *
 *  '-'	Left justify the output.
-*  '0'	Use '0' for the pad character rather than ' '.	 This
+*  '0'	Use '0' for the pad character rather than ' '.  This
 *	flag is ignored if the '-' flag is also used.
 *  '+'	Only used for conversion operations 'd' 'e' 'E' 'f' 'g' 'G'.
 *	Specifies that a leading sign is to be printed for
@@ -4278,7 +4278,7 @@ lb3	creturn 4:ptr
 *  Optional Min Field Width
 *  ------------------------
 *
-*  This field is either a number or *.	If it is *, an integer
+*  This field is either a number or *.  If it is *, an integer
 *  argument is consumed from the stack and used as the field
 *  width.  In either case, the output value is printed in a field
 *  that is NUMBER characters wide.  By default, the value is
@@ -4295,7 +4295,7 @@ lb3	creturn 4:ptr
 *  -----------------------
 *
 *  An 'l' indicates that the 'd', 'o', 'u', 'x' or 'X' argument is
-*  long.	 'L' and 'u' are also accepted for compliance with ANSI C,
+*  long.  'L' and 'u' are also accepted for compliance with ANSI C,
 *  but have no effect in this implementation.
 *
 *  Conversion Specifier
@@ -5223,7 +5223,7 @@ read	ds	2	# chars read
 *  int ~scanf(format, additional arguments)
 *     char *format;
 *
-*  Scan by calling ~getchar indirectly.	 If a '%' is found, it
+*  Scan by calling ~getchar indirectly.  If a '%' is found, it
 *  is interpreted as follows:
 *
 *  Assignment Suppression Flag
@@ -5367,7 +5367,7 @@ rm1d	cmp	#']'	    skip ']' in scanset, if present
 	bne	rm2a
 rm2	jsr	IncFormat
 rm2a	tax
-        beq	rt1	    skip up to the closing ']'
+	beq	rt1	    skip up to the closing ']'
 	cmp	#']'
 	bne	rm2
 rm3	tyx		  if '*' not found

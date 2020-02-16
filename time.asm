@@ -364,7 +364,7 @@ tm_mon   ds    2                        month           0..11
 tm_year  ds    2                        year            70..200 (1900=0)
 tm_wday  ds    2                        day of week     0..6    (Sun = 0)
 tm_yday  ds    2                        day of year     0..365
-tm_isdst ds    2	daylight savings? 1 = yes, 0 = no
+tm_isdst ds    2                        daylight savings? 1 = yes, 0 = no
          end
 
 ****************************************************************

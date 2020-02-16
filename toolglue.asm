@@ -625,21 +625,21 @@ GetMSData start
 
          csubroutine (4:reserved,4:DP),0
 
-	tsc
-	sec
-	sbc	#8
-	tcs
-	_GetMSData
+         tsc
+         sec
+         sbc   #8
+         tcs
+         _GetMSData
          sta   >~TOOLERROR
-	ldy	#2
-	pla
-	sta	[DP]
-	pla
-	sta	[DP],Y
-	pla
-	sta	[reserved]
-	pla
-	sta	[reserved],Y
+         ldy   #2
+         pla
+         sta   [DP]
+         pla
+         sta   [DP],Y
+         pla
+         sta   [reserved]
+         pla
+         sta   [reserved],Y
 
          creturn
          end
