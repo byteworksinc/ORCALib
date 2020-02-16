@@ -373,7 +373,7 @@ tm_isdst ds    2                        daylight savings? 1 = yes, 0 = no
 *        struct tm *tmptr
 *
 *  Inputs:
-*        tmptr - poiner to a time record
+*        tmptr - pointer to a time record
 *
 *  Outputs:
 *        tmptr->wday - day of week

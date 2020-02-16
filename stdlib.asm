@@ -661,7 +661,7 @@ sr4b     ph4   left                     swap left/right entries
          lda   left
          cmp   right
 sr5      blt   sr2
-         ph4   right                    sqap left/right entries
+         ph4   right                    swap left/right entries
          ph4   left
          jsr   swap
          ph4   left                     swap left/last entries
@@ -1183,7 +1183,7 @@ D        equ   1                        caller's DP
          tsc
          adc   >toRemove
          tcs
-         pld                            resore the caller's DP
+         pld                            restore the caller's DP
          plx                            remove the parameter from the stack
          ply
          pla

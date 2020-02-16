@@ -4,7 +4,7 @@
 
 ****************************************************************
 *
-*  signal - Asyncronous event signal handler
+*  signal - Asynchronous event signal handler
 *
 *  April 1990
 *  Mike Westerfield
@@ -27,7 +27,7 @@ SIGMAX   gequ  6                        maximum number of signals
 *
 *  void (*signal(int sig, void (*func) (int)))(int);
 *
-*  Set the interupt handler
+*  Set the interrupt handler
 *
 *  Inputs:
 *        sig - signal number
@@ -41,7 +41,7 @@ SIGMAX   gequ  6                        maximum number of signals
 *
 signal   start
          using signalCommon
-ptr      equ   1                        old sugnal handler
+ptr      equ   1                        old signal handler
 
          csubroutine (2:sig,4:func),4
 

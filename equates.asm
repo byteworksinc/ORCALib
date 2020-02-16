@@ -70,7 +70,7 @@ FILE_ptr  gequ FILE_next+4              next location to write to
 FILE_base gequ FILE_ptr+4               first byte of the buffer
 FILE_end  gequ FILE_base+4              end of the file buffer
 FILE_size gequ FILE_end+4               size of the file buffer
-FILE_cnt  gequ FILE_size+4              # chars that can be read/writen to buffer
+FILE_cnt  gequ FILE_size+4              # chars that can be read/written to buffer
 FILE_pbk  gequ FILE_cnt+4               put back character
 FILE_flag gequ FILE_pbk+2               buffer flags
 FILE_file gequ FILE_flag+2              GS/OS file ID

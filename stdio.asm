@@ -29,7 +29,7 @@ StdIO	start		dummy segment
 *  void clearerr(stream)
 *	FILE *stream;
 *
-*  Clears the error flag for the givin stream.
+*  Clears the error flag for the given stream.
 *
 *  Inputs:
 *	stream - file to clear
@@ -334,7 +334,7 @@ fa3	lda	#EOF	assume there is an error
 	ph4	stream	verify that stream exists
 	jsl	~VerifyStream
 	jcs	rts
-	ldy	#FILE_flag	if the mode is not writting, quit
+	ldy	#FILE_flag	if the mode is not writing, quit
 	lda	[stream],Y
 	and	#_IOWRT
 	beq	fl1
@@ -1410,7 +1410,7 @@ lb1	ldy	#FILE_flag	if the file is not prepared for
 	bne	lb2
 	bit	#_IOREAD	  if it is being read then
 	bne	pc2	    flag the error
-	ora	#_IOWRT	  set the writting flag
+	ora	#_IOWRT	  set the writing flag
 	sta	[stream],Y
 lb2	ldy	#FILE_file	branch if this is a disk file
 	lda	[stream],Y
@@ -3109,7 +3109,7 @@ f	equ	1	file pointer
 	jsl	fopen
 	sta	f
 	stx	f+2
-	ora	f+2	if sucessful then
+	ora	f+2	if successful then
 	beq	lb1
 	ldy	#FILE_flag	  f->_flag |= _IOTEMPFILE
 	lda	[f],Y
@@ -3141,7 +3141,7 @@ type	cstr	'w+bx'
 *
 ungetc	start
 
-char	equ	1	characater to return
+char	equ	1	character to return
 
 	csubroutine (2:c,4:stream),2
 
@@ -4287,7 +4287,7 @@ lb3	creturn 4:ptr
 *  Optional Precision
 *  ------------------
 *
-*  This field is a number, *, or is ommitted.  If it is an integer,
+*  This field is a number, *, or is omitted.  If it is an integer,
 *  an argument is removed from the stack and used as the precision.
 *  The precision is used to describe how many digits to print.
 *
@@ -4302,9 +4302,9 @@ lb3	creturn 4:ptr
 *  --------------------
 *
 *  d,i	Signed decimal conversion from type int or long.
-*  u	Signed decmal conversion from type unsigned or unsigned long.
+*  u	Signed decimal conversion from type unsigned or unsigned long.
 *  o	Octal conversion.
-*  x,X	Hexadecomal conversion.  'x' generates lowercase hex digits,
+*  x,X	Hexadecimal conversion.  'x' generates lowercase hex digits,
 *	while 'X' generates uppercase hex digits.
 *  c	Character.
 *  s	String.
@@ -5546,7 +5546,7 @@ ch	ds	2	temp storage
 ~eofFound ds	2	was EOF found during the scan?
 ~suppress ds	2	suppress assignment?
 ~scanCount ds	2	# of characters scanned
-~scanError ds	2	set to 1 by scaners if an error occurs
+~scanError ds	2	set to 1 by scanners if an error occurs
 ~scanWidth ds	2	max # characters to scan
 ~size	 ds	2	size specifier; -1 -> char, 1 -> long,
 !			 0 -> default

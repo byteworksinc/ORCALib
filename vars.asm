@@ -39,7 +39,7 @@ _toolErr entry                          last error in a tool call (C)
 
 ****************************************************************
 *
-*  ~InitIO - initialize the standad I/O files
+*  ~InitIO - initialize the standard I/O files
 *
 ****************************************************************
 *

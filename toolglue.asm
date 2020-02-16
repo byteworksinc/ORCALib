@@ -36,7 +36,7 @@ ToolGlue start                          dummy routine
 
 ****************************************************************
 *
-*  MiscTool - Miscelaneous tool kit
+*  MiscTool - Miscellaneous tool kit
 *
 ****************************************************************
 *

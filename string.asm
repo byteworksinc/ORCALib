@@ -85,7 +85,7 @@ lb2	sty	str1
 *	set - pointer to the set of characters
 *
 *  Outputs:
-*	strset - set of bytes; non-sero for chars in set
+*	strset - set of bytes; non-zero for chars in set
 *
 ****************************************************************
 *
@@ -203,8 +203,8 @@ lb4	lda	rtl+1	remove parameters from the stack
 *  equal, return 0; otherwise, return 1.
 *
 *  Inputs:
-*	p1 - string to concatonate to
-*	p2 - string to concatonate
+*	p1 - string to concatenate to
+*	p2 - string to concatenate
 *
 *  Outputs:
 *	A - result
@@ -577,14 +577,14 @@ lb2	long	I,M
 
 ****************************************************************
 *
-*  strcat - string concatonation
+*  strcat - string concatenation
 *
 *  Place *s2 at the end of *s1, returning a pointer to *s1.  No
 *  checking for length is performed.
 *
 *  Inputs:
-*	s1 - string to concatonate to
-*	s2 - string to concatonate
+*	s1 - string to concatenate to
+*	s2 - string to concatenate
 *
 *  Outputs:
 *	X-A - pointer to the result (s1)
@@ -956,14 +956,14 @@ lb2	long	M
 
 ****************************************************************
 *
-*  strncat - string concatonation with max length
+*  strncat - string concatenation with max length
 *
 *  Place *s2 at the end of *s1, returning a pointer to *s1.  No
 *  checking for length is performed.
 *
 *  Inputs:
-*	s1 - string to concatonate to
-*	s2 - string to concatonate
+*	s1 - string to concatenate to
+*	s2 - string to concatenate
 *	n - max # chars to copy
 *
 *  Outputs:
@@ -1021,8 +1021,8 @@ lb4	lda	#0	write the terminating null
 *  equal, return 0; otherwise, return 1.
 *
 *  Inputs:
-*	s1 - string to concatonate to
-*	s2 - string to concatonate
+*	s1 - string to concatenate to
+*	s2 - string to concatenate
 *	n - max length of the strings
 *
 *  Outputs:
@@ -1243,9 +1243,9 @@ lb3	long	M
 
 ****************************************************************
 *
-*  strrchr - find the last occurrance of a character in a string
+*  strrchr - find the last occurrence of a character in a string
 *
-*  Returns a pointer to the last occurrance of the character
+*  Returns a pointer to the last occurrence of the character
 *
 *  Inputs:
 *	str - string to search
@@ -1307,9 +1307,9 @@ lb4	long	M
 
 ****************************************************************
 *
-*  strrpos - find the last occurrance of a character in a string
+*  strrpos - find the last occurrence of a character in a string
 *
-*  Returns the position of the las occurrance of the character
+*  Returns the position of the last occurrence of the character
 *
 *  Inputs:
 *	str - string to search
@@ -1598,7 +1598,7 @@ ds5	anop
 ;
 ;  Search for the string
 ;
-ss0	lda	lensub	if the length of the sreach string is
+ss0	lda	lensub	if the length of the search string is
 	and	#$8000	  > 32767 then use a long method
 	ora	lensub+2
 	beq	ss3
