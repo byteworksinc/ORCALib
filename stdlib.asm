@@ -982,12 +982,17 @@ db1c     lda   base                     if the base is zero then
          asl   base                           base 16
          bra   db3
 db2      cmp   #16                      if the base is 16 then
-         bne   cn1
+         bne   db4
          lda   [str]                      if the first two chars are 0x or 0X then
          and   #$DFFF
          cmp   #'X0'
          bne   cn1
 db3      add4  str,#2                       skip them
+         bra   cn1
+db4      cmp   #37                      check for invalid base value
+         bge   cn6
+         dec   a
+         beq   cn6
 ;
 ;  Convert the number
 ;
@@ -1041,7 +1046,7 @@ cn4      inc4  str                      next char
 
 cn5      lda   foundOne                 if no digits were found, flag the error
          bne   rt1
-         lda   #EINVAL
+cn6      lda   #EINVAL
          sta   >errno
          bra   rt2a
 ;
