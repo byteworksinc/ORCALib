@@ -763,10 +763,9 @@ OSname	equ	11	pointer to the GS/OS file name
 	lda	[type]	make sure the file type is in ['a','r','w']
 	and	#$00FF
 	sta	fileType
-	ldx	#$0003
+	ldx	#$0002
 	cmp	#'a'
 	beq	cn1
-	ldx	#$0002
 	cmp	#'w'
 	beq	cn1
 	ldx	#$0001
