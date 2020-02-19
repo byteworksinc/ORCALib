@@ -85,9 +85,9 @@ shellid  start
          rtl
 
 lb1      lda   >~COMMANDLINE+2
-	pha
-	lda   >~COMMANDLINE
-	pha
+         pha
+         lda   >~COMMANDLINE
+         pha
          phd
          tsc
          tcd

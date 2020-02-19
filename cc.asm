@@ -172,8 +172,8 @@ TAB      equ   9                        TAB key code
          plb
          plx
          ply
-         pea   0                        make room for argc, argv
-         pea   0
+         pea   targv|-16                make room for argc, argv
+         per   targv                      (default argv = ptr to targv)
          pea   0
          phy                            put the return addr back on the stack
          phx
@@ -184,36 +184,53 @@ TAB      equ   9                        TAB key code
 
          stz   ~ExitList                no exit routines, yet
          stz   ~ExitList+2
+         stz   ~QuickExitList
+         stz   ~QuickExitList+2
 
          lda   cLine                    if cLine == 0 then
          ora   cLine+2
-         jeq   rtl                        exit
+         bne   lb0
+         stz   targv                      argv[0] = NULL
+         stz   targv+2
+         brl   rtl                        exit
 
-         add4  cLine,#8                 skip the shell identifier
+lb0      add4  cLine,#8                 skip the shell identifier
          ldx   #0                       count the arguments
          txy
          short M
-lb2      lda   [cLine],Y
+* skip over white space
+lb1      lda   [cLine],Y
          beq   lb6
-         cmp   #' '
-         beq   lb3
-         cmp   #'"'
-         beq   lb3
-         cmp   #TAB
-         bne   lb4
-lb3      iny
-         bra   lb2
-lb4      inx
-lb5      lda   [cLine],Y
-         beq   lb6
-         cmp   #' '
-         beq   lb2
-         cmp   #'"'
-         beq   lb2
-         cmp   #TAB
-         beq   lb2
          iny
-         bra   lb5
+         cmp   #' '
+         beq   lb1
+         cmp   #TAB
+         beq   lb1
+         inx
+         cmp   #'"'
+         beq   lb3
+
+* skip to next white space
+lb2      anop
+         lda   [cLine],y
+         beq   lb6
+         iny
+         cmp   #' '
+         beq   lb1
+         cmp   #TAB
+         beq   lb1
+         bra   lb2
+
+* skip to next "
+lb3      anop
+         lda   [cLine],y
+         beq   lb6
+         iny
+         cmp   #'"'
+         beq   lb1
+         bra   lb3
+
+
 lb6      long  M
          txa                            we need (X+1)*4 + strlen(cLine)+1 bytes
          inc   A
@@ -333,17 +350,26 @@ start    ds    2                        start of the command line string
          plb
          plx
          ply
-         pea   0                        set argc, argv to 0
-         pea   0
+         pea   targv|-16                set argc = 0, argv to point to targv
+         per   targv
          pea   0
          phy                            put the return addr back on the stack
          phx
 
          stz   ~ExitList                no exit routines, yet
          stz   ~ExitList+2
+         stz   ~QuickExitList
+         stz   ~QuickExitList+2
+         lda   #~RTL                    set up so exit(), etc. call ~RTL
+         sta   ~C_Quit+1
+
+         stz   targv                    argv[0] = NULL
+         stz   targv+2
 
          plb                            return
          rtl
+
+targv    ds    4
          end
 
 ****************************************************************
@@ -424,12 +450,76 @@ lb4      pld                            return
 
 ****************************************************************
 *
+*  ~QuickExit - call quick exit routines
+*
+*  Inputs:
+*        ~QuickExitList - list of quick exit routines
+*
+****************************************************************
+*
+~QuickExit start
+ptr      equ   3                        pointer to exit routines
+;
+;  Set up our stack frame
+;
+         phb
+         phk
+         plb
+         ph4   ~QuickExitList           set up our stack frame
+         phd
+         tsc
+         tcd
+;
+;  Call the quick exit functions
+;
+lb1      lda   ptr                      if the pointer is non-nil then
+         ora   ptr+2
+         beq   lb3
+         pea   +(lb2-1)|-8              call the function
+         pea   +(lb2-1)|8
+         phb
+         pla
+         ldy   #5
+         lda   [ptr],Y
+         pha
+         dey
+         dey
+         lda   [ptr],Y
+         pha
+         phb
+         pla
+         rtl
+lb2      ldy   #2                         dereference the pointer
+         lda   [ptr],Y
+         tax
+         lda   [ptr]
+         sta   ptr
+         stx   ptr+2
+         bra   lb1
+;
+;  return
+;
+lb3      pld                            return
+         pla
+         pla
+         plb
+         rts
+         end
+
+****************************************************************
+*
 *  ~ExitList - list of exit routines
+*  ~QuickExitList - list of quick exit routines
+*  ~C_Quit - call to quit (may be changed to call ~RTL)
 *
 ****************************************************************
 *
 ~ExitList start
          ds    4
+~QuickExitList entry
+         ds    4
+~C_Quit entry
+         jmp   ~QUIT
          end
 
 ****************************************************************
@@ -998,26 +1088,26 @@ dv10     pld                            return
 *  ~Zero - zero an area of direct page memory
 *
 *  Inputs:
-*	addr - address of the memory
-*	size - number of bytes to zero (must be > 1)
+*        addr - address of the memory
+*        size - number of bytes to zero (must be > 1)
 *
 ****************************************************************
 *
-~Zero	start
+~Zero    start
 
          csubroutine (2:size,4:addr),0
 
-	lda	#0
-	sta	[addr]
-	ldx	addr
-	txy
-	iny
-	lda	size
-	dea
-	dea
-	phb
-	mvn	0,0
-	plb
+         lda   #0
+         sta   [addr]
+         ldx   addr
+         txy
+         iny
+         lda   size
+         dea
+         dea
+         phb
+         mvn   0,0
+         plb
             
          creturn
-	end
+         end

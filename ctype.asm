@@ -139,8 +139,7 @@ isblank	start
 *
 ****************************************************************
 *
-iscntrl start
-isctrl	entry
+iscntrl	start
 
 	lda	4,S	fetch the operand
 	tax
@@ -525,6 +524,8 @@ tolower	start
 	pla
 	sta	1,S
 
+	txa
+	bmi	lb2
 	lda	>__ctype+1,X	branch if the character is not uppercase
 	and	#_upper
 	beq	lb1
@@ -533,7 +534,7 @@ tolower	start
 	rtl
 
 lb1	txa		return the input character
-	rtl
+lb2	rtl
 	end
 
 ****************************************************************
@@ -557,6 +558,8 @@ toupper	start
 	pla
 	sta	1,S
 
+	txa
+	bmi	lb2
 	lda	>__ctype+1,X	branch if the character is not lowercase
 	and	#_lower
 	beq	lb1
@@ -565,7 +568,7 @@ toupper	start
 	rtl
 
 lb1	txa		return the input character
-	rtl
+lb2	rtl
 	end
 
 ****************************************************************
@@ -847,7 +850,7 @@ __ctype	start
 *  __ctype2 - character types array
 *
 *  This data area defines a second array of of bit masks.  It
-*  is used to test for character types.	 For example, to
+*  is used to test for character types.  For example, to
 *  determine if a character is allowed as an initial character
 *  in a symbol, and _csym with the array element for the
 *  character being tested.  If the result is non-zero, the

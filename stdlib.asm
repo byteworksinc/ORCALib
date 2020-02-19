@@ -37,7 +37,7 @@ abort    start
          ph2   #SIGABRT
          jsl   raise
          lda   #-1
-         jmp   ~QUIT
+         jmp   ~C_QUIT
          end
 
 ****************************************************************
@@ -68,6 +68,42 @@ lb1      tay                            return A
          sta   1,S
          tya
          rtl
+         end
+
+****************************************************************
+*
+* void *aligned_alloc(size_t alignment, size_t size)
+*
+* Allocate memory with specified alignment.
+*
+*  Inputs:
+*        alignment - alignment to use (only value allowed is 1)
+*        size - bytes of memory to allocate
+*
+*  Outputs:
+*        Returns pointer to allocated memory, or NULL on error.
+*
+****************************************************************
+*
+aligned_alloc start
+         csubroutine (4:alignment,4:size),0
+
+         lda   alignment                check that alignment==1
+         dec   a
+         ora   alignment+2
+         beq   good
+         stz   size                     return NULL on error
+         stz   size+2
+         lda   #EINVAL
+         sta   >errno
+         bra   ret
+        
+good     ph4   <size                    call malloc
+         jsl   malloc
+         sta   size
+         stx   size+2
+
+ret      creturn 4:size
          end
 
 ****************************************************************
@@ -122,6 +158,60 @@ rval     equ   5                        return value
 
 lb1      creturn 2:rval
          end
+
+****************************************************************
+*
+*  int at_quick_exit(func)
+*        void (*func)();
+*
+*  This function is used to build a list of functions that will
+*  be called as part of the quick exit processing.
+*
+*  Inputs:
+*        func - address of the function to call on quick exit
+*
+*  Outputs:
+*        Returns 0 if successful, -1 if not.
+*
+****************************************************************
+*
+at_quick_exit start
+ptr      equ   1                        work pointer
+rval     equ   5                        return value
+
+         csubroutine (4:func),6
+
+         lda   #-1                      assume we will fail
+         sta   rval                     assume we will fail
+         dec4  func                     we need the addr-1, not the addr
+         ph4   #8                       get space for the record
+         jsl   malloc
+         stx   ptr+2
+         sta   ptr
+         ora   ptr+2                    quit now if we failed
+         beq   lb1
+         ldy   #2                       place the record in the exit list
+         lda   >~QUICKEXITLIST
+         sta   [ptr]
+         lda   >~QUICKEXITLIST+2
+         sta   [ptr],Y
+         lda   ptr
+         sta   >~QUICKEXITLIST
+         lda   ptr+2
+         sta   >~QUICKEXITLIST+2
+         iny                            place the function address in the record
+         iny
+         lda   func
+         sta   [ptr],Y
+         iny
+         iny
+         lda   func+2
+         sta   [ptr],Y
+         inc   rval                     success...
+
+lb1      creturn 2:rval
+         end
+
 
 ****************************************************************
 *
@@ -282,7 +372,7 @@ addr     equ   1
          jsl   ~DIV2
          sta   div_t                    save the results
          stx   div_t+2
-         tay                            if the result is negative then
+         lda   n                        if the numerator is negative then
          bpl   lb1
          sub2  #0,div_t+2,div_t+2         make the remainder negative
 lb1      lla   addr,div_t               return the address
@@ -295,11 +385,13 @@ div_t    ds    4
 
 ****************************************************************
 *
-*  void exit(status)
-*        int status;
+*  void exit(int status);
 *
-*  void _exit(status)
-*        int status;
+*  void _exit(int status);
+*
+*  void _Exit(int status);
+*
+*  void quick_exit(int status);
 *
 *  Stop the program.  Exit cleans up, _exit does not.  Status
 *  is the status returned to the shell.
@@ -313,8 +405,16 @@ exit     start
 
          jsr   ~EXIT
 _exit    entry
+_Exit    entry
          lda   4,S
-         jmp   ~QUIT
+         jmp   ~C_QUIT
+         end
+
+quick_exit start
+
+         jsr   ~QUICKEXIT
+         lda   4,S
+         jmp   ~C_QUIT
          end
 
 ****************************************************************
@@ -423,7 +523,7 @@ addr     equ   1
          jsl   ~DIV4
          pl4   div_t
          pl4   div_t+4
-         lda   div_t+2                  if the result is negative then
+         lda   n+2                      if the numerator is negative then
          bpl   lb1
          sub4  #0,div_t+4,div_t+4         make the remainder negative
 lb1      lla   addr,div_t               return the result
@@ -561,7 +661,7 @@ sr4b     ph4   left                     swap left/right entries
          lda   left
          cmp   right
 sr5      blt   sr2
-         ph4   right                    sqap left/right entries
+         ph4   right                    swap left/right entries
          ph4   left
          jsr   swap
          ph4   left                     swap left/last entries
@@ -695,9 +795,9 @@ rtl      equ   7                        return address
 val      equ   3                        value
 negative equ   1                        is the number negative?
 
-         pea   0                        make room for & initialize negative
          pea   0                        make room for & initialize val
          pea   0
+         pea   0                        make room for & initialize negative
          tsc                            set up direct page addressing
          phd
          tcd
@@ -738,24 +838,30 @@ cn3      ph4   str                      save the starting string
          ph2   base                     convert the unsigned number
          ph4   ptr
          ph4   str
-         jsl   strtoul
+         jsl   ~strtoul
          stx   val+2
          sta   val
          txy                            see if we have an overflow
          bpl   rt1
+         ldy   negative                   allow -2147483648 as legal value
+         beq   ov0
+         cpx   #$8000
+         bne   ov0
+         tay
+         beq   rt1
 ;
 ;  Overflow - flag the error
 ;
-         lda   #ERANGE                  errno = ERANGE
+ov0      lda   #ERANGE                  errno = ERANGE
          sta   >errno
-         lda   ptr                      if ptr <> NULL then
-         ora   ptr+2
-         bne   rt1
-         lda   1,S                        *ptr = original str
-         sta   [ptr]
-         ldy   #2
-         lda   3,S
-         sta   [ptr],Y
+         ldx   #$7FFF                   return value = LONG_MAX
+         ldy   #$FFFF
+         lda   negative                 if negative then
+         beq   ov1
+         inx                              return value = LONG_MIN
+         iny
+ov1      sty   val
+         stx   val+2
 ;
 ;  return the results
 ;
@@ -783,6 +889,8 @@ rt2      ldx   val+2                    get the value
 ****************************************************************
 *
 *  strtoul - convert a string to an unsigned long
+*  ~strtoul - alt entry point that does not parse leading
+*             white space and sign
 *
 *  Inputs:
 *        str - pointer to the string
@@ -797,23 +905,36 @@ rt2      ldx   val+2                    get the value
 ****************************************************************
 *
 strtoul  start
-base     equ   18                       base
-ptr      equ   14                       *return pointer
-str      equ   10                       string pointer
-rtl      equ   7                        return address
+base     equ   22                       base
+ptr      equ   18                       *return pointer
+str      equ   14                       string pointer
+rtl      equ   11                       return address
 
+rangeOK  equ   9                        was the number within range?
+negative equ   7                        was there a minus sign?
 val      equ   3                        value
 foundOne equ   1                        have we found a number?
 
-         pea   0                        make room for & initialize foundOne
+         ldx   #0
+         bra   init
+
+~strtoul entry                          alt entry point called from strtol
+         ldx   #1
+
+init     pea   1                        make room for & initialize rangeOK
+         pea   0                        make room for & initialize negative
          pea   0                        make room for & initialize val
          pea   0
+         pea   0                        make room for & initialize foundOne
          tsc                            set up direct page addressing
          phd
          tcd
 ;
 ;  Skip any leading whitespace
 ;
+         txa                            just process number if called from strtol
+         bne   db1c
+
          lda   ptr                      if ptr in non-null then
          ora   ptr+2
          beq   sw1
@@ -834,35 +955,44 @@ sw1      lda   [str]                    skip the white space
 ;
 ;  Deduce the base
 ;
-db1      lda   [str]                    skip any leading '+'
+db1      lda   [str]                    if the next char is '-' then
          and   #$00FF
-         cmp   #'+'
+         cmp   #'-'
          bne   db1a
-         inc4  str
-db1a     lda   base                     if the base is zero then
+         inc   negative                   negative := true
+         bra   db1b
+db1a     cmp   #'+'                     skip any leading '+'
+         bne   db1c
+db1b     inc4  str
+db1c     lda   base                     if the base is zero then
          bne   db2
          lda   #10                        assume base 10
          sta   base
          lda   [str]                      if the first char is 0 then
          and   #$00FF
          cmp   #'0'
-         bne   db2
+         bne   cn1
          lda   #8                           assume base 8
          sta   base
          ldy   #1                           if the second char is 'X' or 'x' then
          lda   [str],Y
-         and   #$005F
+         and   #$00DF
          cmp   #'X'
-         bne   db2
+         bne   cn1
          asl   base                           base 16
-db2      lda   [str]                    if the first two chars are 0x or 0X then
-         and   #$5F7F
+         bra   db3
+db2      cmp   #16                      if the base is 16 then
+         bne   db4
+         lda   [str]                      if the first two chars are 0x or 0X then
+         and   #$DFFF
          cmp   #'X0'
          bne   cn1
-         add4  str,#2                     skip them
-         lda   base                       make sure the base is 16
-         cmp   #16
-         bne   returnERANGE
+db3      add4  str,#2                       skip them
+         bra   cn1
+db4      cmp   #37                      check for invalid base value
+         bge   cn6
+         dec   a
+         beq   cn6
 ;
 ;  Convert the number
 ;
@@ -872,7 +1002,7 @@ cn1      lda   [str]                    get a (possible) digit
          blt   cn5
          cmp   #'9'+1                   branch if it is a numeric digit
          blt   cn2
-         and   #$005F                   convert lowercase to uppercase
+         and   #$00DF                   convert lowercase to uppercase
          cmp   #'A'                     branch if it is not a digit
          blt   cn5
          cmp   #'Z'+1                   branch if it is not a digit
@@ -901,47 +1031,56 @@ cn3      cmp   base                     branch if the digit is too big
          plx
          ply
          tax
-         bne   returnERANGE
-         clc                            add in the new digit
+         beq   cn3a
+         stz   rangeOK
+cn3a     clc                            add in the new digit
          tya
          adc   val
          sta   val
          bcc   cn4
          inc   val+2
-         beq   returnERANGE
+         bne   cn4
+         stz   rangeOK
 cn4      inc4  str                      next char
          bra   cn1
 
 cn5      lda   foundOne                 if no digits were found, flag the error
          bne   rt1
-;
-;  flag an error
-;
-returnERANGE anop
-         lda   #ERANGE                  errno = ERANGE
+cn6      lda   #EINVAL
          sta   >errno
-         bra   rt2                      skip setting ptr
+         bra   rt2a
 ;
 ;  return the results
 ;
 rt1      lda   ptr                      if ptr is non-null then
          ora   ptr+2
-         beq   rt2
+         beq   rt1a
          lda   str                        set it to str
          sta   [ptr]
          ldy   #2
          lda   str+2
          sta   [ptr],Y
-rt2      ldx   val+2                    get the value
+
+rt1a     lda   rangeOK                  check if number was out of range
+         bne   rt2
+         lda   #ERANGE                  errno = ERANGE
+         sta   >errno
+         ldx   #$FFFF                   return value = ULONG_MAX
+         txy
+         bra   rt3
+rt2      lda   negative                 if negative then
+         beq   rt2a
+         sub4  #0,val,val                 val = -val
+rt2a     ldx   val+2                    get the value
          ldy   val
-         lda   rtl                      fix the stack
+rt3      lda   rtl                      fix the stack
          sta   base-1
          lda   rtl+1
          sta   base
          pld
          tsc
          clc
-         adc   #16
+         adc   #20
          tcs
          tya                            return
          rtl
@@ -973,14 +1112,28 @@ system   start
          sta   exComm
          pla
          sta   exComm+2
-         phy                            execute the command
+         ora   exComm
+         sta   empty
+         bne   lb1                      if calling system(NULL)
+         lda   #empty                     use empty command string
+         sta   exComm
+         lda   #^empty
+         sta   exComm+2
+lb1      phy                            execute the command
          phx
          plb
          Execute ex
-         rtl
+         ldy   empty
+         bne   ret                      if doing system(NULL)
+         tya
+         bcs   ret                        error => no command processor
+         inc   a                           (& vice versa)                
+ret      rtl
 
 ex       dc    i'$8000'
 exComm   ds    4
+
+empty    ds    2
          end
 
 ****************************************************************
@@ -1035,7 +1188,7 @@ D        equ   1                        caller's DP
          tsc
          adc   >toRemove
          tcs
-         pld                            resore the caller's DP
+         pld                            restore the caller's DP
          plx                            remove the parameter from the stack
          ply
          pla

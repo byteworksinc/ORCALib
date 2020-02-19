@@ -41,6 +41,9 @@ second   ds    4                        second  0..59
 count    ds    4                        seconds since 1 Jan 1970
 t1       ds    4                        work variable
 t2       ds    4                        work variable
+
+lasttime ds    4                        last time_t value returned by time()
+lastDST  dc    i2'-1'                   tm_isdst value for lasttime
          end
 
 ****************************************************************
@@ -137,7 +140,10 @@ tm_wday  equ   12
          ldy   #tm_mday                 convert the day to a string
          lda   [timeptr],Y
          jsr   mkstr
-         sta   str+8
+         bit   #$00CF                   check for leading '0'
+         bne   lb1
+         and   #$FFEF                   convert leading '0' to ' '
+lb1      sta   str+8
          ldy   #tm_hour                 convert the hour to a string
          lda   [timeptr],Y
          jsr   mkstr
@@ -151,17 +157,21 @@ tm_wday  equ   12
          jsr   mkstr
          sta   str+17
          ldy   #tm_year                 convert the year to a string
-	lda	#'91'
-	sta	str+20
          lda   [timeptr],Y
-	cmp	#100
-	blt	lb1
-	ldx	#'02'
-	stx	str+20
-	sec
-	sbc	#100
-lb1      jsr   mkstr
+         ldy   #19
+         sec
+yr1      iny
+         sbc   #100
+         bpl   yr1
+         clc
+yr2      dey
+         adc   #100
+         bmi   yr2
+         jsr   mkstr
          sta   str+22
+         tya
+         jsr   mkstr
+         sta   str+20
          lla   timeptr,str
 
          plb
@@ -277,6 +287,15 @@ gmtime   entry
          lda   [t]
          sta   t
          stx   t+2
+
+         ldy   #-1                      default DST setting = -1 (unknown)
+         cmp   lasttime                 determine DST setting, if we can
+         bne   lb0
+         cpx   lasttime+2
+         bne   lb0
+         ldy   lastDST
+lb0      sty   tm_isdst
+
          lda   #69                      find the year
          sta   year
          lda   #1
@@ -333,15 +352,6 @@ lb2a     ble   lb2
          sta   tm_mday
          ph4   #tm_sec                  set the day of week/year
          jsl   mktime
-	pha		determine if it's daylight savings
-	ph2	#$5E
-	_ReadBParam
-	pla
-	lsr	A
-	and	#$0001
-	eor	#$0001
-	sta	tm_isdst
-
          lla   t,tm_sec
          plb
          creturn 4:t
@@ -354,7 +364,7 @@ tm_mon   ds    2                        month           0..11
 tm_year  ds    2                        year            70..200 (1900=0)
 tm_wday  ds    2                        day of week     0..6    (Sun = 0)
 tm_yday  ds    2                        day of year     0..365
-tm_isdst ds    2	daylight savings? 1 = yes, 0 = no
+tm_isdst ds    2                        daylight savings? 1 = yes, 0 = no
          end
 
 ****************************************************************
@@ -363,7 +373,7 @@ tm_isdst ds    2	daylight savings? 1 = yes, 0 = no
 *        struct tm *tmptr
 *
 *  Inputs:
-*        tmptr - poiner to a time record
+*        tmptr - pointer to a time record
 *
 *  Outputs:
 *        tmptr->wday - day of week
@@ -417,7 +427,6 @@ temp2    equ   5                        temp variable
          div4  count,#60*60*24
          ldy   #14                      set the days
          lda   count
-         inc   A
          sta   [tmptr],Y
          div4  temp,#60*60*24,temp2     compute the day of week
          add4  temp2,#4
@@ -493,7 +502,20 @@ time     start
          lda   count+2
          sta   [tptr],Y
 
-lb1      move4 count,tptr
+lb1      lda   count
+         sta   tptr
+         sta   lasttime
+         lda   count+2
+         sta   tptr+2
+         sta   lasttime+2
+         pha                            determine if it's daylight savings
+         ph2   #$5E
+         _ReadBParam
+         pla
+         lsr   A
+         and   #$0001
+         eor   #$0001
+         sta   lastDST
          plb
          creturn 4:tptr
          end

@@ -1,4 +1,4 @@
-	keep	stdio
+	keep	obj/stdio
 	mcopy stdio.macros
 	case	on
 
@@ -29,7 +29,7 @@ StdIO	start		dummy segment
 *  void clearerr(stream)
 *	FILE *stream;
 *
-*  Clears the error flag for the givin stream.
+*  Clears the error flag for the given stream.
 *
 *  Inputs:
 *	stream - file to clear
@@ -334,7 +334,7 @@ fa3	lda	#EOF	assume there is an error
 	ph4	stream	verify that stream exists
 	jsl	~VerifyStream
 	jcs	rts
-	ldy	#FILE_flag	if the mode is not writting, quit
+	ldy	#FILE_flag	if the mode is not writing, quit
 	lda	[stream],Y
 	and	#_IOWRT
 	beq	fl1
@@ -431,16 +431,14 @@ lb0	lda	#EOF
 
 lb1	ldy	#FILE_pbk	if there is a char in the putback buffer
 	lda	[stream],Y
-	bmi	lb2
-	and	#$00FF	  return it
+	and	#$0080
+	bne	lb2
+	lda	[stream],Y	  return it
+	and	#$00FF
 	sta	c
-	ldy	#FILE_pbk+2	  pop the putback buffer
-	lda	[stream],Y
-	tax
-	lda	#$FFFF
-	sta	[stream],Y
-	ldy	#FILE_pbk
-	txa
+	lda	[stream],Y	  pop the putback buffer
+	xba
+	ora	#$FF00
 	sta	[stream],Y
 	brl	gc9
 
@@ -623,6 +621,7 @@ rdRefNum ds	2
 rdDataBuffer ds 4
 rdRequestCount ds 4
 rdTransferCount ds 4
+	dc	i'1'	cache priority
 	end
 
 ****************************************************************
@@ -641,7 +640,7 @@ rdTransferCount ds 4
 *
 *  Outputs:
 *	Returns NULL if an EOF is encountered, placing any
-*	characters read before the EOF into s.	 Returns S if
+*	characters read before the EOF into s.  Returns S if
 *	a line or part of a line is read.
 *
 ****************************************************************
@@ -764,10 +763,9 @@ OSname	equ	11	pointer to the GS/OS file name
 	lda	[type]	make sure the file type is in ['a','r','w']
 	and	#$00FF
 	sta	fileType
-	ldx	#$0003
+	ldx	#$0002
 	cmp	#'a'
 	beq	cn1
-	ldx	#$0002
 	cmp	#'w'
 	beq	cn1
 	ldx	#$0001
@@ -786,6 +784,7 @@ cn1	stx	opAccess	set the access flags
 	stx	OSname+2
 	ora	OSname+2
 	jeq	rt2
+	move4 OSname,opName
 ;
 ;  check for file modifier characters + and b
 ;
@@ -795,15 +794,21 @@ cn1	stx	opAccess	set the access flags
 	lda	[type],Y
 	jsr	Modifier
 	bcc	cm1
-	iny
 	lda	[type],Y
 	jsr	Modifier
+	bcc	cm1
+	lda	fileType	if mode is 'w' or 'a'
+	cmp	#'r'
+	beq	cm1
+	lda	[type],Y	  check for 'x' in type string
+	and	#$00FF
+	cmp	#'x'
+	beq	of1
 cm1	anop
 ;
 ;  open the file
 ;
-	move4 OSname,opName	try to open an existing file
-	OSopen op
+	OSopen op	try to open an existing file
 	bcc	of2
 
 	lda	fileType	if the type is 'r', flag an error
@@ -815,11 +820,15 @@ cm1	anop
 
 of1	move4 OSname,crPathName	create the file
 	OScreate cr
-	bcs	errEIO
+	bcs	of1a
 	OSopen op	open the file
 	bcc	of2
+of1a	cmp	#$0047	check for dupPathname error=>file exists
+	bne	errEIO
+	lda	#EEXIST
+	bra	err1
 errEIO	lda	#EIO
-	sta	>errno
+err1	sta	>errno
 	brl	rt1
 
 of2	lda	fileType	if the file type is 'w' then
@@ -927,8 +936,6 @@ ar6a	sta	[fileBuff],Y
 	ldy	#FILE_pbk	nothing in the putback buffer
 	lda	#$FFFF
 	sta	[fileBuff],Y
-	ldy	#FILE_pbk+2
-	sta	[fileBuff],Y
 	ldy	#FILE_file	set the file ID
 	lda	opRefNum
 	sta	[fileBuff],Y
@@ -950,12 +957,14 @@ Modifier and	#$00FF
 	bne	md1
 	lda	#$0003
 	sta	opAccess
+	iny
 	sec
 	rts
 md1	cmp	#'b'
 	bne	md2
 	lda	#BIN
 	sta	crFileType
+	iny
 md2	sec
 	rts
 
@@ -1081,6 +1090,7 @@ cn1	ph4	filename	get the length of the name buffer
 	stx	OSname+2
 	ora	OSname+2
 	jeq	rt2
+	move4 OSname,opName
 ;
 ;  open the file
 ;
@@ -1098,9 +1108,24 @@ nl1	cmp	#'b'
 	bne	nl2
 	lda	#BIN
 	sta	crFileType
+	iny
+	cpy	#2
+	bne	nl2
+	lda	[type],Y
+	and	#$00FF
+	cmp	#'+'
+	bne	nl2
+	iny
+nl2	lda	fileType	check for 'x' in type string
+	cmp	#'r'
+	beq	nl3
+	lda	[type],Y
+	and	#$00FF
+	cmp	#'x'
+	beq	of1
 
-nl2	move4 OSname,opName	try to open an existing file
-	OSopen op
+	
+nl3	OSopen op	try to open an existing file
 	bcc	of2
 
 	lda	fileType	if the type is 'r', flag an error
@@ -1112,8 +1137,15 @@ errEIO	ph4	stream
 
 of1	move4 OSname,crPathName	create the file
 	OScreate cr
-	bcs	errEIO
-	OSopen op	open the file
+	bcc	of1a
+	cmp	#$0047	check for dupPathname error=>file exists
+	bne	errEIO
+	ph4	stream
+	jsr	~ioerror
+	lda	#EEXIST
+	sta	>errno
+	brl	rt1
+of1a	OSopen op	open the file
 	bcs	errEIO
 
 of2	lda	fileType	if the file type is 'w', reset it
@@ -1159,10 +1191,12 @@ ar3	move4 stream,fileBuff	set the file buffer address
 	sta	[fileBuff],Y
 	ldy	#1	set the flags
 	lda	[type],Y
+	cmp	#'+b'
+	beq	ar3a
 	and	#$00FF
 	cmp	#'+'
 	bne	ar4
-	lda	#_IOFBF+_IORW+_IOMYBUF
+ar3a	lda	#_IOFBF+_IORW+_IOMYBUF
 	bra	ar6
 ar4	lda	fileType
 	cmp	#'r'
@@ -1184,8 +1218,6 @@ ar6a	sta	[fileBuff],Y
 	sta	[fileBuff],Y
 	ldy	#FILE_pbk	nothing in the putback buffer
 	lda	#$FFFF
-	sta	[fileBuff],Y
-	ldy	#FILE_pbk+2
 	sta	[fileBuff],Y
 	ldy	#FILE_file	set the file ID
 	lda	opRefNum
@@ -1377,7 +1409,7 @@ lb1	ldy	#FILE_flag	if the file is not prepared for
 	bne	lb2
 	bit	#_IOREAD	  if it is being read then
 	bne	pc2	    flag the error
-	ora	#_IOWRT	  set the writting flag
+	ora	#_IOWRT	  set the writing flag
 	sta	[stream],Y
 lb2	ldy	#FILE_file	branch if this is a disk file
 	lda	[stream],Y
@@ -1799,8 +1831,6 @@ lb6	ldy	#FILE_flag	clear the EOF , READ, WRITE flags
 	ldy	#FILE_pbk	nothing in the putback buffer
 	lda	#$FFFF
 	sta	[stream],Y
-	ldy	#FILE_pbk+2
-	sta	[stream],Y
 
 	stz	err
 rts	plb
@@ -1914,15 +1944,12 @@ lb1	move4 gmPosition,pos	set the position
 	lda	pos+2
 	sbc	[stream],Y
 	sta	pos+2
-	ldy	#FILE_pbk	  dec pos by 1 for each char in the
-	lda	[stream],Y	    putback buffer then
-	bmi	lb2
-	dec4	pos
-	ldy	#FILE_pbk+2
-	lda	[stream],Y
-	bmi	lb2
-	dec4	pos
-lb2	ldy	#FILE_file	  set the file's mark
+	ldy	#FILE_pbk	  if there is a char in the putback
+	lda	[stream],Y	    buffer then
+	and	#$0080
+	bne	rts
+	dec4	pos	    dec pos by 1
+	ldy	#FILE_file	  set the file's mark
 	lda	[stream],Y
 	sta	spRefNum
 	move4	pos,spPosition
@@ -2022,11 +2049,12 @@ lb5	div4	wrTransferCount,element_size,count
 lb6	plb
 	creturn 4:count	return
 
-wr	dc	i'4'	parameter block for OSWrite
+wr	dc	i'5'	parameter block for OSRead
 wrRefNum ds	2
 wrDataBuffer ds 4
 wrRequestCount ds 4
 wrTransferCount ds 4
+	dc	i'1'
 	end
 
 ****************************************************************
@@ -2035,7 +2063,7 @@ wrTransferCount ds 4
 *
 *  Read a character from standard in.  No errors are possible.
 *
-*  The character read is returned in A.	 The null character
+*  The character read is returned in A.  The null character
 *  is mapped into EOF.
 *
 ****************************************************************
@@ -2057,13 +2085,15 @@ getchar	start
 ;  get the char from the keyboard
 ;
 	lda	>stdin+4+FILE_pbk	if there is a char in the putback
-	bmi	lb1	 buffer then
-	and	#$00FF	  save it in X
+	and	#$0080	 buffer then
+	bne	lb1
+	lda	>stdin+4+FILE_pbk	  save it in x
+	and	#$00FF
 	tax
-	lda	>stdin+4+FILE_pbk+2	  pop the buffer
+	lda	>stdin+4+FILE_pbk	  pop the buffer
+	xba
+	ora	#$FF00
 	sta	>stdin+4+FILE_pbk
-	lda	#$FFFF
-	sta	>stdin+4+FILE_pbk+2
 	txa		  restore the char
 	bra	lb2
 
@@ -2148,6 +2178,13 @@ s	equ	4	string address
 	tsc		set up DP addressing
 	phd
 	tcd
+	
+	lda	s	skip prefix string if it is NULL/empty
+	ora	s+2
+	beq	lb0
+	lda	[s]
+	and	#$00FF
+	beq	lb0
 
 	ph4	>stderr	write the error string
 	ph4	s
@@ -2158,7 +2195,7 @@ s	equ	4	string address
 	ph4	>stderr
 	pea	' '
 	jsl	fputc
-	ph4	>stderr	write the error message
+lb0	ph4	>stderr	write the error message
 	lda	>errno
 	cmp	#maxErr+1
 	blt	lb1
@@ -2171,11 +2208,8 @@ lb1	asl	A
 	lda	>sys_errlist,X
 	pha
 	jsl	fputs
-	ph4	>stderr	write lf, cr
+	ph4	>stderr	write lf
 	pea	10
-	jsl	fputc
-	ph4	>stderr
-	pea	13
 	jsl	fputc
 
 	pld		remove parm and return
@@ -2238,7 +2272,7 @@ args	ds	2	original argument address
 *  int putchar(c)
 *     char c;
 *
-*  Print the character to standard out.	 The character is
+*  Print the character to standard out.  The character is
 *  returned.  No errors are possible.
 *
 *  The character \n is automatically followed by a $0D, which
@@ -2669,6 +2703,14 @@ sprintf	start
 	plb
 	plx		remove the return address
 	ply
+	phd		initialize output to empty string
+	tsc
+	tcd
+	short	M
+	lda	#0
+	sta	[3]
+	long	M
+	pld
 	pla		save the stream
 	sta	string
 	pla
@@ -2737,6 +2779,132 @@ put	phb		remove the char from the stack
 
 args	ds	2	original argument address
 string	ds	4	string address
+	end
+
+****************************************************************
+*
+*  int snprintf(char * s, size_t n, const char * format, ...)
+*
+*  Print the format string to a string, with length limit.
+*
+****************************************************************
+*
+snprintf start
+	using ~printfCommon
+
+	phb		use local addressing
+	phk
+	plb
+	plx		remove the return address
+	ply
+	lda	5,S	check if n == 0
+	ora	7,S
+	bne	lb1
+	lda	#put2	set up do-nothing output routine
+	sta	>~putchar+4
+	lda	#>put2
+	sta	>~putchar+5
+	bra	lb2
+lb1	phd		initialize output to empty string
+	tsc
+	tcd
+	short	M
+	lda	#0
+	sta	[3]
+	long	M
+	pld
+	lda	#put	set up output routine
+	sta	>~putchar+4
+	lda	#>put
+	sta	>~putchar+5
+lb2	pla		save the destination string
+	sta	string
+	pla
+	sta	string+2
+	pla		save n value
+	sta	count
+	pla
+	sta	count+2
+	phy		restore return address/data bank
+	phx
+	plb
+
+	tsc		find the argument list address
+	clc
+	adc	#8
+	sta	>args
+	pea	0
+	pha   
+	jsl	~printf	call the formatter
+	sec		compute the space to pull from the stack
+	pla
+	sbc	>args
+	clc
+	adc	#4
+	sta	>args
+	pla
+	phb		remove the return address
+	plx
+	ply
+	tsc		update the stack pointer
+	clc
+	adc	>args
+	tcs
+	phy		restore the return address
+	phx
+	plb
+	lda	>~numChars	return the value
+	rtl		return
+		
+put	phb		remove the char from the stack
+	phk
+	plb
+	plx
+	pla
+	ply
+	pha
+	phx
+	lda	count	decrement count
+	bne	pt1
+	dec	count+2
+pt1	dec	count
+	bne	pt2	if count == 0:
+	lda	count+2
+	bne	pt2
+pt1a	lda	#put2	  set up do-nothing output routine
+	sta	>~putchar+4
+	lda	#>put2
+	sta	>~putchar+5
+	bra	pt3	  return without writing
+pt2	ldx	string+2	write to string
+	phx
+	ldx	string
+	phx
+	phd
+	tsc
+	tcd
+	tya
+	and	#$00FF
+	sta	[3]
+	pld
+	pla
+	pla
+	inc4	string
+pt3	plb
+	rtl
+
+put2	phb		remove the char from the stack
+	plx
+	pla
+	ply
+	pha
+	phx
+	plb
+	rtl		return, discarding the character
+
+args	ds	2	original argument address
+string	ds	4	string address
+count	ds	4	chars left to write
 	end
 
 ****************************************************************
@@ -2819,7 +2987,7 @@ sys_errlist start
 	dc	a4'EEXISTS'
 	dc	a4'ENOSPC'
 
-! Note: if more errors are added, change maxErr in perror().
+! Note: if more errors are added, change maxErr in perror() and strerror().
 
 EUNDEF	cstr	'invalid error number'
 EDOM	cstr	'domain error'
@@ -2898,9 +3066,10 @@ lb4	long	M	append the two strings
 	ph4	#cname	   move the string
 	ph4	buf
 	jsl	strcpy
+	bra	lb6
 
 lb5	lla	buf,cname	return the string pointer
-	plb
+lb6	plb
 	creturn 4:buf
 
 pr	dc	i'2'	parameter block for OSGet_Prefix
@@ -2939,7 +3108,7 @@ f	equ	1	file pointer
 	jsl	fopen
 	sta	f
 	stx	f+2
-	ora	f+2	if sucessful then
+	ora	f+2	if successful then
 	beq	lb1
 	ldy	#FILE_flag	  f->_flag |= _IOTEMPFILE
 	lda	[f],Y
@@ -2948,7 +3117,7 @@ f	equ	1	file pointer
 	
 lb1	creturn 4:f
 
-type	cstr	'w+b'
+type	cstr	'w+bx'
 	end
 
 ****************************************************************
@@ -2971,7 +3140,7 @@ type	cstr	'w+b'
 *
 ungetc	start
 
-char	equ	1	characater to return
+char	equ	1	character to return
 
 	csubroutine (2:c,4:stream),2
 
@@ -2984,18 +3153,21 @@ char	equ	1	characater to return
 	lda	c	error if EOF is pushed
 	cmp	#EOF
 	beq	rts
-	ldy	#FILE_pbk+2	error if the buffer is full
+	ldy	#FILE_pbk+1	error if the buffer is full
+	short M
 	lda	[stream],Y
 	bpl	rts
-	ldy	#FILE_pbk	push the old character (if any)
+	dey		push the old character (if any)
 	lda	[stream],Y
-	ldy	#FILE_pbk+2
+	iny
 	sta	[stream],Y
-	ldy	#FILE_pbk	put back the character
-	lda	c
-	and	#$00FF
+	dey
+	lda	c	put back the character
 	sta	[stream],Y
 	sta	char
+	stz	char+1
+	bpl	rts
+	dec	char+1
 rts	long	M
 	creturn 2:char
 	end
@@ -3147,6 +3319,14 @@ vsprintf	start
 	plb
 	plx		remove the return address
 	ply
+	phd		initialize output to empty string
+	tsc
+	tcd
+	short	M
+	lda	#0
+	sta	[3]
+	long	M
+	pld
 	pla		save the stream
 	sta	string
 	pla
@@ -3220,6 +3400,133 @@ string	ds	4	string address
 
 ****************************************************************
 *
+*  int vsnprintf(char *s, size_t n, char *format, va_list arg)
+*
+*  Print the format string to a string, with length limit.
+*
+****************************************************************
+*
+vsnprintf	start
+	using ~printfCommon
+
+	phb		use local addressing
+	phk
+	plb
+	plx		remove the return address
+	ply
+	lda	5,S	check if n == 0
+	ora	7,S
+	bne	lb1
+	lda	#put2	set up do-nothing output routine
+	sta	>~putchar+4
+	lda	#>put2
+	sta	>~putchar+5
+	bra	lb2
+lb1	phd		initialize output to empty string
+	tsc
+	tcd
+	short	M
+	lda	#0
+	sta	[3]
+	long	M
+	pld
+	lda	#put	set up output routine
+	sta	>~putchar+4
+	lda	#>put
+	sta	>~putchar+5
+lb2	pla		save the stream
+	sta	string
+	pla
+	sta	string+2
+	pla		save n value
+	sta	count
+	pla
+	sta	count+2
+	phy		restore return address/data bank
+	phx
+	plb
+
+	phd		find the argument list address
+	tsc
+	tcd
+	lda	[10]
+	pld
+	pea	0
+	pha   
+	jsl	~printf	call the formatter
+	ply		update the argument list pointer
+	plx
+	phd
+	tsc
+	tcd
+	tya
+	sta	[10]
+	pld
+	phb		remove the return address
+	plx
+	ply
+	tsc		update the stack pointer
+	clc
+	adc	#8
+	tcs
+	phy		restore the return address
+	phx
+	plb
+	lda	>~numChars	return the value
+	rtl		return
+		
+put	phb		remove the char from the stack
+	phk
+	plb
+	plx
+	pla
+	ply
+	pha
+	phx
+	lda	count	decrement count
+	bne	pt1
+	dec	count+2
+pt1	dec	count
+	bne	pt2	if count == 0:
+	lda	count+2
+	bne	pt2
+pt1a	lda	#put2	  set up do-nothing output routine
+	sta	>~putchar+4
+	lda	#>put2
+	sta	>~putchar+5
+	bra	pt3	  return without writing
+pt2	ldx	string+2	write to string
+	phx
+	ldx	string
+	phx
+	phd
+	tsc
+	tcd
+	tya
+	and	#$00FF
+	sta	[3]
+	pld
+	pla
+	pla
+	inc4	string
+pt3	plb
+	rtl
+
+put2	phb		remove the char from the stack
+	plx
+	pla
+	ply
+	pha
+	phx
+	plb
+	rtl		return, discarding the character
+
+string	ds	4	string address
+count	ds	4	chars left to write
+	end
+
+****************************************************************
+*
 *  ~Format_c - format a '%' character
 *
 *  Inputs:
@@ -3269,7 +3576,7 @@ argp	equ	7	argument pointer
 ;  For signed numbers, if the value is negative, use the sign flag
 ;
 	lda	~isLong	handle long values
-	beq	sn1
+	beq	sn0
 	ldy	#2
 	lda	[argp],Y
 	bpl	cn0
@@ -3281,10 +3588,19 @@ argp	equ	7	argument pointer
 	sbc	[argp],Y
 	sta	[argp],Y
 	bra	sn2
+sn0	lda	~isByte	handle (originally) byte-size values
+	beq	sn1
+	lda	[argp]
+	and	#$00FF
+	sta	[argp]
+	bit	#$0080
+	beq	cn0
+	eor	#$00FF
+	bra	sn1a
 sn1	lda	[argp]	handle int values
 	bpl	cn0
 	eor	#$FFFF
-	inc	a
+sn1a	inc	a
 	sta	[argp]
 sn2	lda	#'-'
 	sta	~sign
@@ -3303,7 +3619,10 @@ cn0	stz	~hexPrefix	don't lead with 0x
 !	pha
 !	bra	cn2	else
 cn1	lda	[argp]	  push an int value
-	pha
+	ldx	~isByte
+	beq	cn1a
+	and	#$00FF
+cn1a	pha
 cn2	ph4	#~str	push the string addr
 	ph2	#l:~str	push the string buffer length
 	ph2	#0	do an unsigned conversion
@@ -3461,7 +3780,11 @@ argp	equ	7	argument pointer
 	sta	argp
 	stx	argp+2
 	lda	~numChars	return the value
-	sta	[argp]
+	ldx	~isByte	if byte, store only low byte
+	beq	lb0
+	sep	#$20
+lb0	sta	[argp]
+	rep	#$20
 	lda	~isLong	if long, set the high word
 	beq	lb1
 	ldy	#2
@@ -3508,7 +3831,10 @@ argp	equ	7	argument pointer
 	lda	[argp],Y
 	sta	~num+2
 cn2	lda	[argp]
-	sta	~num
+	ldx	~isByte
+	beq	cn2a
+	and	#$00FF
+cn2a	sta	~num
 ;
 ;  Convert the number to an ASCII string
 ;
@@ -3673,7 +3999,10 @@ cn0	stz	~sign	ignore the sign flag
 	lda	[argp],Y
 	sta	~num+2
 cn2	lda	[argp]
-	sta	~num
+	ldx	~isByte
+	beq	cn2a
+	and	#$00FF
+cn2a	sta	~num
 	stz	~hexPrefix	assume we won't lead with 0x
 ;
 ;  Convert the number to an ASCII string
@@ -3934,7 +4263,7 @@ lb3	creturn 4:ptr
 *  ------------------------
 *
 *  '-'	Left justify the output.
-*  '0'	Use '0' for the pad character rather than ' '.	 This
+*  '0'	Use '0' for the pad character rather than ' '.  This
 *	flag is ignored if the '-' flag is also used.
 *  '+'	Only used for conversion operations 'd' 'e' 'E' 'f' 'g' 'G'.
 *	Specifies that a leading sign is to be printed for
@@ -3948,7 +4277,7 @@ lb3	creturn 4:ptr
 *  Optional Min Field Width
 *  ------------------------
 *
-*  This field is either a number or *.	If it is *, an integer
+*  This field is either a number or *.  If it is *, an integer
 *  argument is consumed from the stack and used as the field
 *  width.  In either case, the output value is printed in a field
 *  that is NUMBER characters wide.  By default, the value is
@@ -3957,7 +4286,7 @@ lb3	creturn 4:ptr
 *  Optional Precision
 *  ------------------
 *
-*  This field is a number, *, or is ommitted.  If it is an integer,
+*  This field is a number, *, or is omitted.  If it is an integer,
 *  an argument is removed from the stack and used as the precision.
 *  The precision is used to describe how many digits to print.
 *
@@ -3965,16 +4294,16 @@ lb3	creturn 4:ptr
 *  -----------------------
 *
 *  An 'l' indicates that the 'd', 'o', 'u', 'x' or 'X' argument is
-*  long.	 'L' and 'u' are also accepted for compliance with ANSI C,
+*  long.  'L' and 'u' are also accepted for compliance with ANSI C,
 *  but have no effect in this implementation.
 *
 *  Conversion Specifier
 *  --------------------
 *
 *  d,i	Signed decimal conversion from type int or long.
-*  u	Signed decmal conversion from type unsigned or unsigned long.
+*  u	Signed decimal conversion from type unsigned or unsigned long.
 *  o	Octal conversion.
-*  x,X	Hexadecomal conversion.  'x' generates lowercase hex digits,
+*  x,X	Hexadecimal conversion.  'x' generates lowercase hex digits,
 *	while 'X' generates uppercase hex digits.
 *  c	Character.
 *  s	String.
@@ -4035,6 +4364,7 @@ fm1	inc4	format	skip the '%'
 	stz	~precision	use the default precision
 	stz	~precisionSpecified
 	stz	~isLong	assume short operands
+	stz	~isByte
 	lda	#' '	use a blank for padding
 	sta	~paddChar
 	stz	~leftJustify	right justify the output
@@ -4053,16 +4383,28 @@ fm2	jsr	Flag	read and interpret flag characters
 	inc	~precisionSpecified	  note that the precision is specified
 	jsr	GetSize	  get the precision
 	sta	~precision
-	lda	[format]	if *format == 'l' then
+	lda	[format]	if *format in ['l','z','t','j'] then
 	and	#$00FF
 fm3	cmp	#'l'
+	beq	fm3a
+	cmp	#'z'
+	beq	fm3a
+	cmp	#'t'
+	beq	fm3a
+	cmp	#'j'
 	bne	fm4
-	inc	~isLong	  ~isLong = true
+fm3a	inc	~isLong	  ~isLong = true
 	bra	fm5	  ++format
 fm4	cmp	#'L'	else if *format in ['L','h'] then
 	beq	fm5
 	cmp	#'h'
 	bne	fm6
+	inc4	format	  check for 'hh'
+	lda	[format]	
+	and	#$00FF
+	cmp	#'h'
+	bne	fm6
+	inc	~isByte
 fm5	inc4	format	  ++format
 	lda	[format]	find the proper format character
 	and	#$00FF
@@ -4160,6 +4502,14 @@ val	ds	2	value
 ;  List of format specifiers and the equivalent subroutines
 ;
 fList	dc	c'%',i1'0',a'~Format_Percent'	%
+	dc	c'a',i1'0',a'~Format_e'		a (not formatted correctly)
+	dc	c'A',i1'0',a'~Format_E'		A (not formatted correctly)
+	dc	c'f',i1'0',a'~Format_f'		f
+	dc	c'F',i1'0',a'~Format_f'		F
+	dc	c'e',i1'0',a'~Format_e'		e
+	dc	c'E',i1'0',a'~Format_E'		E
+	dc	c'g',i1'0',a'~Format_g'		g
+	dc	c'G',i1'0',a'~Format_G'		G
 	dc	c'n',i1'0',a'~Format_n'		n
 	dc	c's',i1'0',a'~Format_s'		s
 	dc	c'b',i1'0',a'~Format_b'		b
@@ -4171,11 +4521,6 @@ fList	dc	c'%',i1'0',a'~Format_Percent'	%
 	dc	c'u',i1'0',a'~Format_u'		u
 	dc	c'd',i1'0',a'~Format_d'		d
 	dc	c'i',i1'0',a'~Format_d'		i
-	dc	c'f',i1'0',a'~Format_f'		f
-	dc	c'e',i1'0',a'~Format_e'		e
-	dc	c'E',i1'0',a'~Format_E'		E
-	dc	c'g',i1'0',a'~Format_g'		g
-	dc	c'G',i1'0',a'~Format_G'		G
 fListEnd anop
 	end
 
@@ -4198,6 +4543,7 @@ fListEnd anop
 ~fieldWidth ds 2	output field width
 ~hexPrefix ds	2	hex 0x prefix characters (if present)
 ~isLong	 ds	2	is the operand long?
+~isByte	ds	2	is operand byte-size (converted to int)?
 ~leftJustify ds 2	left justify the output?
 ~paddChar ds	2	output padd character
 ~precision ds	2	precision of output
@@ -4225,7 +4571,7 @@ fListEnd anop
 
 ****************************************************************
 *
-*  ~RemoveWord - remove Y words from the stack for printf
+*  ~RemoveWord - remove Y words from the stack for scanf
 *
 *  Inputs:
 *	Y - number of words to remove (must be >0)
@@ -4428,8 +4774,12 @@ lb4b	lda	~suppress	if input is not suppressed then
 	beq	lb4c
 	sub4	#0,val,val	    negate the value
 lb4c	lda	val	  save the value
-	sta	[arg]
-	dec	~size
+	ldx	~size
+	bpl	lb4d
+	sep	#$20
+lb4d	sta	[arg]
+	rep	#$20
+	dex
 	bmi	lb6
 	ldy	#2
 	lda	val+2
@@ -4579,8 +4929,17 @@ arg	equ	11	argument
 	ldx	~suppress	if output is not suppressed then
 	bne	lb1
 	lda	~scanCount	  save the count
-	sta	[arg]
-	dec	~assignments	  fix assignment count
+	ldx	~size
+	bpl	lb0
+	sep	#$20
+lb0	sta	[arg]
+	rep	#$20
+	dex
+	bmi	lb0a
+	lda	#0
+	ldy	#2
+	sta	[arg],y
+lb0a	dec	~assignments	  fix assignment count
 lb1	ldy	#2	remove the parameter from the stack
 	jsr	~RemoveWord
 	rts
@@ -4813,8 +5172,12 @@ lb4a	lda	read	if no chars read then
 lb4b	lda	~suppress	if input is not suppressed then
 	bne	lb7
 	lda	val	  save the value
-	sta	[arg]
-	dec	~size
+	ldx	~size
+	bpl	lb4c
+	sep	#$20
+lb4c	sta	[arg]
+	rep	#$20
+	dex
 	bmi	lb6
 	ldy	#2
 	lda	val+2
@@ -4859,13 +5222,13 @@ read	ds	2	# chars read
 *  int ~scanf(format, additional arguments)
 *     char *format;
 *
-*  Scan by calling ~getchar indirectly.	 If a '%' is found, it
+*  Scan by calling ~getchar indirectly.  If a '%' is found, it
 *  is interpreted as follows:
 *
 *  Assignment Suppression Flag
 *  ---------------------------
 *
-*  '*'	Do everyting but save the result and remove a pointer from
+*  '*'	Do everything but save the result and remove a pointer from
 *	the stack.
 *
 *  Max Field Width
@@ -4885,13 +5248,14 @@ read	ds	2	# chars read
 *  --------------------
 *
 *  d,i	Signed decimal conversion to type int or long.
-*  u	Signed decmal conversion to type unsigned short, unsigned or
+*  u	Signed decimal conversion to type unsigned short, unsigned or
 *	unsigned long.
 *  o	Octal conversion.
-*  x,X	Hexadecomal conversion.
+*  x,X	Hexadecimal conversion.
 *  c	Character.
 *  s	String.
-*  p	Pascal string.
+*  b	Pascal string.
+*  p	Pointer.
 *  n	The argument is (int *); the number of characters written so
 *	far is written to the location.
 *  f,e,E,g,G Signed floating point conversion.
@@ -4956,9 +5320,10 @@ ps3a	txa
 	bra	ps1
 
 ps4	cpx	#'%'	branch if this is a conversion
-	beq	fm1	 specification
+	bne	ps5	 specification
+	brl	fm1
 
-	stx	ch	make sure the char matches the format
+ps5	stx	ch	make sure the char matches the format
 	inc4	format	 specifier
 	jsl	~getchar
 	cmp	ch
@@ -4972,24 +5337,41 @@ rm1	lda	[format]	if this is a format specifier then
 	beq	rt1
 	cmp	#'%'
 	bne	rm4
-	inc4	format	  if it is not a '%' or '*' then
-	lda	[format]
-	and	#$00FF
+	ldy	#2	  plan to remove 2 words
+	jsr	IncFormat
 	beq	rt1
-	cmp	#'%'
-	beq	rm4
 	cmp	#'*'
+	bne	rm1a
+	dey		  ...but not if '*' found
+	dey
+	jsr	IncFormat
+rm1a	cmp	#'0'	  skip field width, if present
+	blt	rm1b
+	cmp	#'9'+1
+	bge	rm1b
+	jsr	IncFormat
+	bra	rm1a
+rm1b	cmp	#'l'	  skip 'l' length modifier, if present
+	bne	rm1c
+	jsr	IncFormat
+rm1c	cmp	#'%'	  ignore if it is '%%' format specifier
 	beq	rm4
-	cmp	#'['	    if it is a '[' then
+	cmp	#'['	  if it is a '[' then
 	bne	rm3
-rm2	inc4	format	      skip up to the closing ']'
-	lda	[format]
-	and	#$00FF
-	beq	rt1
+	jsr	IncFormat
+	cmp	#'^'	    skip '^', if present
+	bne	rm1d
+	jsr	IncFormat
+rm1d	cmp	#']'	    skip ']' in scanset, if present
+	bne	rm2a
+rm2	jsr	IncFormat
+rm2a	tax
+	beq	rt1	    skip up to the closing ']'
 	cmp	#']'
 	bne	rm2
-rm3	ldy	#2	    remove an addr from the stack
-	jsr	~RemoveWord
+rm3	tyx		  if '*' not found
+	beq	rm4
+	jsr	~RemoveWord	    remove an addr from the stack
 rm4	inc4	format	next format character
 	bra	rm1
 ;
@@ -5027,19 +5409,31 @@ fm1	inc4	format	skip the '%'
 fm2	jsr	GetSize	get the field width specifier
 	sta	~scanWidth
 
-	lda	[format]	if the character is an 'l' then
+	lda	[format]	if the char is 'l', 'z', 't', or 'j' then
 	and	#$00FF
 	cmp	#'l'
+	beq	fm2a
+	cmp	#'z'
+	beq	fm2a
+	cmp	#'t'
+	beq	fm2a
+	cmp	#'j'
 	bne	fm3
-	inc	~size	  long specifier
+fm2a	inc	~size	  long specifier
 	bra	fm4
 fm3	cmp	#'h'	else if it is an 'h' then
 	bne	fm5
+	inc4	format	  check for 'hh'
+	lda	[format]
+	and	#$00FF
+	cmp	#'h'
+	bne	fm6
+	dec	~size
 fm4	inc4	format	  ignore the character
 
 fm5	lda	[format]	find the proper format character
 	and	#$00FF
-	inc4	format
+fm6	inc4	format
 	ldx	#fListEnd-fList-4
 fm7	cmp	fList,X
 	beq	fm8
@@ -5080,6 +5474,15 @@ gs2	and	#$000F	  save the ordinal value
 gs3	lda	val
 	rts
 
+;
+;  Increment format and load the new character
+;
+IncFormat anop
+	inc4	format
+	lda	[format]
+	and	#$00FF
+	rts
+
 val	ds	2	value
 ;
 ;  List of format specifiers and the equivalent subroutines
@@ -5095,7 +5498,10 @@ fList	dc	c'd',i1'0',a'~Scan_d'		d
 	dc	c's',i1'0',a'~Scan_s'		s
 	dc	c'b',i1'0',a'~Scan_b'		b
 	dc	c'n',i1'0',a'~Scan_n'		n
+	dc	c'a',i1'0',a'~Scan_f'		a
+	dc	c'A',i1'0',a'~Scan_f'		A
 	dc	c'f',i1'0',a'~Scan_f'		f
+	dc	c'F',i1'0',a'~Scan_f'		F
 	dc	c'e',i1'0',a'~Scan_f'		e
 	dc	c'E',i1'0',a'~Scan_f'		E
 	dc	c'g',i1'0',a'~Scan_f'		g
@@ -5139,9 +5545,9 @@ ch	ds	2	temp storage
 ~eofFound ds	2	was EOF found during the scan?
 ~suppress ds	2	suppress assignment?
 ~scanCount ds	2	# of characters scanned
-~scanError ds	2	set to 1 by scaners if an error occurs
+~scanError ds	2	set to 1 by scanners if an error occurs
 ~scanWidth ds	2	max # characters to scan
-~size	 ds	2	size specifier; -1 -> short, 1 -> long,
+~size	 ds	2	size specifier; -1 -> char, 1 -> long,
 !			 0 -> default
 	end
 
