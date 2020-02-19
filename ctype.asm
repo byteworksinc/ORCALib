@@ -103,7 +103,7 @@ yes	lda	#1
 
 ****************************************************************
 *
-*  int isctrl (int c)
+*  int isblank (int c)
 *
 *  Inputs:
 *	4,S - digit to test
@@ -113,7 +113,34 @@ yes	lda	#1
 *
 ****************************************************************
 *
-isctrl	start
+isblank	start
+
+	lda	4,S	fetch the operand
+	tax
+	lda	2,S	remove parm from stack
+	sta	4,S
+	pla
+	sta	1,S
+	inx		form the result
+	lda	>__ctype2,X
+	and	#_blank
+	rtl
+	end
+
+****************************************************************
+*
+*  int iscntrl (int c)
+*
+*  Inputs:
+*	4,S - digit to test
+*
+*  Outputs:
+*	A - result
+*
+****************************************************************
+*
+iscntrl start
+isctrl	entry
 
 	lda	4,S	fetch the operand
 	tax
@@ -840,7 +867,7 @@ __ctype2 start
 	dc	i1'0'					$06
 	dc	i1'0'					$07
 	dc	i1'0'					$08
-	dc	i1'0'					$09
+	dc	i1'_blank'				$09
 	dc	i1'0'					$0A
 	dc	i1'0'					$0B
 	dc	i1'0'					$0C
@@ -863,7 +890,7 @@ __ctype2 start
 	dc	i1'0'					$1D
 	dc	i1'0'					$1E
 	dc	i1'0'					$1F
-	dc	i1'0'					' '
+	dc	i1'_blank'				' '
 	dc	i1'0'					!
 	dc	i1'0'					"
 	dc	i1'0'					#

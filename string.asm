@@ -880,34 +880,6 @@ lb2	sty	set	set the disp past the current disp
 
 ****************************************************************
 *
-*  strerror - return the addr of an error message
-*
-*  Inputs:
-*	err - error number to return the error for
-*
-****************************************************************
-*
-strerror start
-
-	phb		get the error number
-	plx
-	ply
-	pla
-	phy
-	phx
-	phk		use local data bank
-	plb
-	asl	A	compute the index
-	asl	A
-	tay
-	ldx	sys_errlist+2,Y	load the address
-	lda	sys_errlist,Y
-	plb		restore caller's data bank
-	rtl
-	end
-
-****************************************************************
-*
 *  strlen - find the length of a string
 *
 *  Returns the length of the string.

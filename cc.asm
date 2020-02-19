@@ -184,9 +184,6 @@ TAB      equ   9                        TAB key code
 
          stz   ~ExitList                no exit routines, yet
          stz   ~ExitList+2
-         case  on
-         jsl   ~InitIO                  reset standard I/O
-         case  off
 
          lda   cLine                    if cLine == 0 then
          ora   cLine+2
@@ -401,13 +398,19 @@ lb2      ldy   #2                         dereference the pointer
 ;  Close (and flush) any open files
 ;
          case  on
-lb3      lda   >stderr+6                while there is a next file
-         ora   >stderr+4
+lb3      lda   >__cleanup+2
+         ora   >__cleanup
          beq   lb4
-         ph4   >stderr+4                  close it
-         dc    h'22'                      (jsl fclose, soft reference)
-         dc    s3'fclose'
-         bra   lb3
+         phk
+         pea   lb4-1
+         short I,M
+         lda   >__cleanup+2
+         pha
+         long  I,M
+         lda   >__cleanup
+         dec   A
+         pha
+         rtl
          case  off
 ;
 ;  return

@@ -38,7 +38,7 @@ __assert start
          ph2   l
          ph4   f
          ph4   #msg
-	ph4	>stderr
+         ph4	>__assertfp
          jsl   fprintf
          jsl   abort
 

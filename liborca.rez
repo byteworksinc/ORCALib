@@ -1,0 +1,20 @@
+#include "Types.rez"
+
+resource rVersion (0x1, purgeable3) {
+	{
+		2,0,6,beta,4
+	},
+	verUS,
+	"ORCALib (GNO Version)",
+	"Byte Works' General Purpose Library.\n"
+	"This library is only for use with GNO.\n"
+	"Build Date:  " $$DATE
+};
+
+resource rComment (0x1, purgeable3) {
+	"ORCALib (GNO Version)\n"
+	"Byte Works' General Purpose Library.\n"
+	"This library is only for use with GNO.\n"
+	"Build Date:  " $$DATE
+};
+
