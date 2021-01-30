@@ -3640,9 +3640,12 @@ cn3	_Int2Dec
 ;
 ~Format_IntOut entry
 pd1	lda	~precisionSpecified	if the precision was not specified then
-	bne	pd2
+	bne	pd1a
 	lda	#1	  use a precision of 1
 	sta	~precision
+	bra	pd2
+pd1a	lda	#' '	if the precision was specified then
+	sta	~paddChar	  do not do 0 padding
 pd2	ldx	~precision	if the precision is zero then
 	bne	pd2a
 	lda	~str+l:~str-2	  if the result is ' 0' then
