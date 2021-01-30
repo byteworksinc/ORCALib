@@ -4544,7 +4544,17 @@ GetSize	stz	val	assume a value of 0
 	bne	gs1
 	inc4	format	  skip the '*' char
 	lda	[argp]	  fetch the value
-	sta	val
+	bpl	fv1	  do adjustments if negative:
+	ldx	~precisionSpecified
+	bne	fv0
+	eor	#$ffff	    negative field width is like
+	inc	a	      positive with - flag
+	ldx	#1
+	stx	~leftJustify
+	bra	fv1
+fv0	lda	#0	    negative precision is ignored
+	stz	~precisionSpecified
+fv1	sta	val
 	inc	argp	  remove it from the argument list
 	inc	argp
 gs0	lda	val
