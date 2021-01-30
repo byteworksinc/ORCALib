@@ -3560,6 +3560,7 @@ argp	equ	7	argument pointer
 *	~paddChar - padd character
 *	~leftJustify - left justify the output?
 *	~isLong - is the operand long?
+*	~isLongLong - is the operand long long?
 *	~precision - precision of output
 *	~precisionSpecified - was the precision specified?
 *	~sign - char to use for positive sign
@@ -3626,7 +3627,10 @@ cn1a	pha
 cn2	ph4	#~str	push the string addr
 	ph2	#l:~str	push the string buffer length
 	ph2	#0	do an unsigned conversion
-	lda	~isLong	do the proper conversion
+	lda	~isLongLong	do the proper conversion
+	beq	cn2a
+; TODO actually format 64-bit numbers
+cn2a	lda	~isLong
 	beq	cn3
 	_Long2Dec
 	bra	pd1
@@ -3746,11 +3750,17 @@ pn5	cpy	#l:~str	quit if we're at the end of the ~str
 ;
 ;  remove the number from the argument list
 ;
-rn1	lda	~isLong
+rn1	lda	~isLongLong
 	beq	rn2
 	inc	argp
 	inc	argp
-rn2	inc	argp
+	inc	argp
+	inc	argp
+rn2	lda	~isLong
+	beq	rn3
+	inc	argp
+	inc	argp
+rn3	inc	argp
 	inc	argp
 ;
 ;  Handle left justification
@@ -3765,6 +3775,7 @@ rn2	inc	argp
 *  Inputs:
 *	~numChars - characters written
 *	~isLong - is the operand long?
+*	~isLong - is the operand long long?
 *
 ****************************************************************
 *
@@ -3785,7 +3796,15 @@ argp	equ	7	argument pointer
 	sep	#$20
 lb0	sta	[argp]
 	rep	#$20
-	lda	~isLong	if long, set the high word
+	lda	~isLongLong	if long long, set the high words
+	beq	lb0a
+	ldy	#6
+	lda	#0
+	sta	[argp],Y
+	dey
+	dey
+	sta	[argp],Y
+lb0a	lda	~isLong	if long, set the high word
 	beq	lb1
 	ldy	#2
 	lda	#0
@@ -3809,6 +3828,7 @@ lb1	clc		restore the original argp+4
 *	~paddChar - padd character
 *	~leftJustify - left justify the output?
 *	~isLong - is the operand long?
+*	~isLongLong - is the operand long long?
 *	~precision - precision of output
 *	~precisionSpecified - was the precision specified?
 *
@@ -3825,9 +3845,18 @@ argp	equ	7	argument pointer
 	sta	~str
 	move	~str,~str+1,#l:~str-1
 	stz	~num+2	get the value to convert
-	lda	~isLong
+	lda	~isLongLong
+	beq	cn1
+	ldy	#6
+	lda	[argp],Y
+	sta	~num+6
+	dey
+	dey
+	lda	[argp],Y
+	sta	~num+4
+cn1	lda	~isLong
 	beq	cn2
-	ldy	#2
+cn1a	ldy	#2
 	lda	[argp],Y
 	sta	~num+2
 cn2	lda	[argp]
@@ -3840,14 +3869,22 @@ cn2a	sta	~num
 ;
 	short I,M
 	ldy	#l:~str-1	set up the character index
-cn3	lda	~num+3	quit if the number is zero
+cn3	lda	~num+7	quit if the number is zero
+	ora	~num+6
+	ora	~num+5
+	ora	~num+4
+	ora	~num+3
 	ora	~num+2
 	ora	~num+1
 	ora	~num
 	beq	al1
 	lda	#0	roll off 3 bits
 	ldx	#3
-cn4	lsr	~num+3
+cn4	lsr	~num+7
+	ror	~num+6
+	ror	~num+5
+	ror	~num+4
+	ror	~num+3
 	ror	~num+2
 	ror	~num+1
 	ror	~num
@@ -3965,6 +4002,7 @@ lb4	clc		restore and increment argp
 *	~paddChar - padd character
 *	~leftJustify - left justify the output?
 *	~isLong - is the operand long?
+*	~isLongLong - is the operand long long?
 *	~precision - precision of output
 *	~precisionSpecified - was the precision specified?
 *
@@ -3993,7 +4031,18 @@ cn0	stz	~sign	ignore the sign flag
 	sta	~str
 	move	~str,~str+1,#l:~str-1
 	stz	~num+2	get the value to convert
-	lda	~isLong
+	stz	~num+4
+	stz	~num+6
+	lda	~isLongLong
+	beq	cn1
+	ldy	#6
+	lda	[argp],Y
+	sta	~num+6
+	dey
+	dey
+	lda	[argp],Y
+	sta	~num+4
+cn1	lda	~isLong
 	beq	cn2
 	ldy	#2
 	lda	[argp],Y
@@ -4011,7 +4060,11 @@ cn2a	sta	~num
 	ldy	#l:~str-1	set up the character index
 cn3	lda	#0	roll off 4 bits
 	ldx	#4
-cn4	lsr	~num+3
+cn4	lsr	~num+7
+	ror	~num+6
+	ror	~num+5
+	ror	~num+4
+	ror	~num+3
 	ror	~num+2
 	ror	~num+1
 	ror	~num
@@ -4029,7 +4082,11 @@ cn4	lsr	~num+3
 	ora	orVal
 cn5	sta	~str,Y	save the character
 	dey
-	lda	~num+3	loop if the number is not zero
+	lda	~num+7	loop if the number is not zero
+	ora	~num+6
+	ora	~num+5
+	ora	~num+4
+	ora	~num+3
 	ora	~num+2
 	ora	~num+1
 	ora	~num
@@ -4364,6 +4421,7 @@ fm1	inc4	format	skip the '%'
 	stz	~precision	use the default precision
 	stz	~precisionSpecified
 	stz	~isLong	assume short operands
+	stz	~isLongLong
 	stz	~isByte
 	lda	#' '	use a blank for padding
 	sta	~paddChar
@@ -4384,16 +4442,25 @@ fm2	jsr	Flag	read and interpret flag characters
 	jsr	GetSize	  get the precision
 	sta	~precision
 	lda	[format]	if *format in ['l','z','t','j'] then
-	and	#$00FF
+	and	#$00FF	  ~isLong = true
 fm3	cmp	#'l'
+	bne	fm3b
+	inc4	format	  for 'll' or 'j', also set ~isLongLong
+	lda	[format]	
+	and	#$00FF
+	cmp	#'l'
+	beq	fm3a
+	inc	~isLong
+	bra	fm6
+fm3a	inc	~isLongLong
+	bra	fm3c
+fm3b	cmp	#'j'
 	beq	fm3a
 	cmp	#'z'
-	beq	fm3a
+	beq	fm3c
 	cmp	#'t'
-	beq	fm3a
-	cmp	#'j'
 	bne	fm4
-fm3a	inc	~isLong	  ~isLong = true
+fm3c	inc	~isLong
 	bra	fm5	  ++format
 fm4	cmp	#'L'	else if *format in ['L','h'] then
 	beq	fm5
@@ -4542,7 +4609,8 @@ fListEnd anop
 ~altForm ds	2	use alternate output format?
 ~fieldWidth ds 2	output field width
 ~hexPrefix ds	2	hex 0x prefix characters (if present)
-~isLong	 ds	2	is the operand long?
+~isLong	 ds	2	is the operand long _or_ long long ?
+~isLongLong ds	2	is the operand long long (64-bit)?
 ~isByte	ds	2	is operand byte-size (converted to int)?
 ~leftJustify ds 2	left justify the output?
 ~paddChar ds	2	output padd character
@@ -4553,7 +4621,7 @@ fListEnd anop
 ;
 ;  Work buffers
 ;
-~num	ds	4	long integer
+~num	ds	8	long long integer
 ~numChars ds	2	number of characters printed with this printf
 ~str	ds	83	string buffer
 ;
