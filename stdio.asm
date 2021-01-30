@@ -4052,7 +4052,12 @@ cn2	lda	[argp]
 	beq	cn2a
 	and	#$00FF
 cn2a	sta	~num
-	stz	~hexPrefix	assume we won't lead with 0x
+	ora	~num+2
+	ora	~num+4
+	ora	~num+6
+	bne	cn2b
+	stz	~altForm	if value is 0, do not print hex prefix
+cn2b	stz	~hexPrefix	assume we won't lead with 0x
 ;
 ;  Convert the number to an ASCII string
 ;
