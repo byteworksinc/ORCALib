@@ -3923,7 +3923,8 @@ al3	long	I,M
 ****************************************************************
 *
 *  ~Format_s - format a c-string
-*  ~Format_b - format a p-string
+*  ~Format_b - format a p-string (deprecated)
+*  ~Format_P - format a p-string
 *
 *  Inputs:
 *	~fieldWidth - output field width
@@ -3953,6 +3954,7 @@ lb1	iny
 	bra	lb1a
 
 ~Format_b entry
+~Format_P entry
 	ph4	argp	save the original argp
 	ldy	#2	dereference argp
 	lda	[argp],Y
@@ -4598,6 +4600,7 @@ fList	dc	c'%',i1'0',a'~Format_Percent'	%
 	dc	c'n',i1'0',a'~Format_n'		n
 	dc	c's',i1'0',a'~Format_s'		s
 	dc	c'b',i1'0',a'~Format_b'		b
+	dc	c'P',i1'0',a'~Format_P'		P
 	dc	c'p',i1'0',a'~Format_p'		p
 	dc	c'c',i1'0',a'~Format_c'		c
 	dc	c'X',i1'0',a'~Format_X'		X
@@ -5033,7 +5036,8 @@ lb1	ldy	#2	remove the parameter from the stack
 
 ****************************************************************
 *
-*  ~Scan_b - read a pascal string
+*  ~Scan_b - read a pascal string (deprecated)
+*  ~Scan_P - read a pascal string
 *  ~Scan_s - read a c string
 *
 *  Inputs:
@@ -5045,6 +5049,7 @@ lb1	ldy	#2	remove the parameter from the stack
 ****************************************************************
 *
 ~Scan_b	private
+~Scan_P	entry
 	using ~scanfCommon
 arg	equ	11	argument
 
@@ -5583,6 +5588,7 @@ fList	dc	c'd',i1'0',a'~Scan_d'		d
 	dc	c'c',i1'0',a'~Scan_c'		c
 	dc	c's',i1'0',a'~Scan_s'		s
 	dc	c'b',i1'0',a'~Scan_b'		b
+	dc	c'P',i1'0',a'~Scan_P'		P
 	dc	c'n',i1'0',a'~Scan_n'		n
 	dc	c'a',i1'0',a'~Scan_f'		a
 	dc	c'A',i1'0',a'~Scan_f'		A
