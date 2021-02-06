@@ -498,6 +498,47 @@ lb1      creturn 4:i
 
 ****************************************************************
 *
+*  long long llabs(long long i)
+*
+*  Return the absolute value of i.
+*
+*  Inputs:
+*        i - argument
+*
+*  Outputs:
+*        Returns abs(i).
+*
+****************************************************************
+*
+llabs    start
+imaxabs  entry
+retptr   equ   1
+
+         csubroutine (8:i),4
+         stx   retptr
+         stz   retptr+2
+         
+         ph8   i
+         jsl   ~ABS8
+         pla
+         sta   [retptr]
+         ldy   #2
+         pla
+         sta   [retptr],y
+         iny
+         iny
+         pla
+         sta   [retptr],y
+         iny
+         iny
+         pla
+         sta   [retptr],y
+         
+         creturn
+         end
+
+****************************************************************
+*
 *  ldiv_t ldiv(n,d)
 *        long n,d;
 *
