@@ -536,6 +536,40 @@ div_t    ds    8
 
 ****************************************************************
 *
+*  lldiv_t lldiv(long long n, long long d)
+*
+*  Inputs:
+*        n - numerator
+*        d - denominator
+*
+*  Outputs:
+*        lldiv_t - contains result & remainder
+*
+****************************************************************
+*
+lldiv    start
+imaxdiv  entry
+addr     equ   1
+
+         csubroutine (8:n,8:d),4
+         phb                            use local addressing
+         phk
+         plb
+         ph8   n                        do the divide
+         ph8   d
+         jsl   ~CDIV8
+         pl8   lldiv_t
+         pl8   lldiv_t+8
+         lla   addr,lldiv_t             return the result
+         plb
+
+         creturn 4:addr
+
+lldiv_t  ds    16
+         end
+
+****************************************************************
+*
 *  void qsort(base, count, size, compar)
 *        void *base;
 *        size_t count, size;
