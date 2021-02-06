@@ -23,6 +23,7 @@ Int64    start                          dummy segment
 *
 *  Outputs:
 *        NUM2 - result
+*        X - next 16 bits of true result (bits 64-79)
 *
 ****************************************************************
 *
@@ -83,6 +84,7 @@ ML2      ROR   ANS+14                   shift the interim result
          move4 ANS,NUM2                 move return value and address
          move4 ANS+4,NUM2+4
          move4 RETURN-1,NUM1+4
+         LDX   ANS+8                    set X to next 16 bits of result
          PLD                            fix stack, DP
          TSC
          CLC

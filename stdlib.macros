@@ -689,3 +689,27 @@
 .f
  mnote "Missing closing '}'",16
  mend
+ macro
+&l sub8 &n1,&n2,&n3
+&l ~setm
+ ph8 &n1
+ ph8 &n2
+ jsl ~SUB8
+ aif c:&n3,.a
+ pl8 &n1
+ ago .b
+.a
+ pl8 &n3
+.b
+ ~restm
+ mend
+ macro
+&l jge &bp
+&l blt *+5
+ brl &bp
+ mend
+ macro
+&l jeq &bp
+&l bne *+5
+ brl &bp
+ mend
