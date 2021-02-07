@@ -4764,6 +4764,8 @@ bs1	stz	read	no chars read
 	sta	base
 	stz	val	initialize the value to 0
 	stz	val+2
+	stz	val+4
+	stz	val+6
 lb1	jsl	~getchar	skip leading whitespace...
 	cmp	#EOF	if EOF then
 	bne	ef1
@@ -4804,7 +4806,7 @@ lb1a	jsl	~getchar
 	bne	lb2
 lb1b	asl	base	      use base 16
 	dec	~scanWidth	      get the next character
-	beq	lb4a
+	jeq	lb4a
 	bpl	lb1c
 	stz	~scanWidth
 lb1c	jsl	~getchar
@@ -4829,24 +4831,32 @@ lb2	cmp	#'0'	if the char is a digit then
 	sbc	#6
 lb2a	and	#$000F	  convert it to a value
 	pha		  save the value
-	ph4	val	  update the old value
-	lda	base
+	ph8	val	  update the old value
 	ldx	#0
-	jsl	~UMUL4
-	pl4	val
+	phx
+	phx
+	phx
+	lda	base
+	pha
+	jsl	~UMUL8
+	pl8	val
 	pla		  add in the new digit
 	clc
 	adc	val
 	sta	val
 	bcc	lb3
 	inc	val+2
+	bne	lb3
+	inc	val+4
+	bne	lb3
+	inc	val+6
 lb3	dec	~scanWidth	  quit if the max # chars have been
 	beq	lb4a	    scanned
 	bpl	lb3a	  make sure 0 stays a 0
 	stz	~scanWidth
 lb3a	jsl	~getchar	  next char
 	inc	read
-	bra	lb2
+	brl	lb2
 
 lb4	jsl	~putback	put the last character back
 	dec	read
@@ -4861,7 +4871,7 @@ lb4b	lda	~suppress	if input is not suppressed then
 	bne	lb7
 	lda	minus	  if minus then
 	beq	lb4c
-	sub4	#0,val,val	    negate the value
+	sub8	#0,val,val	    negate the value
 lb4c	lda	val	  save the value
 	ldx	~size
 	bpl	lb4d
@@ -4873,14 +4883,24 @@ lb4d	sta	[arg]
 	ldy	#2
 	lda	val+2
 	sta	[arg],Y
+	dex
+	bmi	lb6
+	iny
+	iny
+	lda	val+4
+	sta	[arg],Y
+	iny
+	iny
+	lda	val+6
+	sta	[arg],Y
 lb6	lda	~suppress	if input is not suppressed then
 	bne	lb7
 	ldy	#2	  remove the parameter from the stack
 	jsr	~RemoveWord
 lb7	rts
 
-val	ds	4	value
-base	dc	i4'10'	constant for mul4
+val	ds	8	value
+base	dc	i2'10'	number base
 based	ds	2	based conversion?
 minus	ds	2	is the value negative?
 read	ds	2	# chars read
@@ -5027,6 +5047,14 @@ lb0	sta	[arg]
 	bmi	lb0a
 	lda	#0
 	ldy	#2
+	sta	[arg],y
+	dex
+	bmi	lb0a
+	iny
+	iny
+	sta	[arg],y
+	iny
+	iny
 	sta	[arg],y
 lb0a	dec	~assignments	  fix assignment count
 lb1	ldy	#2	remove the parameter from the stack
@@ -5233,22 +5261,30 @@ lb2	jsl	~getchar	if the char is a digit then
 	sbc	#6
 lb2a	and	#$000F	  convert it to a value
 	pha		  save the value
-	ph4	val	  update the old value
+	ph8	val	  update the old value
+	ldx	#0
+	phx
+	phx
+	phx
 	lda	base
-	ldx	base+2
-	jsl	~UMUL4
-	pl4	val
+	pha
+	jsl	~UMUL8
+	pl8	val
 	pla		  add in the new digit
 	clc
 	adc	val
 	sta	val
 	bcc	lb3
 	inc	val+2
+	bne	lb3
+	inc	val+4
+	bne	lb3
+	inc	val+6
 lb3	dec	~scanWidth	  quit if the max # chars have been
 	beq	lb4a	    scanned
-	bpl	lb2	  make sure 0 stays a 0
+	jpl	lb2	  make sure 0 stays a 0
 	stz	~scanWidth
-	bra	lb2
+	brl	lb2
 
 lb4	lda	ch	put the last character back
 	jsl	~putback
@@ -5273,6 +5309,16 @@ lb4c	sta	[arg]
 	ldy	#2
 	lda	val+2
 	sta	[arg],Y
+	dex
+	bmi	lb6
+	iny
+	iny
+	lda	val+4
+	sta	[arg],Y
+	iny
+	iny
+	lda	val+6
+	sta	[arg],Y
 lb6	lda	~suppress	if input is not suppressed then
 	bne	lb7
 	ldy	#2	  remove the parameter from the stack
@@ -5284,6 +5330,8 @@ lb7	rts
 Init	stz	read	no chars read
 	stz	val	initialize the value to 0
 	stz	val+2
+	stz	val+4
+	stz	val+6
 in1	jsl	~getchar	skip leading whitespace...
 	cmp	#EOF	if at EOF then
 	bne	in2
@@ -5302,8 +5350,8 @@ in2	tax		...back to slipping whitespace
 	rts
 
 ch	ds	2	char buffer
-val	ds	4	value
-base	dc	i4'10'	constant for mul4
+val	ds	8	value
+base	dc	i2'10'	number base
 based	ds	2	based conversion?
 read	ds	2	# chars read
 	end
@@ -5503,14 +5551,22 @@ fm2	jsr	GetSize	get the field width specifier
 	lda	[format]	if the char is 'l', 'z', 't', or 'j' then
 	and	#$00FF
 	cmp	#'l'
-	beq	fm2a
-	cmp	#'z'
-	beq	fm2a
+	bne	fm2a
+	inc	~size
+	inc4	format	  check for 'll'
+	lda	[format]
+	and	#$00FF
+	cmp	#'l'
+	bne	fm6
+	bra	fm2b
+fm2a	cmp	#'z'
+	beq	fm2b
 	cmp	#'t'
-	beq	fm2a
-	cmp	#'j'
+	beq	fm2b
+	cmp	#'j'	  'j' also specifies a long long size
 	bne	fm3
-fm2a	inc	~size	  long specifier
+	inc	~size
+fm2b	inc	~size	  long specifier
 	bra	fm4
 fm3	cmp	#'h'	else if it is an 'h' then
 	bne	fm5
@@ -5639,8 +5695,8 @@ ch	ds	2	temp storage
 ~scanCount ds	2	# of characters scanned
 ~scanError ds	2	set to 1 by scanners if an error occurs
 ~scanWidth ds	2	max # characters to scan
-~size	 ds	2	size specifier; -1 -> char, 1 -> long,
-!			 0 -> default
+~size	 ds	2	size specifier; -1 -> char, 0 -> default,
+!			 1 -> long, 2 -> long long
 	end
 
 ****************************************************************
