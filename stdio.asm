@@ -5169,15 +5169,24 @@ pString	ds	2	is this a p string?
 	using ~scanfCommon
 arg	equ	11	argument
 
-	jsl	~getchar	get the character
+	lda	~suppress	if input is not suppressed then
+	bne	lb1
+	dec	~assignments	  no assignment done
+lb1	jsl	~getchar	skip leading whitespace...
+	cmp	#EOF	if EOF then
+	bne	lb2
+	sta	~eofFound	  ~eofFound = EOF
+	rts
+lb2	tax		...back to skipping whitespace
+	lda	__ctype+1,X
+	and	#_space
+	bne	lb1
+	txa
 	cmp	#'%'	if it is not a percent then
-	beq	lb1
+	beq	lb3
 	jsl	~putback	  put it back
 	inc	~scanError	  note the error
-	lda	~suppress	  if input is not suppressed then
-	bne	lb1
-	dec	~assignments	    no assignment done
-lb1	rts
+lb3	rts
 	end
 
 ****************************************************************
