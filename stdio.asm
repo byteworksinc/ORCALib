@@ -5298,11 +5298,14 @@ lb4a	lda	read	if no chars read then
 	bra	lb6	  remove the parameter
 lb4b	lda	~suppress	if input is not suppressed then
 	bne	lb7
-	lda	val	  save the value
+	lda	minus	  if minus then
+	beq	lb4c
+	sub8	#0,val,val	    negate the value
+lb4c	lda	val	  save the value
 	ldx	~size
-	bpl	lb4c
+	bpl	lb4d
 	sep	#$20
-lb4c	sta	[arg]
+lb4d	sta	[arg]
 	rep	#$20
 	dex
 	bmi	lb6
@@ -5341,18 +5344,38 @@ in1	jsl	~getchar	skip leading whitespace...
 in1a	sta	~eofFound	   eofFound = EOF
 	pla		   pop stack
 	bra	lb6	   bail out
-in2	tax		...back to slipping whitespace
+in2	tax		...back to skipping whitespace
 	lda	__ctype+1,X
 	and	#_space
 	bne	in1
-	txa
-	jsl	~putback
+	txa		check for leading sign
+	stz	minus	assume positive number
+	cmp	#'+'	skip leading +
+	beq	in3
+	cmp	#'-'	if - then set minus flag
+	bne	in5
+	inc	minus
+in3	dec	~scanWidth	update ~scanWidth
+	beq	in6	sign only is not a matching sequence
+	bpl	in4	make sure 0 stays a 0
+	stz	~scanWidth
+in4	rts
+
+in5	jsl	~putback
 	rts
+
+in6	inc	~scanError	~scanError = true
+	lda	~suppress	if input is not suppressed then
+	bne	in7
+	dec	~assignments	  no assignment made
+in7	pla		pop stack
+	bra	lb6	bail out
 
 ch	ds	2	char buffer
 val	ds	8	value
 base	dc	i2'10'	number base
 based	ds	2	based conversion?
+minus	ds	2	is there a minus sign?
 read	ds	2	# chars read
 	end
 
