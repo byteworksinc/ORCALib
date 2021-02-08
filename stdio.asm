@@ -5500,7 +5500,10 @@ ps5	stx	ch	make sure the char matches the format
 	jsl	~getchar
 	cmp	ch
 	beq	ps1
-	jsl	~putback	put the character back
+	cmp	#EOF	check for EOF
+	bne	ps6
+	sta	~eofFound
+ps6	jsl	~putback	put the character back
 ;
 ;  Remove the parameters for remaining conversion specifications
 ;
