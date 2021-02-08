@@ -4787,7 +4787,6 @@ ef1	tax		{...back to skipping whitespace}
 	bne	sg2
 	inc	minus
 sg1	jsl	~getchar
-	inc	read
 sg2	ldx	based	if base 8, 16 are allowed then
 	beq	lb2
 	cmp	#'0'	  if the digit is '0' then
@@ -4805,6 +4804,7 @@ lb1a	jsl	~getchar
 	cmp	#'x'
 	bne	lb2
 lb1b	asl	base	      use base 16
+	stz	read	      '0x' alone should not match
 	dec	~scanWidth	      get the next character
 	jeq	lb4a
 	bpl	lb1c
@@ -4903,7 +4903,7 @@ val	ds	8	value
 base	dc	i2'10'	number base
 based	ds	2	based conversion?
 minus	ds	2	is the value negative?
-read	ds	2	# chars read
+read	ds	2	# of digits read
 	end
 
 ****************************************************************
@@ -5228,7 +5228,8 @@ hx1	jsl	~getchar
 	beq	hx1a
 	cmp	#'X'
 	bne	hx2
-hx1a	dec	~scanWidth	    accept the character
+hx1a	stz	read	    ('0x' alone should not match)
+	dec	~scanWidth	    accept the character
 	jeq	lb4a
 	bpl	hx3
 	stz	~scanWidth
@@ -5376,7 +5377,7 @@ val	ds	8	value
 base	dc	i2'10'	number base
 based	ds	2	based conversion?
 minus	ds	2	is there a minus sign?
-read	ds	2	# chars read
+read	ds	2	# of digits read
 	end
 
 ****************************************************************
