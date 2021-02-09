@@ -5096,6 +5096,7 @@ arg	equ	11	argument
 lb1	jsl	~getchar	skip leading whitespace
 	cmp	#EOF
 	bne	lb2
+	sta	~eofFound
 	inc	~scanError
 	lda	~suppress	(no assignment made)
 	bne	lb6
