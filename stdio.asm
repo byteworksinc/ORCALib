@@ -4759,7 +4759,7 @@ arg	equ	11	argument
 	lda	#1	allow base 8, 10, 16
 	sta	based
 
-bs1	stz	read	no chars read
+bs1	stz	read	no digits read
 	lda	#10	assume base 10
 	sta	base
 	stz	val	initialize the value to 0
@@ -4778,16 +4778,20 @@ ef1	tax		{...back to skipping whitespace}
 	lda	__ctype+1,X
 	and	#_space
 	bne	lb1
-	inc	read
 	txa
 	stz	minus	assume positive number
 	cmp	#'+'	skip leading +
 	beq	sg1
 	cmp	#'-'	if - then set minus flag
-	bne	sg2
+	bne	sg3
 	inc	minus
-sg1	jsl	~getchar
-sg2	ldx	based	if base 8, 16 are allowed then
+sg1	dec	~scanWidth
+	jeq	lb4a
+	bpl	sg2
+	stz	~scanWidth
+sg2	jsl	~getchar
+sg3	inc	read
+	ldx	based	if base 8, 16 are allowed then
 	beq	lb2
 	cmp	#'0'	  if the digit is '0' then
 	bne	lb2
