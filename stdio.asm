@@ -5550,7 +5550,9 @@ rm2a	tax
 	bne	rm2
 rm3	tyx		  if '*' not found
 	beq	rm4
+	pha		    lay out stack as ~RemoveWord needs
 	jsr	~RemoveWord	    remove an addr from the stack
+	pla
 rm4	inc4	format	next format character
 	bra	rm1
 ;
