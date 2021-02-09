@@ -5352,11 +5352,11 @@ Init	stz	read	no chars read
 in1	jsl	~getchar	skip leading whitespace...
 	cmp	#EOF	if at EOF then
 	bne	in2
+	sta	~eofFound	   eofFound = EOF
 	lda	~suppress	   if input is not suppressed then
 	bne	in1a
 	dec	~assignments	      no assignment made
-in1a	sta	~eofFound	   eofFound = EOF
-	pla		   pop stack
+in1a	pla		   pop stack
 	bra	lb6	   bail out
 in2	tax		...back to skipping whitespace
 	lda	__ctype+1,X
