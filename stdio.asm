@@ -4959,7 +4959,7 @@ lb4	lda	~str,Y
 
 lb5	jsl	~getchar	get a character
 	cmp	#EOF	quit if at EOF
-	beq	lb8
+	beq	lb7a
 	pha		quit if not in the set
 	jsr	Set
 	ply
@@ -4980,7 +4980,7 @@ lb6	dec	~scanWidth	note that we processed one
 	bra	lb5	next char
 
 lb7	tya		put back the last char scanned
-	jsl	~putback
+lb7a	jsl	~putback
 
 lb8	lda	didOne	if no chars read then
 	bne	lb8a
@@ -5119,14 +5119,14 @@ lb3	dec	~scanWidth	note that we processed one
 	stz	~scanWidth
 lb4	jsl	~getchar	next char
 	cmp	#EOF	quit if at EOF
-	beq	lb5
+	beq	lb4a
 	and	#$00FF	loop if not whitespace
 	tax
 	lda	__ctype+1,X
 	and	#_space
 	beq	lb2a
 	txa		whitespace: put it back
-	jsl	~putback
+lb4a	jsl	~putback
 
 lb5	lda	~suppress	if output is not suppressed then
 	bne	lb6
