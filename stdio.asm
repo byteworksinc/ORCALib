@@ -4708,20 +4708,25 @@ lb1	lda	13,S	move the critical values
 	using ~scanfCommon
 arg	equ	11	argument
 
+	stz	didOne	no characters scanned from the stream
 	lda	~scanWidth	if ~scanWidth == 0 then
 	bne	lb1
 	inc	~scanWidth	  ~scanWidth = 1
 
 lb1	jsl	~getchar	get the character
 	cmp	#EOF	if at EOF then
+	bne	lb1b
+	ldx	didOne	   if no characters read then
 	bne	lb1a
-	sta	~eofFound	   ~eofFound = EOF
-	lda	~suppress	   if input is not suppressed then
+	sta	~eofFound	     ~eofFound = EOF
+lb1a	lda	~suppress	   if input is not suppressed then
 	bne	lb3
 	dec	~assignments	      no assignment made
 	bra	lb3	   bail out
 
-lb1a	ldx	~suppress	if input is not suppressed then
+lb1b	ldx	#1
+	stx	didOne
+	ldx	~suppress	if input is not suppressed then
 	bne	lb2
 	short M	  save the value
 	sta	[arg]
@@ -4734,6 +4739,8 @@ lb3	lda	~suppress	if input is not suppressed then
 	ldy	#2
 	jsr	~RemoveWord	remove the parameter from the stack
 lb4	rts
+
+didOne	ds	2	non-zero if we have scanned a character
 	end
 
 ****************************************************************
