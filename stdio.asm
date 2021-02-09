@@ -5590,29 +5590,31 @@ fm1	inc4	format	skip the '%'
 fm2	jsr	GetSize	get the field width specifier
 	sta	~scanWidth
 
-	lda	[format]	if the char is 'l', 'z', 't', or 'j' then
+	lda	[format]
 	and	#$00FF
-	cmp	#'l'
+	cmp	#'l'	'l' specifies long int or double
 	bne	fm2a
 	inc	~size
-	inc4	format	  check for 'll'
+	inc4	format	  unless it is 'll' for long long
 	lda	[format]
 	and	#$00FF
 	cmp	#'l'
 	bne	fm6
-	bra	fm2b
-fm2a	cmp	#'z'
+	bra	fm2c
+fm2a	cmp	#'z'	'z' specifies size_t (long int)
+	beq	fm2c
+	cmp	#'t'	't' specifies ptrdiff_t (long int)
+	beq	fm2c
+	cmp	#'j'	'j' specifies intmax_t (long long)
 	beq	fm2b
-	cmp	#'t'
-	beq	fm2b
-	cmp	#'j'	  'j' also specifies a long long size
+	cmp	#'L'	'L' specifies long double
 	bne	fm3
-	inc	~size
-fm2b	inc	~size	  long specifier
+fm2b	inc	~size
+fm2c	inc	~size
 	bra	fm4
-fm3	cmp	#'h'	else if it is an 'h' then
+fm3	cmp	#'h'	'h' specifies short int
 	bne	fm5
-	inc4	format	  check for 'hh'
+	inc4	format	  unless it is 'hh' for char types
 	lda	[format]
 	and	#$00FF
 	cmp	#'h'
@@ -5738,7 +5740,7 @@ ch	ds	2	temp storage
 ~scanError ds	2	set to 1 by scanners if an error occurs
 ~scanWidth ds	2	max # characters to scan
 ~size	 ds	2	size specifier; -1 -> char, 0 -> default,
-!			 1 -> long, 2 -> long long
+!			 1 -> long, 2 -> long long/long double
 	end
 
 ****************************************************************
