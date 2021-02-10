@@ -1678,7 +1678,7 @@ SetEOF	ldy	#FILE_flag	  set the eof flag
 *     char *format;
 *     FILE *stream;
 *
-*  Read a string from a string.
+*  Read a string from a stream.
 *
 ****************************************************************
 *
@@ -1712,6 +1712,14 @@ lb1	lda	#get	set up our routines
 	sta	>~putback+12
 	lda	#>unget
 	sta	>~putback+13
+
+	lda	#~RemoveWordFromStack
+	sta	>~RemoveWord+1
+	lda	#>~RemoveWordFromStack
+	sta	>~RemoveWord+2
+
+	lda	#0
+	sta	>~isVarArgs
 
 	brl	~scanf
 
@@ -2514,6 +2522,14 @@ scanf	start
 	lda	#>unget
 	sta	>~putback+13
 
+	lda	#~RemoveWordFromStack
+	sta	>~RemoveWord+1
+	lda	#>~RemoveWordFromStack
+	sta	>~RemoveWord+2
+
+	lda	#0
+	sta	>~isVarArgs
+
 	brl	~scanf
 
 unget	tax
@@ -2941,6 +2957,14 @@ sscanf	start
 	sta	>~putback+12
 	lda	#>unget
 	sta	>~putback+13
+
+	lda	#~RemoveWordFromStack
+	sta	>~RemoveWord+1
+	lda	#>~RemoveWordFromStack
+	sta	>~RemoveWord+2
+
+	lda	#0
+	sta	>~isVarArgs
 
 	brl	~scanf
 
@@ -3523,6 +3547,178 @@ put2	phb		remove the char from the stack
 
 string	ds	4	string address
 count	ds	4	chars left to write
+	end
+
+****************************************************************
+*
+*  int vfscanf(FILE *stream, char *format, va_list arg)
+*
+*  Read a string from a stream.
+*
+****************************************************************
+*
+vfscanf	start
+	using ~scanfCommon
+
+	phb		use local addressing
+	phk
+	plb
+	plx		remove the return address
+	ply
+	pla		save the stream
+	sta	stream
+	pla
+	sta	stream+2
+	phy		restore return address/data bank
+	phx
+	plb
+
+	ph4	>stream	verify that stream exists
+	jsl	~VerifyStream
+	bcc	lb1
+	lda	#EOF
+	rtl
+lb1	lda	#get	set up our routines
+	sta	>~getchar+10
+	lda	#>get
+	sta	>~getchar+11
+
+	lda	#unget
+	sta	>~putback+12
+	lda	#>unget
+	sta	>~putback+13
+
+	lda	#~RemoveWordFromVarArgs
+	sta	>~RemoveWord+1
+	lda	#>~RemoveWordFromVarArgs
+	sta	>~RemoveWord+2
+
+	lda	#1
+	sta	>~isVarArgs
+
+	brl	~scanf
+
+get	ph4	stream	get a character
+	jsl	fgetc
+	rtl
+
+unget	ldx	stream+2	put a character back
+	phx
+	ldx	stream
+	phx
+	pha
+	jsl	ungetc
+	rtl
+
+stream	ds	4
+	end
+
+****************************************************************
+*
+*  int vscanf(char *format, va_list arg)
+*
+*  Read a string from standard in.
+*
+****************************************************************
+*
+vscanf	start
+	using ~scanfCommon
+
+	lda	#getchar
+	sta	>~getchar+10
+	lda	#>getchar
+	sta	>~getchar+11
+
+	lda	#unget
+	sta	>~putback+12
+	lda	#>unget
+	sta	>~putback+13
+
+	lda	#~RemoveWordFromVarArgs
+	sta	>~RemoveWord+1
+	lda	#>~RemoveWordFromVarArgs
+	sta	>~RemoveWord+2
+
+	lda	#1
+	sta	>~isVarArgs
+
+	brl	~scanf
+
+unget	tax
+	lda	>stdin+2
+	pha
+	lda	>stdin
+	pha
+	phx
+	jsl	ungetc
+	rtl
+	end
+
+****************************************************************
+*
+*  int vsscanf(char *s, char *format, va_list arg)
+*
+*  Read a string from a string.
+*
+****************************************************************
+*
+vsscanf	start
+	using ~scanfCommon
+
+	phb		use local addressing
+	phk
+	plb
+	plx		remove the return address
+	ply
+	pla		save the stream
+	sta	string
+	pla
+	sta	string+2
+	phy		restore return address/data bank
+	phx
+	plb
+
+	lda	#get	set up our routines
+	sta	>~getchar+10
+	lda	#>get
+	sta	>~getchar+11
+
+	lda	#unget
+	sta	>~putback+12
+	lda	#>unget
+	sta	>~putback+13
+
+	lda	#~RemoveWordFromVarArgs
+	sta	>~RemoveWord+1
+	lda	#>~RemoveWordFromVarArgs
+	sta	>~RemoveWord+2
+
+	lda	#1
+	sta	>~isVarArgs
+
+	brl	~scanf
+
+get	ph4	string	get a character
+	phd
+	tsc
+	tcd
+	lda	[3]
+	and	#$00FF
+	bne	gt1
+	dec4	string
+	lda	#EOF
+gt1	pld
+	ply
+	ply
+	inc4	string
+	rtl
+
+unget	cmp	#EOF	put a character back
+	beq	ug1
+	dec4	string
+ug1	rtl
+
+string	ds	4
 	end
 
 ****************************************************************
@@ -4660,14 +4856,14 @@ fListEnd anop
 
 ****************************************************************
 *
-*  ~RemoveWord - remove Y words from the stack for scanf
+*  ~RemoveWordFromStack - remove Y words from the stack for scanf
 *
 *  Inputs:
 *	Y - number of words to remove (must be >0)
 *
 ****************************************************************
 *
-~RemoveWord start
+~RemoveWordFromStack private
 
 lb1	lda	13,S	move the critical values
 	sta	15,S
@@ -4691,6 +4887,40 @@ lb1	lda	13,S	move the critical values
 
 	dey		next word
 	bne	lb1
+	rts
+	end
+
+****************************************************************
+*
+*  ~RemoveWordFromVarArgs - remove Y words from the variable 
+*                           arguments for scanf
+*
+*  Inputs:
+*	Y - number of words to remove (must be 1 or 2)
+*
+****************************************************************
+*
+~RemoveWordFromVarArgs private
+	using ~scanfCommon
+arg	equ	11	argument position
+
+	tya		advance argument pointer
+	asl	a
+lb2	inc4	~va_arg_ptr
+	dec	a
+	bne	lb2
+
+	lda	~va_arg_ptr	stick next argument in arg location
+	sta	arg
+	lda	~va_arg_ptr+2
+	sta	arg+2
+	lda	[arg]
+	tax
+	cpy	#2
+	bne	lb1
+	lda	[arg],y
+	sta	arg+2
+lb1	stx	arg
 	rts
 	end
 
@@ -5463,9 +5693,32 @@ format	equ	7	pointer to format code
 	tsc		set up a DP
 	tcd
 ;
+;  Set up for varargs, if we are using them
+;
+	lda	~isVarArgs
+	beq	ps
+	lda	arg	initialize ~va_list_ptr
+	sta	~va_list_ptr
+	lda	arg+2
+	sta	~va_list_ptr+2
+	lda	[arg]	initialize ~va_arg_ptr
+	sta	~va_arg_ptr
+	tax
+	ldy	#2
+	lda	[arg],y
+	sta	~va_arg_ptr+2
+	stx	arg
+	sta	arg+2
+
+	lda	[arg]	put first variable arg in arg location
+	tax
+	lda	[arg],y
+	stx	arg
+	sta	arg+2
+;
 ;  Process the format string
 ;
-	stz	~assignments	no assignments yet
+ps	stz	~assignments	no assignments yet
 	stz	~scanCount	no characters scanned
 	stz	~scanError	no scan error so far
 	stz	~eofFound	eof was not the first char
@@ -5566,7 +5819,21 @@ rm4	inc4	format	next format character
 ;
 ;  Remove the format parameter and return
 ;
-rt1	lda	format-2	move the return address
+rt1	lda	~isVarArgs	if it is a varargs call then
+	beq	rt1a
+	lda	~va_list_ptr	  get pointer to va_list
+	sta	arg
+	lda	~va_list_ptr+2
+	sta	arg+2
+	lda	~va_arg_ptr	  update pointer in va_list
+	sta	[arg]
+	lda	~va_arg_ptr+2
+	ldy	#2
+	sta	[arg],y
+	pha		  remove the va_list parameter
+	jsr	~RemoveWordFromStack
+	pla
+rt1a	lda	format-2	move the return address
 	sta	format+2
 	lda	format-3
 	sta	format+1
@@ -5739,6 +6006,10 @@ ch	ds	2	temp storage
 	dc	h'68'	pla
 	dc	h'5C 00 00 00'
 ;
+; ~RemoveWord is a vector to the proper routine to remove a parameter word.
+;
+~RemoveWord dc	h'5C 00 00 00'
+;
 ;  global variables
 ;
 ~assignments ds 2	# of assignments made
@@ -5749,6 +6020,9 @@ ch	ds	2	temp storage
 ~scanWidth ds	2	max # characters to scan
 ~size	 ds	2	size specifier; -1 -> char, 0 -> default,
 !			 1 -> long, 2 -> long long/long double
+~va_arg_ptr ds	4	pointer to next variable argument
+~va_list_ptr ds 4	pointer to the va_list array
+~isVarArgs ds	2	is this a varargs call (vscanf etc.)?
 	end
 
 ****************************************************************
