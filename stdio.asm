@@ -3772,8 +3772,32 @@ argp	equ	7	argument pointer
 ;
 ;  For signed numbers, if the value is negative, use the sign flag
 ;
-	lda	~isLong	handle long values
+	lda	~isLongLong	handle long long values
 	beq	sn0
+	ldy	#6
+	lda	[argp],Y
+	bpl	cn0
+	sec
+	lda	#0
+	sbc	[argp]
+	sta	[argp]
+	ldy	#2
+	lda	#0
+	sbc	[argp],Y
+	sta	[argp],Y
+	iny
+	iny
+	lda	#0
+	sbc	[argp],Y
+	sta	[argp],Y
+	iny
+	iny
+	lda	#0
+	sbc	[argp],Y
+	sta	[argp],Y
+	bra	sn2
+sn0	lda	~isLong	handle long values
+	beq	sn0a
 	ldy	#2
 	lda	[argp],Y
 	bpl	cn0
@@ -3785,7 +3809,7 @@ argp	equ	7	argument pointer
 	sbc	[argp],Y
 	sta	[argp],Y
 	bra	sn2
-sn0	lda	~isByte	handle (originally) byte-size values
+sn0a	lda	~isByte	handle (originally) byte-size values
 	beq	sn1
 	lda	[argp]
 	and	#$00FF
@@ -3807,7 +3831,16 @@ sn2	lda	#'-'
 ;  Convert the number to an ASCII string
 ;
 cn0	stz	~hexPrefix	don't lead with 0x
-	lda	~isLong	if the value is long then
+	lda	~isLongLong	if the value is long long then
+	beq	cn0a
+	ldy	#6	  push a long long value
+	lda	[argp],Y
+	pha
+	dey
+	dey
+	lda	[argp],Y
+	pha
+cn0a	lda	~isLong	else if the value is long then
 	beq	cn1
 	ldy	#2	  push a long value
 	lda	[argp],Y
@@ -3825,7 +3858,9 @@ cn2	ph4	#~str	push the string addr
 	ph2	#0	do an unsigned conversion
 	lda	~isLongLong	do the proper conversion
 	beq	cn2a
-; TODO actually format 64-bit numbers
+	pla
+	jsr	~ULongLong2Dec
+	bra	pd1
 cn2a	lda	~isLong
 	beq	cn3
 	_Long2Dec
@@ -3965,6 +4000,54 @@ rn3	inc	argp
 ;  Handle left justification
 ;
 	brl	~LeftJustify	handle left justification
+	end
+
+****************************************************************
+*
+*  ~ULongLong2Dec - produce a string from an unsigned long long
+*
+*  Inputs:
+*	llValue - the unsigned long long value
+*	strPtr - pointer to string buffer
+*	strLength - length of string buffer
+*
+****************************************************************
+*
+~ULongLong2Dec private
+	lsub (8:llValue,4:strPtr,2:strLength),0
+
+	dec	strLength
+
+lb1	ph8	llValue	divide by 10
+	ph8	#10
+	jsl	~UDIV8
+	pl8	llValue
+	pla		get the last digit
+	plx
+	plx
+	plx
+	ora	#$30	compute ASCII value for digit
+	short	M	store ASCII value
+	ldy	strLength
+	sta	[strPtr],y
+	long	M
+	dec	strLength
+	bmi	ret
+	lda	llValue	loop if remaining value is not 0
+	ora	llValue+2
+	ora	llValue+4
+	ora	llValue+6
+	bne	lb1
+	
+	short	M	pad with spaces
+	ldy	strLength
+	lda	#' '
+lb2	sta	[strPtr],y
+	dey
+	bpl	lb2
+	
+	long	M
+ret	lret
 	end
 
 ****************************************************************
