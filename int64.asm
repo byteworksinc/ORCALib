@@ -1,6 +1,6 @@
          keep  obj/int64
          mcopy int64.macros
-         case  on
+         case  off
 
 ****************************************************************
 *
@@ -11,7 +11,7 @@
 *
 ****************************************************************
 *
-Int64    start                          dummy segment
+Int64    private                        dummy segment
          end
 
 ****************************************************************
@@ -325,3 +325,122 @@ DV11     LDA   ANS,X
          TCS
          RTL
          END
+
+****************************************************************
+*
+*  ~CnvULongLongReal - convert an unsigned long long integer 
+*        into an extended SANE real
+*
+*  Inputs:
+*        unsigned long long int on stack
+*
+*  Outputs:
+*        extended real on stack
+*
+****************************************************************
+*
+~CnvULongLongReal start
+mantissa equ   4                        mantissa (integer and fraction)
+exponent equ   mantissa+8               biased exponent and sign bit
+
+         lda   1,S                      move return value
+         pha
+         lda   4,S
+         sta   2,S
+         tsc                            set up DP
+         phd
+         tcd
+
+         lda   mantissa+2               move 64-bit value to mantissa
+         sta   mantissa
+         lda   mantissa+4
+         sta   mantissa+2
+         lda   mantissa+6
+         sta   mantissa+4
+         lda   mantissa+8
+         sta   mantissa+6
+
+         ora   mantissa                 if value is 0 then
+         ora   mantissa+2
+         ora   mantissa+4
+         beq   ret                        return
+
+         lda   #63+16383                set initial exponent (2^63) and sign
+         sta   exponent
+
+         lda   mantissa+6               if number is normalized (i=1) then
+         bmi   ret                        return
+
+lp1      dec   exponent                 normalize number
+         asl   mantissa
+         rol   mantissa+2
+         rol   mantissa+4
+         rol   mantissa+6
+         bpl   lp1
+
+ret      pld
+         rtl
+         end
+
+****************************************************************
+*
+*  ~CnvLongLongReal - convert a long long integer into
+*        an extended SANE real
+*
+*  Inputs:
+*        signed long long int on stack
+*
+*  Outputs:
+*        extended real on stack
+*
+****************************************************************
+*
+~CnvLongLongReal start
+mantissa equ   4                        mantissa (integer and fraction)
+exponent equ   mantissa+8               biased exponent and sign bit
+
+         lda   1,S                      move return value
+         pha
+         lda   4,S
+         sta   2,S
+         tsc                            set up DP
+         phd
+         tcd
+
+         lda   mantissa+2               move 64-bit value to mantissa
+         sta   mantissa
+         lda   mantissa+4
+         sta   mantissa+2
+         lda   mantissa+6
+         sta   mantissa+4
+         lda   mantissa+8
+         sta   mantissa+6
+
+         ora   mantissa                 if value is 0 then
+         ora   mantissa+2
+         ora   mantissa+4
+         beq   ret                        return
+
+         ldy   #0                       default sign bit is 0 (positive)
+         lda   mantissa+6               if mantissa is negative then
+         bpl   lb0
+         sub8  #0,mantissa,mantissa       negate it
+         ldy   #$8000                     sign bit is 1 (negative)
+
+lb0      tya                            set sign
+         ora   #63+16383                set initial exponent (2^63)
+         sta   exponent
+
+         lda   mantissa+6               if number is normalized (i=1) then
+         bmi   ret                        return
+
+lp1      dec   exponent                 normalize number
+         asl   mantissa
+         rol   mantissa+2
+         rol   mantissa+4
+         rol   mantissa+6
+         bpl   lp1
+
+ret      pld
+         rtl
+         end
