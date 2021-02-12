@@ -349,14 +349,29 @@ num1     equ   4
          phd
          tcd
          
-loop1    lsr   num1+6                   do the shift
+         txa
+loop0    cmp   #16                      shift by 16s first
+         blt   loop1
+         ldy   num1+2
+         sty   num1
+         ldy   num1+4
+         sty   num1+2
+         ldy   num1+6
+         sty   num1+4
+         stz   num1+6
+;        sec
+         sbc   #16
+         bne   loop0
+         bra   rt0
+         
+loop1    lsr   num1+6                   do the remaining shift
          ror   num1+4
          ror   num1+2
          ror   num1
-         dex
+         dec   a
          bne   loop1
          
-         pld
+rt0      pld
 rtl      rtl
          end
 
@@ -419,14 +434,29 @@ num1     equ   4
          phd
          tcd
          
-loop1    asl   num1                     do the shift
+         txa
+loop0    cmp   #16                      shift by 16s first
+         blt   loop1
+         ldy   num1+4
+         sty   num1+6
+         ldy   num1+2
+         sty   num1+4
+         ldy   num1
+         sty   num1+2
+         stz   num1
+;        sec
+         sbc   #16
+         bne   loop0
+         bra   rt0
+         
+loop1    asl   num1                     do the remaining shift
          rol   num1+2
          rol   num1+4
          rol   num1+6
-         dex
+         dec   a
          bne   loop1
          
-         pld
+rt0      pld
 rtl      rtl
          end
 
