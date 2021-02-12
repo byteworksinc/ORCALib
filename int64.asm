@@ -328,6 +328,110 @@ DV11     LDA   ANS,X
 
 ****************************************************************
 *
+*  ~LShr8 - Shift an unsigned long long value right
+*
+*  Inputs:
+*        num1 - value to shift
+*        A - # of bits to shift by
+*
+*  Outputs:
+*        num1 - result
+*
+****************************************************************
+*
+~LShr8   start
+num1     equ   4
+
+         tax                            save shift count
+         beq   rtl                      return if it is 0
+
+         tsc
+         phd
+         tcd
+         
+loop1    lsr   num1+6                   do the shift
+         ror   num1+4
+         ror   num1+2
+         ror   num1
+         dex
+         bne   loop1
+         
+         pld
+rtl      rtl
+         end
+
+****************************************************************
+*
+*  ~AShr8 - Shift a signed long long value right
+*
+*  Inputs:
+*        num1 - value to shift
+*        A - # of bits to shift by
+*
+*  Outputs:
+*        num1 - result
+*
+****************************************************************
+*
+~AShr8   start
+num1     equ   4
+
+         tax                            save shift count
+         beq   rtl                      return if it is 0
+
+         tsc
+         phd
+         tcd
+         
+loop1    lda   num1+6                   do the shift
+         asl   a
+         ror   num1+6
+         ror   num1+4
+         ror   num1+2
+         ror   num1
+         dex
+         bne   loop1
+         
+         pld
+rtl      rtl
+         end
+
+****************************************************************
+*
+*  ~Shl8 - Shift a signed long long value left
+*
+*  Inputs:
+*        num1 - value to shift
+*        A - # of bits to shift by
+*
+*  Outputs:
+*        num1 - result
+*
+****************************************************************
+*
+~Shl8    start
+num1     equ   4
+
+         tax                            save shift count
+         beq   rtl                      return if it is 0
+
+         tsc
+         phd
+         tcd
+         
+loop1    asl   num1                     do the shift
+         rol   num1+2
+         rol   num1+4
+         rol   num1+6
+         dex
+         bne   loop1
+         
+         pld
+rtl      rtl
+         end
+
+****************************************************************
+*
 *  ~CnvULongLongReal - convert an unsigned long long integer 
 *        into an extended SANE real
 *
