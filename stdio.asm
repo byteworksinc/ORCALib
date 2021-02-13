@@ -4018,7 +4018,7 @@ rn3	inc	argp
 
 	dec	strLength
 
-lb1	ph8	llValue	divide by 10
+lb1	ph8	<llValue	divide by 10
 	ph8	#10
 	jsl	~UDIV8
 	pl8	llValue
@@ -5195,7 +5195,7 @@ lb4b	lda	~suppress	if input is not suppressed then
 	bne	lb7
 	lda	minus	  if minus then
 	beq	lb4c
-	sub8	#0,val,val	    negate the value
+	negate8 val	    negate the value
 lb4c	lda	val	  save the value
 	ldx	~size
 	bpl	lb4d
@@ -5635,7 +5635,7 @@ lb4b	lda	~suppress	if input is not suppressed then
 	bne	lb7
 	lda	minus	  if minus then
 	beq	lb4c
-	sub8	#0,val,val	    negate the value
+	negate8 val	    negate the value
 lb4c	lda	val	  save the value
 	ldx	~size
 	bpl	lb4d

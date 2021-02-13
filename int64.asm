@@ -558,7 +558,7 @@ exponent equ   mantissa+8               biased exponent and sign bit
          ldy   #0                       default sign bit is 0 (positive)
          lda   mantissa+6               if mantissa is negative then
          bpl   lb0
-         sub8  #0,mantissa,mantissa       negate it
+         negate8 mantissa               negate it
          ldy   #$8000                     sign bit is 1 (negative)
 
 lb0      tya                            set sign

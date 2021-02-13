@@ -518,7 +518,7 @@ retptr   equ   1
          stx   retptr
          stz   retptr+2
          
-         ph8   i
+         ph8   <i
          jsl   ~ABS8
          pla
          sta   [retptr]
@@ -596,8 +596,8 @@ addr     equ   1
          phb                            use local addressing
          phk
          plb
-         ph8   n                        do the divide
-         ph8   d
+         ph8   <n                       do the divide
+         ph8   <d
          jsl   ~CDIV8
          pl8   lldiv_t
          pl8   lldiv_t+8
@@ -1272,7 +1272,7 @@ rt1      pla                            remove the original value of str from
          pla                             the stack
          lda   negative                 if negative then
          beq   rt2
-         sub8  #0,val,val                 val = -val
+         negate8 val                      val = -val
 
 rt2      lda   val                      get the value
          sta   [retptr]
@@ -1437,7 +1437,7 @@ cn3      cmp   base                     branch if the digit is too big
          ldx   #1                       note that we have found a number
          stx   foundOne
          pha                            save the digit
-         ph8   val                      val = val*base
+         ph8   <val                     val = val*base
          pea   0
          pea   0
          pea   0
@@ -1499,7 +1499,7 @@ rt1a     lda   rangeOK                  check if number was out of range
          bra   rt3
 rt2      lda   negative                 if negative then
          beq   rt2a
-         sub8  #0,val,val                 val = -val
+         negate8 val                      val = -val
 rt2a     lda   val                      get the value
          sta   [retptr]
          ldy   #2
