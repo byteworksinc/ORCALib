@@ -328,6 +328,62 @@ DV11     LDA   ANS,X
 
 ****************************************************************
 *
+*  ~SCMP8 - Eight Byte Signed Integer Compare
+*
+*  Inputs:
+*        NUM1 - first argument
+*        NUM2 - second argument
+*
+*  Outputs:
+*        C - set if NUM1 >= NUM2, else clear
+*        Z - set if NUM1 = NUM2, else clear
+*
+****************************************************************
+*
+~SCMP8   START
+NUM1     EQU   12                       first argument
+NUM2     EQU   4                        second argument
+RETURN   EQU   0                        P reg and return addr
+
+         TDC                            set up DP
+         TAX
+         TSC
+         TCD
+         LDA   NUM1+6                   if numbers are of opposite sign then
+         EOR   NUM2+6
+         BPL   LB1
+         LDA   NUM2+6                     reverse sense of compare
+         CMP   NUM1+6
+         BRA   LB2                      else
+LB1      LDA   NUM1+6                     compare numbers
+         CMP   NUM2+6
+         BNE   LB2
+         LDA   NUM1+4
+         CMP   NUM2+4
+         BNE   LB2
+         LDA   NUM1+2
+         CMP   NUM2+2
+         BNE   LB2
+         LDA   NUM1
+         CMP   NUM2
+LB2      ANOP                           endif
+         PHP                            save result
+         LDA   RETURN                   move P and return addr
+         STA   NUM1+4
+         LDA   RETURN+2
+         STA   NUM1+6
+         CLC                            remove 16 bytes from stack
+         TSC
+         ADC   #16
+         TCS
+         TXA                            restore DP
+         TCD
+         PLP                            restore P
+         RTL                            return
+         END
+
+****************************************************************
+*
 *  ~LShr8 - Shift an unsigned long long value right
 *
 *  Inputs:
