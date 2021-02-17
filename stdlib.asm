@@ -278,6 +278,35 @@ atol     entry
 
 ****************************************************************
 *
+*  atoll - convert a string to a long long
+*
+*  Inputs:
+*        str - pointer to the string
+*
+*  Outputs:
+*        converted number
+*
+****************************************************************
+*
+atoll    start
+
+         ph2   #10                      base 10
+         ph4   #0                       no pointer returned
+         lda   12,S                     pass the string addr on
+         pha
+         lda   12,S
+         pha                            note: x reg is unchanged
+         jsl   strtoll                  convert the string
+         lda   2,S                      fix the stack
+         sta   6,S
+         pla
+         sta   3,S
+         pla
+         rtl
+         end
+
+****************************************************************
+*
 *  char *bsearch(key, base, count, size, compar)
 *        void *key, *base;
 *        size_t count, size;
