@@ -614,7 +614,7 @@ exponent equ   mantissa+8               biased exponent and sign bit
          ldy   #0                       default sign bit is 0 (positive)
          lda   mantissa+6               if mantissa is negative then
          bpl   lb0
-         negate8 mantissa               negate it
+         negate8 mantissa                 negate it
          ldy   #$8000                     sign bit is 1 (negative)
 
 lb0      tya                            set sign
@@ -633,4 +633,131 @@ lp1      dec   exponent                 normalize number
 
 ret      pld
          rtl
+         end
+
+****************************************************************
+*
+*  ~CnvRealLongLong - convert an extended SANE real into
+*        a long long integer
+*
+*  Inputs:
+*        extended real on stack
+*
+*  Outputs:
+*        signed long long int on stack
+*
+****************************************************************
+*
+~CnvRealLongLong start
+         tsc
+         clc
+         adc   #4
+         pea   0                        push src address for fcpxx
+         pha
+         pea   llmin|-16                push dst address for fcpxx
+         pea   llmin
+         pea   0                        push operand address for ftintx
+         pha
+         ftintx                         round
+         fcpxx                          compare with LLONG_MIN
+         bne   convert
+         
+         lda   #$8000                   if it is LONG_MIN, use that value
+         sta   12,s
+         asl   a
+         sta   10,s
+         sta   8,s
+         sta   6,s
+         bra   done
+         
+convert  tsc                            if it is not LONG_MIN, call fx2c:
+         clc
+         adc   #4
+         pea   0                          push src address for fx2c
+         pha
+         pea   0                          push dst address for fx2c
+         inc   a
+         inc   a
+         pha
+         fx2c                             convert
+         
+done     phb                            move return address
+         pla
+         plx
+         ply
+         phx
+         pha
+         plb
+         rtl
+
+llmin    dc    e'-9223372036854775808'
+         end
+
+****************************************************************
+*
+*  ~CnvRealULongLong - convert an extended SANE real into
+*        an unsigned long long integer
+*
+*  Inputs:
+*        extended real on stack
+*
+*  Outputs:
+*        unsigned long long int on stack
+*
+****************************************************************
+*
+~CnvRealULongLong start
+         pea   0                        initially assume val <= LLONG_MAX
+
+         tsc
+         clc
+         adc   #6
+         pea   0                        push src address for fcpxx
+         pha
+         pea   llbig|-16                push dst address for fcpxx
+         pea   llbig
+         pea   0                        push operand address for ftintx
+         pha
+         ftintx                         round
+         fcpxx                          compare with LLONG_MAX+1
+         bmi   convert
+         
+         lda   #1                       if val > LLONG_MAX:
+         sta   1,S                        save flag to indicate this
+         tsc
+         clc
+         adc   #6
+         pea   llbig|-16                  push src address for fsubx
+         pea   llbig
+         pea   0                          push dst address for fsubx
+         pha
+         fsubx                            val -= LLONG_MAX+1
+         
+convert  tsc
+         clc
+         adc   #6
+         pea   0                        push src address for fx2c
+         pha
+         pea   0                        push dst address for fx2c
+         inc   a
+         inc   a
+         pha
+         fx2c                           convert val as comp
+         
+         pla                            if orig val was > LLONG_MAX:
+         beq   done
+         lda   12,s
+         eor   #$8000
+         sta   12,s                       result += LLONG_MAX+1
+         
+done     phb                            move return address
+         pla
+         plx
+         ply
+         phx
+         pha
+         plb
+         rtl
+
+llbig    dc    e'9223372036854775808'
          end
