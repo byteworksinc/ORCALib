@@ -4009,7 +4009,7 @@ rn3	inc	argp
 *  Inputs:
 *	llValue - the unsigned long long value
 *	strPtr - pointer to string buffer
-*	strLength - length of string buffer
+*	strLength - length of string buffer (must be >= 20)
 *
 ****************************************************************
 *
@@ -4018,36 +4018,68 @@ rn3	inc	argp
 
 	dec	strLength
 
-lb1	ph8	<llValue	divide by 10
-	ph8	#10
-	jsl	~UDIV8
-	pl8	llValue
-	pla		get the last digit
-	plx
-	plx
-	plx
-	ora	#$30	compute ASCII value for digit
-	short	M	store ASCII value
-	ldy	strLength
-	sta	[strPtr],y
-	long	M
-	dec	strLength
-	bmi	ret
-	lda	llValue	loop if remaining value is not 0
-	ora	llValue+2
-	ora	llValue+4
-	ora	llValue+6
-	bne	lb1
-	
-	short	M	pad with spaces
-	ldy	strLength
-	lda	#' '
-lb2	sta	[strPtr],y
+	ldx	#8
+initbcd	stz	bcdnum,x
+	dex
+	dex
+	bpl	initbcd
+
+	ldy	#64
+	sed		use BCD
+bitloop	asl	llValue
+	rol	llValue+2
+	rol	llValue+4
+	rol	llValue+6	carry is now high bit from llValue
+	ldx	#8
+addloop	lda	bcdnum,x	bcdNum := bcdNum*2 + carry (in BCD)
+	adc	bcdnum,x
+	dey		make fully big-endian on last iteration
+	bne	notlast
+	xba
+notlast	iny
+	sta	bcdnum,x
+	dex
+	dex
+	bpl	addloop
 	dey
-	bpl	lb2
+	bne	bitloop
+	cld
+
+	short	M	convert BCD to ASCII
+	ldx	#9
+	ldy	strLength
+bcdloop	lda	bcdnum,x
+	and	#$0F
+	ora	#$30	low digit to ASCII
+	sta	[strPtr],y
+	dey
+	lda	bcdnum,x
+	lsr	a
+	lsr	a
+	lsr	a
+	lsr	a
+	ora	#$30	high digit to ASCII
+	sta	[strPtr],y
+	dey
+	dex
+	bpl	bcdloop
+	
+rmzeros	iny		remove leading zeros
+	lda	[strPtr],y
+	cmp	#'0'
+	bne	padit
+	cpy	strLength
+	bne	rmzeros
+padit	dey		pad with spaces
+	lda	#' '
+padloop	sta	[strPtr],y
+	dey
+	bpl	padloop
 	
 	long	M
-ret	lret
+	lret
+
+bcdnum	ds	10
 	end
 
 ****************************************************************
