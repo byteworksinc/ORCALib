@@ -663,6 +663,9 @@ qsort    start
          phk
          plb
 
+         lda   count                    nothing to do if count is 0
+         ora   count+2
+         beq   done
          dec4  count                    set count to the addr of the last entry
          mul4  count,size
          add4  count,base
@@ -677,7 +680,7 @@ qsort    start
          ph4   base
          jsl   rsort
 
-         plb
+done     plb
          creturn
          end
 
