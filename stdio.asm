@@ -1678,7 +1678,7 @@ SetEOF	ldy	#FILE_flag	  set the eof flag
 *     char *format;
 *     FILE *stream;
 *
-*  Read a string from a string.
+*  Read a string from a stream.
 *
 ****************************************************************
 *
@@ -1712,6 +1712,14 @@ lb1	lda	#get	set up our routines
 	sta	>~putback+12
 	lda	#>unget
 	sta	>~putback+13
+
+	lda	#~RemoveWordFromStack
+	sta	>~RemoveWord+1
+	lda	#>~RemoveWordFromStack
+	sta	>~RemoveWord+2
+
+	lda	#0
+	sta	>~isVarArgs
 
 	brl	~scanf
 
@@ -2514,6 +2522,14 @@ scanf	start
 	lda	#>unget
 	sta	>~putback+13
 
+	lda	#~RemoveWordFromStack
+	sta	>~RemoveWord+1
+	lda	#>~RemoveWordFromStack
+	sta	>~RemoveWord+2
+
+	lda	#0
+	sta	>~isVarArgs
+
 	brl	~scanf
 
 unget	tax
@@ -2941,6 +2957,14 @@ sscanf	start
 	sta	>~putback+12
 	lda	#>unget
 	sta	>~putback+13
+
+	lda	#~RemoveWordFromStack
+	sta	>~RemoveWord+1
+	lda	#>~RemoveWordFromStack
+	sta	>~RemoveWord+2
+
+	lda	#0
+	sta	>~isVarArgs
 
 	brl	~scanf
 
@@ -3527,6 +3551,178 @@ count	ds	4	chars left to write
 
 ****************************************************************
 *
+*  int vfscanf(FILE *stream, char *format, va_list arg)
+*
+*  Read a string from a stream.
+*
+****************************************************************
+*
+vfscanf	start
+	using ~scanfCommon
+
+	phb		use local addressing
+	phk
+	plb
+	plx		remove the return address
+	ply
+	pla		save the stream
+	sta	stream
+	pla
+	sta	stream+2
+	phy		restore return address/data bank
+	phx
+	plb
+
+	ph4	>stream	verify that stream exists
+	jsl	~VerifyStream
+	bcc	lb1
+	lda	#EOF
+	rtl
+lb1	lda	#get	set up our routines
+	sta	>~getchar+10
+	lda	#>get
+	sta	>~getchar+11
+
+	lda	#unget
+	sta	>~putback+12
+	lda	#>unget
+	sta	>~putback+13
+
+	lda	#~RemoveWordFromVarArgs
+	sta	>~RemoveWord+1
+	lda	#>~RemoveWordFromVarArgs
+	sta	>~RemoveWord+2
+
+	lda	#1
+	sta	>~isVarArgs
+
+	brl	~scanf
+
+get	ph4	stream	get a character
+	jsl	fgetc
+	rtl
+
+unget	ldx	stream+2	put a character back
+	phx
+	ldx	stream
+	phx
+	pha
+	jsl	ungetc
+	rtl
+
+stream	ds	4
+	end
+
+****************************************************************
+*
+*  int vscanf(char *format, va_list arg)
+*
+*  Read a string from standard in.
+*
+****************************************************************
+*
+vscanf	start
+	using ~scanfCommon
+
+	lda	#getchar
+	sta	>~getchar+10
+	lda	#>getchar
+	sta	>~getchar+11
+
+	lda	#unget
+	sta	>~putback+12
+	lda	#>unget
+	sta	>~putback+13
+
+	lda	#~RemoveWordFromVarArgs
+	sta	>~RemoveWord+1
+	lda	#>~RemoveWordFromVarArgs
+	sta	>~RemoveWord+2
+
+	lda	#1
+	sta	>~isVarArgs
+
+	brl	~scanf
+
+unget	tax
+	lda	>stdin+2
+	pha
+	lda	>stdin
+	pha
+	phx
+	jsl	ungetc
+	rtl
+	end
+
+****************************************************************
+*
+*  int vsscanf(char *s, char *format, va_list arg)
+*
+*  Read a string from a string.
+*
+****************************************************************
+*
+vsscanf	start
+	using ~scanfCommon
+
+	phb		use local addressing
+	phk
+	plb
+	plx		remove the return address
+	ply
+	pla		save the stream
+	sta	string
+	pla
+	sta	string+2
+	phy		restore return address/data bank
+	phx
+	plb
+
+	lda	#get	set up our routines
+	sta	>~getchar+10
+	lda	#>get
+	sta	>~getchar+11
+
+	lda	#unget
+	sta	>~putback+12
+	lda	#>unget
+	sta	>~putback+13
+
+	lda	#~RemoveWordFromVarArgs
+	sta	>~RemoveWord+1
+	lda	#>~RemoveWordFromVarArgs
+	sta	>~RemoveWord+2
+
+	lda	#1
+	sta	>~isVarArgs
+
+	brl	~scanf
+
+get	ph4	string	get a character
+	phd
+	tsc
+	tcd
+	lda	[3]
+	and	#$00FF
+	bne	gt1
+	dec4	string
+	lda	#EOF
+gt1	pld
+	ply
+	ply
+	inc4	string
+	rtl
+
+unget	cmp	#EOF	put a character back
+	beq	ug1
+	dec4	string
+ug1	rtl
+
+string	ds	4
+	end
+
+****************************************************************
+*
 *  ~Format_c - format a '%' character
 *
 *  Inputs:
@@ -3560,6 +3756,7 @@ argp	equ	7	argument pointer
 *	~paddChar - padd character
 *	~leftJustify - left justify the output?
 *	~isLong - is the operand long?
+*	~isLongLong - is the operand long long?
 *	~precision - precision of output
 *	~precisionSpecified - was the precision specified?
 *	~sign - char to use for positive sign
@@ -3575,8 +3772,32 @@ argp	equ	7	argument pointer
 ;
 ;  For signed numbers, if the value is negative, use the sign flag
 ;
-	lda	~isLong	handle long values
+	lda	~isLongLong	handle long long values
 	beq	sn0
+	ldy	#6
+	lda	[argp],Y
+	bpl	cn0
+	sec
+	lda	#0
+	sbc	[argp]
+	sta	[argp]
+	ldy	#2
+	lda	#0
+	sbc	[argp],Y
+	sta	[argp],Y
+	iny
+	iny
+	lda	#0
+	sbc	[argp],Y
+	sta	[argp],Y
+	iny
+	iny
+	lda	#0
+	sbc	[argp],Y
+	sta	[argp],Y
+	bra	sn2
+sn0	lda	~isLong	handle long values
+	beq	sn0a
 	ldy	#2
 	lda	[argp],Y
 	bpl	cn0
@@ -3588,7 +3809,7 @@ argp	equ	7	argument pointer
 	sbc	[argp],Y
 	sta	[argp],Y
 	bra	sn2
-sn0	lda	~isByte	handle (originally) byte-size values
+sn0a	lda	~isByte	handle (originally) byte-size values
 	beq	sn1
 	lda	[argp]
 	and	#$00FF
@@ -3610,7 +3831,16 @@ sn2	lda	#'-'
 ;  Convert the number to an ASCII string
 ;
 cn0	stz	~hexPrefix	don't lead with 0x
-	lda	~isLong	if the value is long then
+	lda	~isLongLong	if the value is long long then
+	beq	cn0a
+	ldy	#6	  push a long long value
+	lda	[argp],Y
+	pha
+	dey
+	dey
+	lda	[argp],Y
+	pha
+cn0a	lda	~isLong	else if the value is long then
 	beq	cn1
 	ldy	#2	  push a long value
 	lda	[argp],Y
@@ -3626,7 +3856,12 @@ cn1a	pha
 cn2	ph4	#~str	push the string addr
 	ph2	#l:~str	push the string buffer length
 	ph2	#0	do an unsigned conversion
-	lda	~isLong	do the proper conversion
+	lda	~isLongLong	do the proper conversion
+	beq	cn2a
+	pla
+	jsr	~ULongLong2Dec
+	bra	pd1
+cn2a	lda	~isLong
 	beq	cn3
 	_Long2Dec
 	bra	pd1
@@ -3636,9 +3871,12 @@ cn3	_Int2Dec
 ;
 ~Format_IntOut entry
 pd1	lda	~precisionSpecified	if the precision was not specified then
-	bne	pd2
+	bne	pd1a
 	lda	#1	  use a precision of 1
 	sta	~precision
+	bra	pd2
+pd1a	lda	#' '	if the precision was specified then
+	sta	~paddChar	  do not do 0 padding
 pd2	ldx	~precision	if the precision is zero then
 	bne	pd2a
 	lda	~str+l:~str-2	  if the result is ' 0' then
@@ -3746,11 +3984,17 @@ pn5	cpy	#l:~str	quit if we're at the end of the ~str
 ;
 ;  remove the number from the argument list
 ;
-rn1	lda	~isLong
+rn1	lda	~isLongLong
 	beq	rn2
 	inc	argp
 	inc	argp
-rn2	inc	argp
+	inc	argp
+	inc	argp
+rn2	lda	~isLong
+	beq	rn3
+	inc	argp
+	inc	argp
+rn3	inc	argp
 	inc	argp
 ;
 ;  Handle left justification
@@ -3760,11 +4004,92 @@ rn2	inc	argp
 
 ****************************************************************
 *
+*  ~ULongLong2Dec - produce a string from an unsigned long long
+*
+*  Inputs:
+*	llValue - the unsigned long long value
+*	strPtr - pointer to string buffer
+*	strLength - length of string buffer (must be >= 20)
+*
+****************************************************************
+*
+~ULongLong2Dec private
+	lsub (8:llValue,4:strPtr,2:strLength),0
+
+	dec	strLength
+
+	ldx	#8
+initbcd	stz	bcdnum,x
+	dex
+	dex
+	bpl	initbcd
+
+	ldy	#64
+	sed		use BCD
+bitloop	asl	llValue
+	rol	llValue+2
+	rol	llValue+4
+	rol	llValue+6	carry is now high bit from llValue
+	ldx	#8
+addloop	lda	bcdnum,x	bcdNum := bcdNum*2 + carry (in BCD)
+	adc	bcdnum,x
+	dey		make fully big-endian on last iteration
+	bne	notlast
+	xba
+notlast	iny
+	sta	bcdnum,x
+	dex
+	dex
+	bpl	addloop
+	dey
+	bne	bitloop
+	cld
+
+	short	M	convert BCD to ASCII
+	ldx	#9
+	ldy	strLength
+bcdloop	lda	bcdnum,x
+	and	#$0F
+	ora	#$30	low digit to ASCII
+	sta	[strPtr],y
+	dey
+	lda	bcdnum,x
+	lsr	a
+	lsr	a
+	lsr	a
+	lsr	a
+	ora	#$30	high digit to ASCII
+	sta	[strPtr],y
+	dey
+	dex
+	bpl	bcdloop
+	
+rmzeros	iny		remove leading zeros
+	lda	[strPtr],y
+	cmp	#'0'
+	bne	padit
+	cpy	strLength
+	bne	rmzeros
+padit	dey		pad with spaces
+	lda	#' '
+padloop	sta	[strPtr],y
+	dey
+	bpl	padloop
+	
+	long	M
+	lret
+
+bcdnum	ds	10
+	end
+
+****************************************************************
+*
 *  ~Format_n - return the number of characters printed
 *
 *  Inputs:
 *	~numChars - characters written
 *	~isLong - is the operand long?
+*	~isLong - is the operand long long?
 *
 ****************************************************************
 *
@@ -3785,7 +4110,15 @@ argp	equ	7	argument pointer
 	sep	#$20
 lb0	sta	[argp]
 	rep	#$20
-	lda	~isLong	if long, set the high word
+	lda	~isLongLong	if long long, set the high words
+	beq	lb0a
+	ldy	#6
+	lda	#0
+	sta	[argp],Y
+	dey
+	dey
+	sta	[argp],Y
+lb0a	lda	~isLong	if long, set the high word
 	beq	lb1
 	ldy	#2
 	lda	#0
@@ -3809,6 +4142,7 @@ lb1	clc		restore the original argp+4
 *	~paddChar - padd character
 *	~leftJustify - left justify the output?
 *	~isLong - is the operand long?
+*	~isLongLong - is the operand long long?
 *	~precision - precision of output
 *	~precisionSpecified - was the precision specified?
 *
@@ -3825,9 +4159,18 @@ argp	equ	7	argument pointer
 	sta	~str
 	move	~str,~str+1,#l:~str-1
 	stz	~num+2	get the value to convert
-	lda	~isLong
+	lda	~isLongLong
+	beq	cn1
+	ldy	#6
+	lda	[argp],Y
+	sta	~num+6
+	dey
+	dey
+	lda	[argp],Y
+	sta	~num+4
+cn1	lda	~isLong
 	beq	cn2
-	ldy	#2
+cn1a	ldy	#2
 	lda	[argp],Y
 	sta	~num+2
 cn2	lda	[argp]
@@ -3840,14 +4183,22 @@ cn2a	sta	~num
 ;
 	short I,M
 	ldy	#l:~str-1	set up the character index
-cn3	lda	~num+3	quit if the number is zero
+cn3	lda	~num+7	quit if the number is zero
+	ora	~num+6
+	ora	~num+5
+	ora	~num+4
+	ora	~num+3
 	ora	~num+2
 	ora	~num+1
 	ora	~num
 	beq	al1
 	lda	#0	roll off 3 bits
 	ldx	#3
-cn4	lsr	~num+3
+cn4	lsr	~num+7
+	ror	~num+6
+	ror	~num+5
+	ror	~num+4
+	ror	~num+3
 	ror	~num+2
 	ror	~num+1
 	ror	~num
@@ -3883,7 +4234,8 @@ al3	long	I,M
 ****************************************************************
 *
 *  ~Format_s - format a c-string
-*  ~Format_b - format a p-string
+*  ~Format_b - format a p-string (deprecated)
+*  ~Format_P - format a p-string
 *
 *  Inputs:
 *	~fieldWidth - output field width
@@ -3913,6 +4265,7 @@ lb1	iny
 	bra	lb1a
 
 ~Format_b entry
+~Format_P entry
 	ph4	argp	save the original argp
 	ldy	#2	dereference argp
 	lda	[argp],Y
@@ -3965,6 +4318,7 @@ lb4	clc		restore and increment argp
 *	~paddChar - padd character
 *	~leftJustify - left justify the output?
 *	~isLong - is the operand long?
+*	~isLongLong - is the operand long long?
 *	~precision - precision of output
 *	~precisionSpecified - was the precision specified?
 *
@@ -3993,7 +4347,18 @@ cn0	stz	~sign	ignore the sign flag
 	sta	~str
 	move	~str,~str+1,#l:~str-1
 	stz	~num+2	get the value to convert
-	lda	~isLong
+	stz	~num+4
+	stz	~num+6
+	lda	~isLongLong
+	beq	cn1
+	ldy	#6
+	lda	[argp],Y
+	sta	~num+6
+	dey
+	dey
+	lda	[argp],Y
+	sta	~num+4
+cn1	lda	~isLong
 	beq	cn2
 	ldy	#2
 	lda	[argp],Y
@@ -4003,7 +4368,12 @@ cn2	lda	[argp]
 	beq	cn2a
 	and	#$00FF
 cn2a	sta	~num
-	stz	~hexPrefix	assume we won't lead with 0x
+	ora	~num+2
+	ora	~num+4
+	ora	~num+6
+	bne	cn2b
+	stz	~altForm	if value is 0, do not print hex prefix
+cn2b	stz	~hexPrefix	assume we won't lead with 0x
 ;
 ;  Convert the number to an ASCII string
 ;
@@ -4011,7 +4381,11 @@ cn2a	sta	~num
 	ldy	#l:~str-1	set up the character index
 cn3	lda	#0	roll off 4 bits
 	ldx	#4
-cn4	lsr	~num+3
+cn4	lsr	~num+7
+	ror	~num+6
+	ror	~num+5
+	ror	~num+4
+	ror	~num+3
 	ror	~num+2
 	ror	~num+1
 	ror	~num
@@ -4029,7 +4403,11 @@ cn4	lsr	~num+3
 	ora	orVal
 cn5	sta	~str,Y	save the character
 	dey
-	lda	~num+3	loop if the number is not zero
+	lda	~num+7	loop if the number is not zero
+	ora	~num+6
+	ora	~num+5
+	ora	~num+4
+	ora	~num+3
 	ora	~num+2
 	ora	~num+1
 	ora	~num
@@ -4364,6 +4742,7 @@ fm1	inc4	format	skip the '%'
 	stz	~precision	use the default precision
 	stz	~precisionSpecified
 	stz	~isLong	assume short operands
+	stz	~isLongLong
 	stz	~isByte
 	lda	#' '	use a blank for padding
 	sta	~paddChar
@@ -4384,16 +4763,25 @@ fm2	jsr	Flag	read and interpret flag characters
 	jsr	GetSize	  get the precision
 	sta	~precision
 	lda	[format]	if *format in ['l','z','t','j'] then
-	and	#$00FF
+	and	#$00FF	  ~isLong = true
 fm3	cmp	#'l'
+	bne	fm3b
+	inc4	format	  for 'll' or 'j', also set ~isLongLong
+	lda	[format]	
+	and	#$00FF
+	cmp	#'l'
+	beq	fm3a
+	inc	~isLong
+	bra	fm6
+fm3a	inc	~isLongLong
+	bra	fm3c
+fm3b	cmp	#'j'
 	beq	fm3a
 	cmp	#'z'
-	beq	fm3a
+	beq	fm3c
 	cmp	#'t'
-	beq	fm3a
-	cmp	#'j'
 	bne	fm4
-fm3a	inc	~isLong	  ~isLong = true
+fm3c	inc	~isLong
 	bra	fm5	  ++format
 fm4	cmp	#'L'	else if *format in ['L','h'] then
 	beq	fm5
@@ -4472,7 +4860,17 @@ GetSize	stz	val	assume a value of 0
 	bne	gs1
 	inc4	format	  skip the '*' char
 	lda	[argp]	  fetch the value
-	sta	val
+	bpl	fv1	  do adjustments if negative:
+	ldx	~precisionSpecified
+	bne	fv0
+	eor	#$ffff	    negative field width is like
+	inc	a	      positive with - flag
+	ldx	#1
+	stx	~leftJustify
+	bra	fv1
+fv0	lda	#0	    negative precision is ignored
+	stz	~precisionSpecified
+fv1	sta	val
 	inc	argp	  remove it from the argument list
 	inc	argp
 gs0	lda	val
@@ -4513,6 +4911,7 @@ fList	dc	c'%',i1'0',a'~Format_Percent'	%
 	dc	c'n',i1'0',a'~Format_n'		n
 	dc	c's',i1'0',a'~Format_s'		s
 	dc	c'b',i1'0',a'~Format_b'		b
+	dc	c'P',i1'0',a'~Format_P'		P
 	dc	c'p',i1'0',a'~Format_p'		p
 	dc	c'c',i1'0',a'~Format_c'		c
 	dc	c'X',i1'0',a'~Format_X'		X
@@ -4542,7 +4941,8 @@ fListEnd anop
 ~altForm ds	2	use alternate output format?
 ~fieldWidth ds 2	output field width
 ~hexPrefix ds	2	hex 0x prefix characters (if present)
-~isLong	 ds	2	is the operand long?
+~isLong	 ds	2	is the operand long _or_ long long ?
+~isLongLong ds	2	is the operand long long (64-bit)?
 ~isByte	ds	2	is operand byte-size (converted to int)?
 ~leftJustify ds 2	left justify the output?
 ~paddChar ds	2	output padd character
@@ -4553,7 +4953,7 @@ fListEnd anop
 ;
 ;  Work buffers
 ;
-~num	ds	4	long integer
+~num	ds	8	long long integer
 ~numChars ds	2	number of characters printed with this printf
 ~str	ds	83	string buffer
 ;
@@ -4571,14 +4971,14 @@ fListEnd anop
 
 ****************************************************************
 *
-*  ~RemoveWord - remove Y words from the stack for scanf
+*  ~RemoveWordFromStack - remove Y words from the stack for scanf
 *
 *  Inputs:
 *	Y - number of words to remove (must be >0)
 *
 ****************************************************************
 *
-~RemoveWord start
+~RemoveWordFromStack private
 
 lb1	lda	13,S	move the critical values
 	sta	15,S
@@ -4607,6 +5007,40 @@ lb1	lda	13,S	move the critical values
 
 ****************************************************************
 *
+*  ~RemoveWordFromVarArgs - remove Y words from the variable 
+*                           arguments for scanf
+*
+*  Inputs:
+*	Y - number of words to remove (must be 1 or 2)
+*
+****************************************************************
+*
+~RemoveWordFromVarArgs private
+	using ~scanfCommon
+arg	equ	11	argument position
+
+	tya		advance argument pointer
+	asl	a
+lb2	inc4	~va_arg_ptr
+	dec	a
+	bne	lb2
+
+	lda	~va_arg_ptr	stick next argument in arg location
+	sta	arg
+	lda	~va_arg_ptr+2
+	sta	arg+2
+	lda	[arg]
+	tax
+	cpy	#2
+	bne	lb1
+	lda	[arg],y
+	sta	arg+2
+lb1	stx	arg
+	rts
+	end
+
+****************************************************************
+*
 *  ~Scan_c - read a character or multiple characters
 *
 *  Inputs:
@@ -4619,20 +5053,25 @@ lb1	lda	13,S	move the critical values
 	using ~scanfCommon
 arg	equ	11	argument
 
+	stz	didOne	no characters scanned from the stream
 	lda	~scanWidth	if ~scanWidth == 0 then
 	bne	lb1
 	inc	~scanWidth	  ~scanWidth = 1
 
 lb1	jsl	~getchar	get the character
 	cmp	#EOF	if at EOF then
+	bne	lb1b
+	ldx	didOne	   if no characters read then
 	bne	lb1a
-	sta	~eofFound	   ~eofFound = EOF
-	lda	~suppress	   if input is not suppressed then
+	sta	~eofFound	     ~eofFound = EOF
+lb1a	lda	~suppress	   if input is not suppressed then
 	bne	lb3
 	dec	~assignments	      no assignment made
 	bra	lb3	   bail out
 
-lb1a	ldx	~suppress	if input is not suppressed then
+lb1b	ldx	#1
+	stx	didOne
+	ldx	~suppress	if input is not suppressed then
 	bne	lb2
 	short M	  save the value
 	sta	[arg]
@@ -4645,6 +5084,8 @@ lb3	lda	~suppress	if input is not suppressed then
 	ldy	#2
 	jsr	~RemoveWord	remove the parameter from the stack
 lb4	rts
+
+didOne	ds	2	non-zero if we have scanned a character
 	end
 
 ****************************************************************
@@ -4670,11 +5111,13 @@ arg	equ	11	argument
 	lda	#1	allow base 8, 10, 16
 	sta	based
 
-bs1	stz	read	no chars read
+bs1	stz	read	no digits read
 	lda	#10	assume base 10
 	sta	base
 	stz	val	initialize the value to 0
 	stz	val+2
+	stz	val+4
+	stz	val+6
 lb1	jsl	~getchar	skip leading whitespace...
 	cmp	#EOF	if EOF then
 	bne	ef1
@@ -4687,17 +5130,20 @@ ef1	tax		{...back to skipping whitespace}
 	lda	__ctype+1,X
 	and	#_space
 	bne	lb1
-	inc	read
 	txa
 	stz	minus	assume positive number
 	cmp	#'+'	skip leading +
 	beq	sg1
 	cmp	#'-'	if - then set minus flag
-	bne	sg2
+	bne	sg3
 	inc	minus
-sg1	jsl	~getchar
-	inc	read
-sg2	ldx	based	if base 8, 16 are allowed then
+sg1	dec	~scanWidth
+	jeq	lb4a
+	bpl	sg2
+	stz	~scanWidth
+sg2	jsl	~getchar
+sg3	inc	read
+	ldx	based	if base 8, 16 are allowed then
 	beq	lb2
 	cmp	#'0'	  if the digit is '0' then
 	bne	lb2
@@ -4714,8 +5160,9 @@ lb1a	jsl	~getchar
 	cmp	#'x'
 	bne	lb2
 lb1b	asl	base	      use base 16
+	stz	read	      '0x' alone should not match
 	dec	~scanWidth	      get the next character
-	beq	lb4a
+	jeq	lb4a
 	bpl	lb1c
 	stz	~scanWidth
 lb1c	jsl	~getchar
@@ -4740,24 +5187,32 @@ lb2	cmp	#'0'	if the char is a digit then
 	sbc	#6
 lb2a	and	#$000F	  convert it to a value
 	pha		  save the value
-	ph4	val	  update the old value
-	lda	base
+	ph8	val	  update the old value
 	ldx	#0
-	jsl	~UMUL4
-	pl4	val
+	phx
+	phx
+	phx
+	lda	base
+	pha
+	jsl	~UMUL8
+	pl8	val
 	pla		  add in the new digit
 	clc
 	adc	val
 	sta	val
 	bcc	lb3
 	inc	val+2
+	bne	lb3
+	inc	val+4
+	bne	lb3
+	inc	val+6
 lb3	dec	~scanWidth	  quit if the max # chars have been
 	beq	lb4a	    scanned
 	bpl	lb3a	  make sure 0 stays a 0
 	stz	~scanWidth
 lb3a	jsl	~getchar	  next char
 	inc	read
-	bra	lb2
+	brl	lb2
 
 lb4	jsl	~putback	put the last character back
 	dec	read
@@ -4772,7 +5227,7 @@ lb4b	lda	~suppress	if input is not suppressed then
 	bne	lb7
 	lda	minus	  if minus then
 	beq	lb4c
-	sub4	#0,val,val	    negate the value
+	negate8 val	    negate the value
 lb4c	lda	val	  save the value
 	ldx	~size
 	bpl	lb4d
@@ -4784,17 +5239,27 @@ lb4d	sta	[arg]
 	ldy	#2
 	lda	val+2
 	sta	[arg],Y
+	dex
+	bmi	lb6
+	iny
+	iny
+	lda	val+4
+	sta	[arg],Y
+	iny
+	iny
+	lda	val+6
+	sta	[arg],Y
 lb6	lda	~suppress	if input is not suppressed then
 	bne	lb7
 	ldy	#2	  remove the parameter from the stack
 	jsr	~RemoveWord
 lb7	rts
 
-val	ds	4	value
-base	dc	i4'10'	constant for mul4
+val	ds	8	value
+base	dc	i2'10'	number base
 based	ds	2	based conversion?
 minus	ds	2	is the value negative?
-read	ds	2	# chars read
+read	ds	2	# of digits read
 	end
 
 ****************************************************************
@@ -4846,7 +5311,7 @@ lb4	lda	~str,Y
 
 lb5	jsl	~getchar	get a character
 	cmp	#EOF	quit if at EOF
-	beq	lb8
+	beq	lb7a
 	pha		quit if not in the set
 	jsr	Set
 	ply
@@ -4867,7 +5332,7 @@ lb6	dec	~scanWidth	note that we processed one
 	bra	lb5	next char
 
 lb7	tya		put back the last char scanned
-	jsl	~putback
+lb7a	jsl	~putback
 
 lb8	lda	didOne	if no chars read then
 	bne	lb8a
@@ -4939,6 +5404,14 @@ lb0	sta	[arg]
 	lda	#0
 	ldy	#2
 	sta	[arg],y
+	dex
+	bmi	lb0a
+	iny
+	iny
+	sta	[arg],y
+	iny
+	iny
+	sta	[arg],y
 lb0a	dec	~assignments	  fix assignment count
 lb1	ldy	#2	remove the parameter from the stack
 	jsr	~RemoveWord
@@ -4947,7 +5420,8 @@ lb1	ldy	#2	remove the parameter from the stack
 
 ****************************************************************
 *
-*  ~Scan_b - read a pascal string
+*  ~Scan_b - read a pascal string (deprecated)
+*  ~Scan_P - read a pascal string
 *  ~Scan_s - read a c string
 *
 *  Inputs:
@@ -4959,6 +5433,7 @@ lb1	ldy	#2	remove the parameter from the stack
 ****************************************************************
 *
 ~Scan_b	private
+~Scan_P	entry
 	using ~scanfCommon
 arg	equ	11	argument
 
@@ -4973,6 +5448,7 @@ arg	equ	11	argument
 lb1	jsl	~getchar	skip leading whitespace
 	cmp	#EOF
 	bne	lb2
+	sta	~eofFound
 	inc	~scanError
 	lda	~suppress	(no assignment made)
 	bne	lb6
@@ -4996,14 +5472,14 @@ lb3	dec	~scanWidth	note that we processed one
 	stz	~scanWidth
 lb4	jsl	~getchar	next char
 	cmp	#EOF	quit if at EOF
-	beq	lb5
+	beq	lb4a
 	and	#$00FF	loop if not whitespace
 	tax
 	lda	__ctype+1,X
 	and	#_space
 	beq	lb2a
 	txa		whitespace: put it back
-	jsl	~putback
+lb4a	jsl	~putback
 
 lb5	lda	~suppress	if output is not suppressed then
 	bne	lb6
@@ -5050,15 +5526,24 @@ pString	ds	2	is this a p string?
 	using ~scanfCommon
 arg	equ	11	argument
 
-	jsl	~getchar	get the character
+	lda	~suppress	if input is not suppressed then
+	bne	lb1
+	dec	~assignments	  no assignment done
+lb1	jsl	~getchar	skip leading whitespace...
+	cmp	#EOF	if EOF then
+	bne	lb2
+	sta	~eofFound	  ~eofFound = EOF
+	rts
+lb2	tax		...back to skipping whitespace
+	lda	__ctype+1,X
+	and	#_space
+	bne	lb1
+	txa
 	cmp	#'%'	if it is not a percent then
-	beq	lb1
+	beq	lb3
 	jsl	~putback	  put it back
 	inc	~scanError	  note the error
-	lda	~suppress	  if input is not suppressed then
-	bne	lb1
-	dec	~assignments	    no assignment done
-lb1	rts
+lb3	rts
 	end
 
 ****************************************************************
@@ -5109,7 +5594,8 @@ hx1	jsl	~getchar
 	beq	hx1a
 	cmp	#'X'
 	bne	hx2
-hx1a	dec	~scanWidth	    accept the character
+hx1a	stz	read	    ('0x' alone should not match)
+	dec	~scanWidth	    accept the character
 	jeq	lb4a
 	bpl	hx3
 	stz	~scanWidth
@@ -5142,22 +5628,30 @@ lb2	jsl	~getchar	if the char is a digit then
 	sbc	#6
 lb2a	and	#$000F	  convert it to a value
 	pha		  save the value
-	ph4	val	  update the old value
+	ph8	val	  update the old value
+	ldx	#0
+	phx
+	phx
+	phx
 	lda	base
-	ldx	base+2
-	jsl	~UMUL4
-	pl4	val
+	pha
+	jsl	~UMUL8
+	pl8	val
 	pla		  add in the new digit
 	clc
 	adc	val
 	sta	val
 	bcc	lb3
 	inc	val+2
+	bne	lb3
+	inc	val+4
+	bne	lb3
+	inc	val+6
 lb3	dec	~scanWidth	  quit if the max # chars have been
 	beq	lb4a	    scanned
-	bpl	lb2	  make sure 0 stays a 0
+	jpl	lb2	  make sure 0 stays a 0
 	stz	~scanWidth
-	bra	lb2
+	brl	lb2
 
 lb4	lda	ch	put the last character back
 	jsl	~putback
@@ -5171,16 +5665,29 @@ lb4a	lda	read	if no chars read then
 	bra	lb6	  remove the parameter
 lb4b	lda	~suppress	if input is not suppressed then
 	bne	lb7
-	lda	val	  save the value
+	lda	minus	  if minus then
+	beq	lb4c
+	negate8 val	    negate the value
+lb4c	lda	val	  save the value
 	ldx	~size
-	bpl	lb4c
+	bpl	lb4d
 	sep	#$20
-lb4c	sta	[arg]
+lb4d	sta	[arg]
 	rep	#$20
 	dex
 	bmi	lb6
 	ldy	#2
 	lda	val+2
+	sta	[arg],Y
+	dex
+	bmi	lb6
+	iny
+	iny
+	lda	val+4
+	sta	[arg],Y
+	iny
+	iny
+	lda	val+6
 	sta	[arg],Y
 lb6	lda	~suppress	if input is not suppressed then
 	bne	lb7
@@ -5193,28 +5700,50 @@ lb7	rts
 Init	stz	read	no chars read
 	stz	val	initialize the value to 0
 	stz	val+2
+	stz	val+4
+	stz	val+6
 in1	jsl	~getchar	skip leading whitespace...
 	cmp	#EOF	if at EOF then
 	bne	in2
+	sta	~eofFound	   eofFound = EOF
 	lda	~suppress	   if input is not suppressed then
 	bne	in1a
 	dec	~assignments	      no assignment made
-in1a	sta	~eofFound	   eofFound = EOF
-	pla		   pop stack
+in1a	pla		   pop stack
 	bra	lb6	   bail out
-in2	tax		...back to slipping whitespace
+in2	tax		...back to skipping whitespace
 	lda	__ctype+1,X
 	and	#_space
 	bne	in1
-	txa
-	jsl	~putback
+	txa		check for leading sign
+	stz	minus	assume positive number
+	cmp	#'+'	skip leading +
+	beq	in3
+	cmp	#'-'	if - then set minus flag
+	bne	in5
+	inc	minus
+in3	dec	~scanWidth	update ~scanWidth
+	beq	in6	sign only is not a matching sequence
+	bpl	in4	make sure 0 stays a 0
+	stz	~scanWidth
+in4	rts
+
+in5	jsl	~putback
 	rts
 
+in6	inc	~scanError	~scanError = true
+	lda	~suppress	if input is not suppressed then
+	bne	in7
+	dec	~assignments	  no assignment made
+in7	pla		pop stack
+	bra	lb6	bail out
+
 ch	ds	2	char buffer
-val	ds	4	value
-base	dc	i4'10'	constant for mul4
+val	ds	8	value
+base	dc	i2'10'	number base
 based	ds	2	based conversion?
-read	ds	2	# chars read
+minus	ds	2	is there a minus sign?
+read	ds	2	# of digits read
 	end
 
 ****************************************************************
@@ -5279,9 +5808,32 @@ format	equ	7	pointer to format code
 	tsc		set up a DP
 	tcd
 ;
+;  Set up for varargs, if we are using them
+;
+	lda	~isVarArgs
+	beq	ps
+	lda	arg	initialize ~va_list_ptr
+	sta	~va_list_ptr
+	lda	arg+2
+	sta	~va_list_ptr+2
+	lda	[arg]	initialize ~va_arg_ptr
+	sta	~va_arg_ptr
+	tax
+	ldy	#2
+	lda	[arg],y
+	sta	~va_arg_ptr+2
+	stx	arg
+	sta	arg+2
+
+	lda	[arg]	put first variable arg in arg location
+	tax
+	lda	[arg],y
+	stx	arg
+	sta	arg+2
+;
 ;  Process the format string
 ;
-	stz	~assignments	no assignments yet
+ps	stz	~assignments	no assignments yet
 	stz	~scanCount	no characters scanned
 	stz	~scanError	no scan error so far
 	stz	~eofFound	eof was not the first char
@@ -5328,7 +5880,10 @@ ps5	stx	ch	make sure the char matches the format
 	jsl	~getchar
 	cmp	ch
 	beq	ps1
-	jsl	~putback	put the character back
+	cmp	#EOF	check for EOF
+	bne	ps6
+	sta	~eofFound
+ps6	jsl	~putback	put the character back
 ;
 ;  Remove the parameters for remaining conversion specifications
 ;
@@ -5371,13 +5926,29 @@ rm2a	tax
 	bne	rm2
 rm3	tyx		  if '*' not found
 	beq	rm4
+	pha		    lay out stack as ~RemoveWord needs
 	jsr	~RemoveWord	    remove an addr from the stack
+	pla
 rm4	inc4	format	next format character
 	bra	rm1
 ;
 ;  Remove the format parameter and return
 ;
-rt1	lda	format-2	move the return address
+rt1	lda	~isVarArgs	if it is a varargs call then
+	beq	rt1a
+	lda	~va_list_ptr	  get pointer to va_list
+	sta	arg
+	lda	~va_list_ptr+2
+	sta	arg+2
+	lda	~va_arg_ptr	  update pointer in va_list
+	sta	[arg]
+	lda	~va_arg_ptr+2
+	ldy	#2
+	sta	[arg],y
+	pha		  remove the va_list parameter
+	jsr	~RemoveWordFromStack
+	pla
+rt1a	lda	format-2	move the return address
 	sta	format+2
 	lda	format-3
 	sta	format+1
@@ -5409,21 +5980,31 @@ fm1	inc4	format	skip the '%'
 fm2	jsr	GetSize	get the field width specifier
 	sta	~scanWidth
 
-	lda	[format]	if the char is 'l', 'z', 't', or 'j' then
+	lda	[format]
+	and	#$00FF
+	cmp	#'l'	'l' specifies long int or double
+	bne	fm2a
+	inc	~size
+	inc4	format	  unless it is 'll' for long long
+	lda	[format]
 	and	#$00FF
 	cmp	#'l'
-	beq	fm2a
-	cmp	#'z'
-	beq	fm2a
-	cmp	#'t'
-	beq	fm2a
-	cmp	#'j'
+	bne	fm6
+	bra	fm2c
+fm2a	cmp	#'z'	'z' specifies size_t (long int)
+	beq	fm2c
+	cmp	#'t'	't' specifies ptrdiff_t (long int)
+	beq	fm2c
+	cmp	#'j'	'j' specifies intmax_t (long long)
+	beq	fm2b
+	cmp	#'L'	'L' specifies long double
 	bne	fm3
-fm2a	inc	~size	  long specifier
+fm2b	inc	~size
+fm2c	inc	~size
 	bra	fm4
-fm3	cmp	#'h'	else if it is an 'h' then
+fm3	cmp	#'h'	'h' specifies short int
 	bne	fm5
-	inc4	format	  check for 'hh'
+	inc4	format	  unless it is 'hh' for char types
 	lda	[format]
 	and	#$00FF
 	cmp	#'h'
@@ -5497,6 +6078,7 @@ fList	dc	c'd',i1'0',a'~Scan_d'		d
 	dc	c'c',i1'0',a'~Scan_c'		c
 	dc	c's',i1'0',a'~Scan_s'		s
 	dc	c'b',i1'0',a'~Scan_b'		b
+	dc	c'P',i1'0',a'~Scan_P'		P
 	dc	c'n',i1'0',a'~Scan_n'		n
 	dc	c'a',i1'0',a'~Scan_f'		a
 	dc	c'A',i1'0',a'~Scan_f'		A
@@ -5539,6 +6121,10 @@ ch	ds	2	temp storage
 	dc	h'68'	pla
 	dc	h'5C 00 00 00'
 ;
+; ~RemoveWord is a vector to the proper routine to remove a parameter word.
+;
+~RemoveWord dc	h'5C 00 00 00'
+;
 ;  global variables
 ;
 ~assignments ds 2	# of assignments made
@@ -5547,8 +6133,11 @@ ch	ds	2	temp storage
 ~scanCount ds	2	# of characters scanned
 ~scanError ds	2	set to 1 by scanners if an error occurs
 ~scanWidth ds	2	max # characters to scan
-~size	 ds	2	size specifier; -1 -> char, 1 -> long,
-!			 0 -> default
+~size	 ds	2	size specifier; -1 -> char, 0 -> default,
+!			 1 -> long, 2 -> long long/long double
+~va_arg_ptr ds	4	pointer to next variable argument
+~va_list_ptr ds 4	pointer to the va_list array
+~isVarArgs ds	2	is this a varargs call (vscanf etc.)?
 	end
 
 ****************************************************************

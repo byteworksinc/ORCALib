@@ -278,6 +278,35 @@ atol     entry
 
 ****************************************************************
 *
+*  atoll - convert a string to a long long
+*
+*  Inputs:
+*        str - pointer to the string
+*
+*  Outputs:
+*        converted number
+*
+****************************************************************
+*
+atoll    start
+
+         ph2   #10                      base 10
+         ph4   #0                       no pointer returned
+         lda   12,S                     pass the string addr on
+         pha
+         lda   12,S
+         pha                            note: x reg is unchanged
+         jsl   strtoll                  convert the string
+         lda   2,S                      fix the stack
+         sta   6,S
+         pla
+         sta   3,S
+         pla
+         rtl
+         end
+
+****************************************************************
+*
 *  char *bsearch(key, base, count, size, compar)
 *        void *key, *base;
 *        size_t count, size;
@@ -498,6 +527,47 @@ lb1      creturn 4:i
 
 ****************************************************************
 *
+*  long long llabs(long long i)
+*
+*  Return the absolute value of i.
+*
+*  Inputs:
+*        i - argument
+*
+*  Outputs:
+*        Returns abs(i).
+*
+****************************************************************
+*
+llabs    start
+imaxabs  entry
+retptr   equ   1
+
+         csubroutine (8:i),4
+         stx   retptr
+         stz   retptr+2
+         
+         ph8   <i
+         jsl   ~ABS8
+         pla
+         sta   [retptr]
+         ldy   #2
+         pla
+         sta   [retptr],y
+         iny
+         iny
+         pla
+         sta   [retptr],y
+         iny
+         iny
+         pla
+         sta   [retptr],y
+         
+         creturn
+         end
+
+****************************************************************
+*
 *  ldiv_t ldiv(n,d)
 *        long n,d;
 *
@@ -536,6 +606,40 @@ div_t    ds    8
 
 ****************************************************************
 *
+*  lldiv_t lldiv(long long n, long long d)
+*
+*  Inputs:
+*        n - numerator
+*        d - denominator
+*
+*  Outputs:
+*        lldiv_t - contains result & remainder
+*
+****************************************************************
+*
+lldiv    start
+imaxdiv  entry
+addr     equ   1
+
+         csubroutine (8:n,8:d),4
+         phb                            use local addressing
+         phk
+         plb
+         ph8   <n                       do the divide
+         ph8   <d
+         jsl   ~CDIV8
+         pl8   lldiv_t
+         pl8   lldiv_t+8
+         lla   addr,lldiv_t             return the result
+         plb
+
+         creturn 4:addr
+
+lldiv_t  ds    16
+         end
+
+****************************************************************
+*
 *  void qsort(base, count, size, compar)
 *        void *base;
 *        size_t count, size;
@@ -559,6 +663,9 @@ qsort    start
          phk
          plb
 
+         lda   count                    nothing to do if count is 0
+         ora   count+2
+         beq   done
          dec4  count                    set count to the addr of the last entry
          mul4  count,size
          add4  count,base
@@ -573,7 +680,7 @@ qsort    start
          ph4   base
          jsl   rsort
 
-         plb
+done     plb
          creturn
          end
 
@@ -1081,6 +1188,371 @@ rt3      lda   rtl                      fix the stack
          tsc
          clc
          adc   #20
+         tcs
+         tya                            return
+         rtl
+         end
+
+****************************************************************
+*
+*  strtoll - convert a string to a long long
+*
+*  Inputs:
+*        str - pointer to the string
+*        ptr - pointer to a pointer; a pointer to the first
+*              char past the number is placed here.  If ptr is
+*              nil, no pointer is returned
+*        base - base of the number
+*
+*  Outputs:
+*        converted number
+*
+****************************************************************
+*
+strtoll  start
+strtoimax entry
+base     equ   26                       base
+ptr      equ   22                       *return pointer
+str      equ   18                       string pointer
+rtl      equ   15                       return address
+
+retptr   equ   11                       pointer to location for return value
+val      equ   3                        value
+negative equ   1                        is the number negative?
+
+         pea   0                        make room for & initialize retptr
+         phx
+         pea   0                        make room for & initialize val
+         pea   0
+         pea   0
+         pea   0
+         pea   0                        make room for & initialize negative
+         tsc                            set up direct page addressing
+         phd
+         tcd
+;
+;  Skip any leading whitespace
+;
+         lda   ptr                      if ptr in non-null then
+         ora   ptr+2
+         beq   sw1
+         lda   str                        initialize it to str
+         sta   [ptr]
+         ldy   #2
+         lda   str+2
+         sta   [ptr],Y
+
+sw1      lda   [str]                    skip the white space
+         and   #$00FF
+         tax
+         lda   >__ctype+1,X
+         and   #_space
+         beq   cn0
+         inc4  str
+         bra   sw1
+;
+;  Convert the number
+;
+cn0      lda   [str]                    if the next char is '-' then
+         and   #$00FF
+         cmp   #'-'
+         bne   cn1
+         inc   negative                   negative := true
+         bra   cn2                        ++str
+cn1      cmp   #'+'                     else if the char is '+' then
+         bne   cn3
+cn2      inc4  str                        ++str
+
+cn3      ph4   str                      save the starting string
+         ph2   base                     convert the unsigned number
+         ph4   ptr
+         ph4   str
+         tdc
+         clc
+         adc   #val
+         tax
+         jsl   ~strtoull
+         lda   val+6          
+         bpl   rt1                      see if we have an overflow
+         ldy   negative                   allow LLONG_MIN as legal value
+         beq   ov0
+         cmp   #$8000
+         bne   ov0
+         lda   val
+         ora   val+2
+         ora   val+4
+         beq   rt1
+;
+;  Overflow - flag the error
+;
+ov0      lda   #ERANGE                  errno = ERANGE
+         sta   >errno
+         ldx   #$7FFF                   return value = LLONG_MAX
+         ldy   #$FFFF
+         lda   negative                 if negative then
+         beq   ov1
+         inx                              return value = LLONG_MIN
+         iny
+ov1      sty   val
+         sty   val+2
+         sty   val+4
+         stx   val+6
+;
+;  return the results
+;
+rt1      pla                            remove the original value of str from
+         pla                             the stack
+         lda   negative                 if negative then
+         beq   rt2
+         negate8 val                      val = -val
+
+rt2      lda   val                      get the value
+         sta   [retptr]
+         ldy   #2
+         lda   val+2
+         sta   [retptr],y
+         iny
+         iny
+         lda   val+4
+         sta   [retptr],y
+         iny
+         iny
+         lda   val+6
+         sta   [retptr],y
+         lda   rtl                      fix the stack
+         sta   base-1
+         lda   rtl+1
+         sta   base
+         pld
+         tsc
+         clc
+         adc   #24
+         tcs
+         tya                            return
+         rtl
+         end
+
+****************************************************************
+*
+*  strtoull - convert a string to an unsigned long long
+*  ~strtoull - alt entry point that does not parse leading
+*              white space and sign
+*
+*  Inputs:
+*        str - pointer to the string
+*        ptr - pointer to a pointer; a pointer to the first
+*              char past the number is placed here.  If ptr is
+*              nil, no pointer is returned
+*        base - base of the number
+*
+*  Outputs:
+*        converted number
+*
+****************************************************************
+*
+strtoull start
+strtoumax entry
+base     equ   30                       base
+ptr      equ   26                       *return pointer
+str      equ   22                       string pointer
+rtl      equ   19                       return address
+
+retptr   equ   15                       pointer to location for return value
+rangeOK  equ   13                       was the number within range?
+negative equ   11                       was there a minus sign?
+val      equ   3                        value
+foundOne equ   1                        have we found a number?
+
+         ldy   #0
+         bra   init
+
+~strtoull entry                         alt entry point called from strtoll
+         ldy   #1
+
+init     pea   0                        make room for & initialize retptr
+         phx
+         pea   1                        make room for & initialize rangeOK
+         pea   0                        make room for & initialize negative
+         pea   0                        make room for & initialize val
+         pea   0
+         pea   0
+         pea   0
+         pea   0                        make room for & initialize foundOne
+         tsc                            set up direct page addressing
+         phd
+         tcd
+;
+;  Skip any leading whitespace
+;
+         tya                            just process number if called from strtol
+         bne   db1c
+
+         lda   ptr                      if ptr in non-null then
+         ora   ptr+2
+         beq   sw1
+         lda   str                        initialize it to str
+         sta   [ptr]
+         ldy   #2
+         lda   str+2
+         sta   [ptr],Y
+
+sw1      lda   [str]                    skip the white space
+         and   #$00FF
+         tax
+         lda   >__ctype+1,X
+         and   #_space
+         beq   db1
+         inc4  str
+         bra   sw1
+;
+;  Deduce the base
+;
+db1      lda   [str]                    if the next char is '-' then
+         and   #$00FF
+         cmp   #'-'
+         bne   db1a
+         inc   negative                   negative := true
+         bra   db1b
+db1a     cmp   #'+'                     skip any leading '+'
+         bne   db1c
+db1b     inc4  str
+db1c     lda   base                     if the base is zero then
+         bne   db2
+         lda   #10                        assume base 10
+         sta   base
+         lda   [str]                      if the first char is 0 then
+         and   #$00FF
+         cmp   #'0'
+         bne   cn1
+         lda   #8                           assume base 8
+         sta   base
+         ldy   #1                           if the second char is 'X' or 'x' then
+         lda   [str],Y
+         and   #$00DF
+         cmp   #'X'
+         bne   cn1
+         asl   base                           base 16
+         bra   db3
+db2      cmp   #16                      if the base is 16 then
+         bne   db4
+         lda   [str]                      if the first two chars are 0x or 0X then
+         and   #$DFFF
+         cmp   #'X0'
+         bne   cn1
+db3      add4  str,#2                       skip them
+         bra   cn1
+db4      cmp   #37                      check for invalid base value
+         jge   cn6
+         dec   a
+         jeq   cn6
+;
+;  Convert the number
+;
+cn1      lda   [str]                    get a (possible) digit
+         and   #$00FF
+         cmp   #'0'                     branch if it is not a digit
+         blt   cn5
+         cmp   #'9'+1                   branch if it is a numeric digit
+         blt   cn2
+         and   #$00DF                   convert lowercase to uppercase
+         cmp   #'A'                     branch if it is not a digit
+         blt   cn5
+         cmp   #'Z'+1                   branch if it is not a digit
+         bge   cn5
+         sbc   #'A'-11                  convert "alpha" digit to value
+         bra   cn3                      go test the digit
+
+cn2      and   #$000F                   convert digit to value
+cn3      cmp   base                     branch if the digit is too big
+         bge   cn5
+
+         ldx   #1                       note that we have found a number
+         stx   foundOne
+         pha                            save the digit
+         ph8   <val                     val = val*base
+         pea   0
+         pea   0
+         pea   0
+         ph2   base
+         jsl   ~UMUL8
+         pl8   val
+         pla                            get the saved digit
+         txy                            branch if there was an error
+         beq   cn3a
+         stz   rangeOK
+cn3a     clc                            add in the new digit
+         adc   val
+         sta   val
+         lda   val+2
+         adc   #0
+         sta   val+2
+         lda   val+4
+         adc   #0
+         sta   val+4
+         lda   val+6
+         adc   #0
+         sta   val+6
+         bcc   cn4
+         stz   rangeOK
+cn4      inc4  str                      next char
+         bra   cn1
+
+cn5      lda   foundOne                 if no digits were found, flag the error
+         bne   rt1
+cn6      lda   #EINVAL
+         sta   >errno
+         bra   rt2a
+;
+;  return the results
+;
+rt1      lda   ptr                      if ptr is non-null then
+         ora   ptr+2
+         beq   rt1a
+         lda   str                        set it to str
+         sta   [ptr]
+         ldy   #2
+         lda   str+2
+         sta   [ptr],Y
+
+rt1a     lda   rangeOK                  check if number was out of range
+         bne   rt2
+         lda   #ERANGE                  errno = ERANGE
+         sta   >errno
+         lda   #$FFFF                   return value = ULLONG_MAX
+         sta   [retptr]
+         ldy   #2
+         sta   [retptr],y
+         iny
+         iny
+         sta   [retptr],y
+         iny
+         iny
+         sta   [retptr],y
+         bra   rt3
+rt2      lda   negative                 if negative then
+         beq   rt2a
+         negate8 val                      val = -val
+rt2a     lda   val                      get the value
+         sta   [retptr]
+         ldy   #2
+         lda   val+2
+         sta   [retptr],y
+         iny
+         iny
+         lda   val+4
+         sta   [retptr],y
+         iny
+         iny
+         lda   val+6
+         sta   [retptr],y
+rt3      lda   rtl                      fix the stack
+         sta   base-1
+         lda   rtl+1
+         sta   base
+         pld
+         tsc
+         clc
+         adc   #28
          tcs
          tya                            return
          rtl

@@ -1,0 +1,81 @@
+;
+; New and improved macros for operations on 64-bit integers
+;
+
+; Negate a 64-bit value (DP, absolute, or absolute long)
+	macro
+&l	negate8 &n1
+&l	~setm
+	sec
+	ldy  #0
+	tya
+	sbc  &n1
+	sta  &n1
+	tya
+	sbc  &n1+2
+	sta  &n1+2
+	tya
+	sbc  &n1+4
+	sta  &n1+4
+	tya
+	sbc  &n1+6
+	sta  &n1+6
+	~restm
+	mend
+
+
+; Improved ph8 macro:
+; - Generates more effecient code for constants
+; - Supports "ph8 <dp" to get better code using pei
+	macro
+&l	ph8	&n1
+	lclc	&c
+&l	anop
+&c	amid	&n1,1,1
+	aif	s:longa=1,.a
+	rep	#%00100000
+.a
+	aif	"&c"="#",.d
+	aif	"&c"="[",.b
+	aif	"&c"<>"{",.c
+&c	amid	&n1,l:&n1,1
+	aif	"&c"<>"}",.g
+&n1	amid	&n1,2,l:&n1-2
+&n1	setc	(&n1)
+.b
+	ldy	#6
+~&SYSCNT lda	&n1,y
+	pha
+	dey
+	dey
+	bpl	~&SYSCNT
+	ago	.e
+.c
+	aif	"&c"<>"<",.c1
+	pei &n1+6
+	pei &n1+4
+	pei &n1+2
+	pei &n1
+	ago .e
+.c1
+	ldx	#6
+~&SYSCNT lda	&n1,x
+	pha
+	dex
+	dex
+	bpl	~&SYSCNT
+	ago	.e
+.d
+&n1	amid	&n1,2,l:&n1-1
+	pea	+(&n1)|-48
+	pea	+(&n1)|-32
+	pea	+(&n1)|-16
+	pea	&n1
+.e
+	aif	s:longa=1,.f
+	sep	#%00100000
+.f
+	mexit
+.g
+	mnote "Missing closing '}'",16
+	mend
