@@ -128,3 +128,28 @@ lb1      sta   val
          
          creturn 2:val
          end
+
+****************************************************************
+*
+*  int __signbit(long double x);
+*
+*  Get the sign bit of a floating-point value
+*
+*  Inputs:
+*        val - the number 
+*
+*  Outputs:
+*        0 if positive, non-zero if negative
+*
+****************************************************************
+*
+__signbit start
+
+         csubroutine (10:val),0
+         
+         lda   val+8
+         and   #$8000
+         sta   val
+         
+         creturn 2:val
+         end
