@@ -482,21 +482,19 @@ rtl	equ	1	return address
 
 	ph4	p	save the pointer
 
+	short	M
 	lda	val	form a 2 byte value
-	xba
-	ora	val
-	sta	val
+	sta	val+1
 
 	lda	len	if there are an odd # of bytes then
 	lsr	A
 	bcc	lb1
-	short M	  set 1 byte now
-	lda	val
+	lda	val	  set 1 byte now
 	sta	[p]
 	long	M
 	dec	len
 	inc4	p
-lb1	anop		endif
+lb1	long	M	endif
 
 	lda	val	set len bytes
 	ldx	len+2	set full banks
