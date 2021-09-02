@@ -1593,14 +1593,14 @@ system   start
          sta   exComm+2
 lb1      phy                            execute the command
          phx
-         plb
          Execute ex
          ldy   empty
          bne   ret                      if doing system(NULL)
          tya
          bcs   ret                        error => no command processor
          inc   a                           (& vice versa)                
-ret      rtl
+ret      plb
+         rtl
 
 ex       dc    i'$8000'
 exComm   ds    4
