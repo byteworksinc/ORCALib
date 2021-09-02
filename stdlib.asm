@@ -4,10 +4,10 @@
 
 ****************************************************************
 *
-*  StdDef - Standard Definitions
+*  StdLib - Standard Library Utility Functions
 *
 *  This code implements the tables and subroutines needed to
-*  support the standard C library STDDEF.
+*  support the standard C library STDLIB.
 *
 *  December 1988
 *  Mike Westerfield
@@ -19,7 +19,7 @@
 *
 ****************************************************************
 *
-StdDef   start                          dummy segment
+StdLib   start                          dummy segment
          copy  equates.asm
 
          end
