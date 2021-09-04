@@ -4,10 +4,10 @@
 
 ****************************************************************
 *
-*  StdDef - Standard Definitions
+*  StdLib - Standard Library Utility Functions
 *
 *  This code implements the tables and subroutines needed to
-*  support the standard C library STDDEF.
+*  support the standard C library STDLIB.
 *
 *  December 1988
 *  Mike Westerfield
@@ -19,7 +19,7 @@
 *
 ****************************************************************
 *
-StdDef   start                          dummy segment
+StdLib   start                          dummy segment
          copy  equates.asm
 
          end
@@ -1593,14 +1593,14 @@ system   start
          sta   exComm+2
 lb1      phy                            execute the command
          phx
-         plb
          Execute ex
          ldy   empty
          bne   ret                      if doing system(NULL)
          tya
          bcs   ret                        error => no command processor
          inc   a                           (& vice versa)                
-ret      rtl
+ret      plb
+         rtl
 
 ex       dc    i'$8000'
 exComm   ds    4

@@ -48,6 +48,30 @@ lastDST  dc    i2'-1'                   tm_isdst value for lasttime
 
 ****************************************************************
 *
+*  clock_t __clocks_per_sec()
+*
+*  Outputs:
+*        X-A - the number of clock ticks per second (50 or 60)
+*
+****************************************************************
+*
+__clocks_per_sec start
+LANGSEL  equ   $E1C02B                  LANGSEL soft switch
+
+         short I,M
+         ldy   #60
+         ldx   #0
+         lda   >LANGSEL
+         and   #$10                     test NTSC/PAL bit of LANGSEL
+         beq   lb1
+         ldy   #50
+lb1      long  I,M
+         tya
+         rtl
+         end
+
+****************************************************************
+*
 *  char *asctime(struct tm *ts)
 *
 *  Inputs:
