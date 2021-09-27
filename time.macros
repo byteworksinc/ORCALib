@@ -600,3 +600,17 @@
  longi off
 .c
  mend
+ macro
+&l dec4 &a
+&l ~setm
+ lda &a
+ bne ~&SYSCNT
+ dec 2+&a
+~&SYSCNT dec &a
+ ~restm
+ mend
+ MACRO
+&LAB _INT2DEC
+&LAB LDX #$260B
+ JSL $E10000
+ MEND
