@@ -640,6 +640,47 @@ lldiv_t  ds    16
 
 ****************************************************************
 *
+*  int mblen(const char *s, size_t n)
+*
+*  Inputs:
+*        s - NULL or pointer to character
+*        n - maximum number of bytes to inspect
+*
+*  Outputs:
+*        If s is NULL, returns 0, indicating encodings are not
+*        state-dependent.  Otherwise, returns 0 if s points to a
+*        null character, -1 if the next n or fewer bytes do not
+*        form a valid character, or the number of bytes forming
+*        a valid character.
+*
+*  Note: This implementation assumes we do not support actual
+*        multi-byte or state-dependent character encodings.
+*
+****************************************************************
+*
+mblen    start
+
+         csubroutine (4:s,4:n)
+         ldx   #0
+         lda   s                        if s == NULL
+         ora   s+2
+         beq   ret                        return 0
+         lda   n                        if n == 0
+         ora   n+2
+         bne   readchar
+         dex                              return -1
+         bra   ret
+readchar lda   [s]                      if *s == '\0'
+         and   #$00FF
+         beq   ret                        return 0
+         inx                            else return 1
+
+ret      stx   n
+         creturn 2:n
+         end
+
+****************************************************************
+*
 *  void qsort(base, count, size, compar)
 *        void *base;
 *        size_t count, size;
