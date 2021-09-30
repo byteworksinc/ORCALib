@@ -765,6 +765,31 @@ lb4	long	M
 
 ****************************************************************
 *
+*  int strcoll(const char *s1, const char *s2);
+*
+*  Compare *s1 to *s2 based on current locale's collation order.
+*  If *s1 < *s2 then return a negative number; if they are 
+*  equal, return 0; otherwise, return a positive number.
+*
+*  Inputs:
+*	s1 - first string ptr
+*	s2 - second string ptr
+*
+*  Outputs:
+*	A - result
+*
+*  Notes:
+*	The current implementation assumes all supported locales
+*	have the same collation order as given by strcmp.
+*
+****************************************************************
+*
+strcoll	start
+	jml	strcmp
+	end
+
+****************************************************************
+*
 *  strcpy - string copy
 *
 *  Copy string *s2 to string *s1.  Return a pointer to s1.
@@ -1789,4 +1814,45 @@ lb10	ldx	set+2	get the return value
 	rtl
 
 isp	ds	4	internal state pointer (isp)
+	end
+
+****************************************************************
+*
+*  size_t strxfrm(char *s1, const char *s2, size_t n);
+*
+*  Transform string *s2 into *s1, such that two output strings
+*  from strxfrm will compare the same way with strcmp that the
+*  input strings would with strcoll.  Writes at most n bytes.
+*
+*  Inputs:
+*	s1 - output string pointer
+*	s2 - input string pointer
+*	n - max length to write
+*
+*  Outputs:
+*	*s1 - transformed output string (if it fits)
+*	A - length of full transformed string
+*	    (not including terminating null)
+*
+*  Notes:
+*	The current implementation assumes all supported locales
+*	have the same collation order as given by strcmp.
+*
+****************************************************************
+*
+strxfrm start
+
+	csubroutine (4:s1,4:s2,4:n),4
+len	equ	1	length of s2
+	
+	ph4	s2	len = strlen(s2)
+	jsl	strlen
+	sta	len
+	stx	len+2
+	cmpl	len,n	if len < n
+	bge	ret
+	ph4	s2
+	ph4	s1
+	jsl	strcpy	  strcpy(s1,s2)
+ret	creturn 4:len	return len
 	end
