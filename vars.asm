@@ -31,7 +31,7 @@ _ownerid entry                          user ID (C)
 ~USER_ID entry                          user ID (Pascal, libraries)
          ds    2
 sys_nerr entry                          # of error messages
-         dc    i'12'
+         dc    i'13'
 _toolErr entry                          last error in a tool call (C)
 ~TOOLERROR entry                        last error in a tool call (Pascal)
          ds    2

@@ -912,7 +912,7 @@ lb2	sty	set	set the disp past the current disp
 ****************************************************************
 *
 strerror start
-maxErr	equ	ENOSPC	max error in sys_errlist
+maxErr	equ	EILSEQ	max error in sys_errlist
 
 	phb		get the error number
 	plx
