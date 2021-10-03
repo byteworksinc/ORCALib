@@ -19,7 +19,7 @@ if {#} == 0
       unset exit
    end
 
-   for i in cc ctype string stdlib time setjmp orca fcntl vars toolglue signal int64 fenv fpextra math2 locale
+   for i in cc ctype string stdlib time setjmp orca fcntl vars toolglue signal int64 fenv fpextra math2 locale uchar
       Newer obj/{i}.a {i}.asm
       if {Status} != 0
          set exit on
@@ -40,7 +40,7 @@ delete orcalib
 
 set list        vars.a assert.a cc.a setjmp.a ctype.a string.a stdlib.a
 set list {list} time.a signal.a toolglue.a orca.a fcntl.a stdio.a int64.a
-set list {list} fenv.a fpextra.a math2.a locale.a
+set list {list} fenv.a fpextra.a math2.a locale.a uchar.a
 for i in {list}
    echo makelib orcalib +obj/{i}
    makelib orcalib +obj/{i}
