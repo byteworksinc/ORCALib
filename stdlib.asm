@@ -1651,8 +1651,37 @@ empty    ds    2
 
 ****************************************************************
 *
-*  void __va_end(list)
-*        va_list list;
+*  void __record_va_info(va_list ap);
+*
+*  Record that a traversal of variable arguments has finished.
+*  Data is recorded in the internal va info that will be used
+*  to remove variable arguments at the end of the function.
+*
+*  Inputs:
+*        ap - the va_list
+*
+****************************************************************
+*
+__record_va_info start
+va_info_ptr equ 1                       pointer to the internal va info
+
+         csubroutine (4:ap),4
+         ldy   #4                       get pointer to internal va info
+         lda   [ap],y
+         sta   va_info_ptr
+         stz   va_info_ptr+2
+
+         lda   [ap]                     update end of variable arguments
+         cmp   [va_info_ptr]
+         blt   ret
+         sta   [va_info_ptr]
+
+ret      creturn
+         end
+
+****************************************************************
+*
+*  void __va_end(internal_va_info *list);
 *
 *  Remove variable length arguments from the stack.
 *
