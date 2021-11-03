@@ -153,3 +153,44 @@ __signbit start
          
          creturn 2:val
          end
+
+****************************************************************
+*
+*  int __fpcompare(long double x, long double y, short mask);
+*
+*  Compare two floating-point values, not signaling invalid
+*  if they are unordered.
+*
+*  Inputs:
+*        x,y - values to compare
+*        mask - mask of bits as returned in X register from FCMP
+*
+*  Outputs:
+*        1 if x and y have one of the relations specified by mask
+*        0 otherwise
+*
+****************************************************************
+*
+__fpcompare start
+
+         csubroutine (10:x,10:y,2:mask),0
+         
+         tdc
+         clc
+         adc   #x
+         pea   0
+         pha
+         tdc
+         clc
+         adc   #y
+         pea   0
+         pha
+         FCMPX
+         txa
+         and   mask
+         beq   lb1
+         lda   #1
+lb1      sta   mask
+         
+         creturn 2:mask
+         end
