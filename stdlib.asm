@@ -920,6 +920,31 @@ srand    start
 
 ****************************************************************
 *
+*  strtof - convert a string to a float
+*  strtold - convert a string to a long double
+*
+*  Inputs:
+*        str - pointer to the string
+*        ptr - pointer to a pointer; a pointer to the first
+*              char past the number is placed here.  If ptr is
+*              nil, no pointer is returned
+*
+*  Outputs:
+*        X-A - pointer to result
+*
+*  Note: These are currently implemented by just calling strtod
+*        (in SysFloat).  As such, all of these function really
+*        return values in the SANE extended format.
+*
+****************************************************************
+*
+strtold  start
+strtof   entry
+         jml   strtod
+         end
+
+****************************************************************
+*
 *  strtol - convert a string to a long
 *
 *  Inputs:

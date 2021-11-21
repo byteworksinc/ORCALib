@@ -13,6 +13,7 @@
 ****************************************************************
 
 math2    private                        dummy segment
+         copy  equates.asm
          end
 
 ****************************************************************
@@ -591,6 +592,165 @@ ret      creturn 4:x                    return it
 
 ****************************************************************
 *
+*  float modff(float x, float *iptr);
+*
+*  Splits x into integer and fractional parts.  Returns the
+*  fractional part and stores integer part as a float in *iptr.
+*
+****************************************************************
+*
+modff    start
+         using MathCommon2
+         
+         csubroutine (10:x,4:iptr),0
+
+         phb
+         phk
+         plb
+
+         lda   x                        copy x to t1
+         sta   t1
+         lda   x+2
+         sta   t1+2
+         lda   x+4
+         sta   t1+4
+         lda   x+6
+         sta   t1+6
+         lda   x+8
+         sta   t1+8
+
+         asl   a                        check for infinity or nan
+         cmp   #32767|1
+         bne   finite
+         lda   x+6
+         asl   a
+         ora   x+4
+         ora   x+2
+         ora   x
+         bne   storeint                 if value is nan, return it as-is
+         stz   t1                       if value is +-inf, fractional part is 0
+         stz   t1+2
+         stz   t1+4
+         stz   t1+6
+         stz   t1+8
+         bra   storeint
+         
+finite   tdc                            truncate x to an integer
+         clc
+         adc   #x
+         pea   0
+         pha
+         FTINTX
+         
+         tdc                            t1 := t1 - x
+         clc
+         adc   #x
+         pea   0
+         pha
+         ph4   #t1
+         FSUBX
+         
+storeint tdc                            copy x to *iptr, converting to float
+         clc
+         adc   #x
+         pea   0
+         pha
+         pei   iptr+2
+         pei   iptr
+         FX2S
+
+copysign asl   t1+8                     copy sign of x to t1
+         asl   x+8
+         ror   t1+8
+
+         lda   #^t1                     return t1 (fractional part)
+         sta   iptr+2
+         lda   #t1
+         sta   iptr
+         plb
+         creturn 4:iptr
+         end
+
+****************************************************************
+*
+*  long double modfl(long double x, long double *iptr);
+*
+*  Splits x into integer and fractional parts.  Returns the
+*  fractional part and stores the integer part in *iptr.
+*
+****************************************************************
+*
+modfl    start
+         using MathCommon2
+         
+         csubroutine (10:x,4:iptr),0
+         
+         phb
+         phk
+         plb
+         
+         lda   x                        copy x to *iptr and t1
+         sta   [iptr]
+         sta   t1
+         ldy   #2
+         lda   x+2
+         sta   [iptr],y
+         sta   t1+2
+         iny
+         iny
+         lda   x+4
+         sta   [iptr],y
+         sta   t1+4
+         iny
+         iny
+         lda   x+6
+         sta   [iptr],y
+         sta   t1+6
+         iny
+         iny
+         lda   x+8
+         sta   [iptr],y
+         sta   t1+8
+         
+         asl   a                        check for infinity or nan
+         cmp   #32767|1
+         bne   finite
+         lda   x+6
+         asl   a
+         ora   x+4
+         ora   x+2
+         ora   x
+         bne   ret                      if value is nan, return it as-is
+         stz   t1                       if value is +-inf, fractional part is 0
+         stz   t1+2
+         stz   t1+4
+         stz   t1+6
+         stz   t1+8
+         bra   copysign
+
+finite   pei   iptr+2                   if value is finite
+         pei   iptr
+         FTINTX                           truncate *iptr to an integer
+         
+         pei   iptr+2                     t1 := t1 - *iptr
+         pei   iptr
+         ph4   #t1
+         FSUBX
+
+copysign asl   t1+8                     copy sign of x to t1
+         asl   x+8
+         ror   t1+8
+
+ret      lda   #^t1                     return t1 (fractional part)
+         sta   iptr+2
+         lda   #t1
+         sta   iptr
+         plb
+         creturn 4:iptr
+         end
+
+****************************************************************
+*
 *  double remainder(double x, double y);
 *
 *  Returns x REM y as specified by IEEE 754: r = x - ny,
@@ -838,4 +998,115 @@ truncl   entry
          ldx   #^t1                     return a pointer to the result
          lda   #t1
          rtl
+         end
+
+****************************************************************
+*
+*  float and long double versions of functions in SysFloat
+*
+****************************************************************
+*
+acosf    start
+acosl    entry
+         jml   acos
+         end
+
+asinf    start
+asinl    entry
+         jml   asin
+         end
+
+atanf    start
+atanl    entry
+         jml   atan
+         end
+
+atan2f   start
+atan2l   entry
+         jml   atan2
+         end
+
+ceilf    start
+ceill    entry
+         jml   ceil
+         end
+
+cosf     start
+cosl     entry
+         jml   cos
+         end
+
+coshf    start
+coshl    entry
+         jml   cosh
+         end
+
+expf     start
+expl     entry
+         jml   exp
+         end
+
+fabsf    start
+fabsl    entry
+         jml   fabs
+         end
+
+floorf   start
+floorl   entry
+         jml   floor
+         end
+
+fmodf    start
+fmodl    entry
+         jml   fmod
+         end
+
+frexpf   start
+frexpl   entry
+         jml   frexp
+         end
+
+ldexpf   start
+ldexpl   entry
+         jml   ldexp
+         end
+
+logf     start
+logl     entry
+         jml   log
+         end
+
+log10f   start
+log10l   entry
+         jml   log10
+         end
+
+powf     start
+powl     entry
+         jml   pow
+         end
+
+sinf     start
+sinl     entry
+         jml   sin
+         end
+
+sinhf    start
+sinhl    entry
+         jml   sinh
+         end
+
+sqrtf    start
+sqrtl    entry
+         jml   sqrt
+         end
+
+tanf     start
+tanl     entry
+         jml   tan
+         end
+
+tanhf    start
+tanhl    entry
+         jml   tanh
          end
