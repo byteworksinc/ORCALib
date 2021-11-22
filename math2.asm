@@ -918,6 +918,81 @@ rintl    entry
 
 ****************************************************************
 *
+*  double scalbln(double x, long n);
+*
+*  Returns x * 2^n.
+*
+****************************************************************
+*
+scalbln  start
+scalblnf entry
+scalblnl entry
+         using MathCommon2
+         
+         csubroutine (10:x,4:n),0
+         
+         phb
+         phk
+         plb
+
+         lda   x                        place x in a work area
+         sta   t1
+         lda   x+2
+         sta   t1+2
+         lda   x+4
+         sta   t1+4
+         lda   x+6
+         sta   t1+6
+         lda   x+8
+         sta   t1+8
+
+loop     cmp4  n,#32767+1               if n > INT_MAX
+         blt   notbig
+         pea   32767                      scale by INT_MAX
+         pea   0
+         bra   adjust_n
+notbig   cmp4  n,#-32768                else if n < INT_MIN
+         bge   notsmall
+         pea   -32768+64                  scale by INT_MIN
+         pea   -1
+
+adjust_n sec                            if n is out of range of int
+         lda   n                          subtract scale factor from n
+         sbc   3,s
+         sta   n
+         lda   n+2
+         sbc   1,s
+         sta   n+2
+         pla
+         bra   do_scalb                 else
+notsmall pei   n                          scale by n
+         stz   n                          remaining amount to scale by is 0
+         stz   n+2
+
+do_scalb ph4   #t1                      scale the number
+         FSCALBX
+
+         lda   n                        if no more scaling to do
+         ora   n+2
+         beq   done                       we are done
+         
+         ph4   #t1                      else if value is nan/inf/zero
+         FCLASSX
+         txa
+         and   #$FE
+         bne   done                       stop: more scaling would not change it
+         brl   loop                     else scale by remaining amount
+
+done     lda   #^t1                     return a pointer to the result
+         sta   n+2
+         lda   #t1
+         sta   n
+         plb
+         creturn 4:n
+         end
+
+****************************************************************
+*
 *  double scalbn(double x, int n);
 *
 *  Returns x * 2^n.
