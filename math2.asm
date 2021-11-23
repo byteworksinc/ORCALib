@@ -822,6 +822,70 @@ ret      lda   #^t1                     return t1 (fractional part)
 
 ****************************************************************
 *
+*  double nan(const char *tagp);
+*
+*  Returns a quiet NaN, with NaN code determined by the
+*  argument string.
+*
+****************************************************************
+*
+nan      start
+nanf     entry
+nanl     entry
+         using MathCommon2
+         
+         csubroutine (4:tagp)
+         
+         phb
+         phk
+         plb
+         
+         stz   t1+6                     initial code is 0
+         
+loop     lda   [tagp]                   do
+         and   #$00FF                     get next character
+         beq   loopdone                   if end of string, break
+         cmp   #'0'
+         blt   no_code
+         cmp   #'9'+1
+         bge   no_code                    if not a digit, treat as no code
+         and   #$000F
+         asl   t1+6                       code = code*10 + digit
+         clc
+         adc   t1+6
+         asl   t1+6
+         asl   t1+6
+         clc
+         adc   t1+6
+         sta   t1+6
+         inc4  tagp                       tagp++
+         bra   loop                     while true
+         
+no_code  stz   t1+6                     if no code specified, default to 0
+
+loopdone lda   t1+6
+         and   #$00FF                   use low 8 bits as NaN code
+         bne   codeok                   if code is 0
+         lda   #21                        use NANZERO
+codeok   ora   #$4000                   set high bit of f for quiet NaN
+         sta   t1+6
+         
+         lda   #32767                   e=32767 for NaN
+         sta   t1+8
+         stz   t1+4                     set rest of fraction field to 0
+         stz   t1+2
+         stz   t1
+         
+         lda   #^t1                     return a pointer to the result
+         sta   tagp+2
+         lda   #t1
+         sta   tagp
+         plb
+         creturn 4:tagp
+         end
+
+****************************************************************
+*
 *  double nearbyint(double x);
 *
 *  Rounds x to an integer using current rounding direction,

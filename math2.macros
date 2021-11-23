@@ -274,6 +274,14 @@
  longi on
 .a
  mend
+ macro
+&l inc4 &a
+&l ~setm
+ inc &a
+ bne ~&SYSCNT
+ inc 2+&a
+~&SYSCNT ~restm
+ mend
  MACRO
 &LAB FCLASSS
 &LAB PEA $021C
