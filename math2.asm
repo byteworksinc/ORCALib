@@ -390,6 +390,77 @@ expm1l   entry
 
 ****************************************************************
 *
+*  double fdim(double x, double y);
+*
+*  Returns x - y if x > y, or +0 if x <= y.
+*
+****************************************************************
+*
+fdim     start
+fdimf    entry
+fdiml    entry
+         using MathCommon2
+
+         phb
+         phk
+         plb
+
+         tsc                            compare x and y
+         clc
+         adc   #5
+         pea   0
+         pha
+         adc   #10
+         pea   0
+         pha
+         FCMPX
+         bmi   x_le_y
+         beq   x_le_y
+         
+         tsc                            if x > y (or unordered)
+         clc
+         adc   #5+10
+         pea   0
+         pha
+         sbc   #10-1                      (carry is clear)
+         pea   0
+         pha
+         FSUBX                            x = x - y
+         lda   5,s                        t1 = x
+         sta   t1
+         lda   5+2,s
+         sta   t1+2
+         lda   5+4,s
+         sta   t1+4
+         lda   5+6,s
+         sta   t1+6
+         lda   5+8,s
+         sta   t1+8
+         bra   ret                      else
+
+x_le_y   stz   t1                         t1 = +0.0
+         stz   t1+2
+         stz   t1+4
+         stz   t1+6
+         stz   t1+8
+
+ret      plx                            clean up stack
+         ply
+         tsc
+         clc
+         adc   #20
+         tcs
+         phy
+         phx
+         plb
+         
+         ldx   #^t1                     return a pointer to the result
+         lda   #t1
+         rtl
+         end
+
+****************************************************************
+*
 *  int ilogb(double x);
 *
 *  Returns the binary exponent of x (a signed integer value),
@@ -747,6 +818,50 @@ ret      lda   #^t1                     return t1 (fractional part)
          sta   iptr
          plb
          creturn 4:iptr
+         end
+
+****************************************************************
+*
+*  double nearbyint(double x);
+*
+*  Rounds x to an integer using current rounding direction,
+*  never raising the "inexact" exception.
+*
+****************************************************************
+*
+nearbyint start
+nearbyintf entry
+nearbyintl entry
+         using MathCommon2
+
+         phb                            place the number in a work area
+         plx
+         ply
+         phk
+         plb
+         pla
+         sta   t1
+         pla
+         sta   t1+2
+         pla
+         sta   t1+4
+         pla
+         sta   t1+6
+         pla
+         sta   t1+8
+         phy
+         phx
+         plb
+
+         FGETENV                        save environment
+         phx
+         ph4   #t1                      compute the value
+         FRINTX
+         FSETENV                        restore environment
+         
+         ldx   #^t1                     return a pointer to the result
+         lda   #t1
+         rtl
          end
 
 ****************************************************************
