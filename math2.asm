@@ -666,6 +666,64 @@ ret      creturn 2:x                    return it
 
 ****************************************************************
 *
+*  long long llrint(double x);
+*
+*  Rounds x to an integer using current rounding direction
+*  and returns it as a long long (if representable).
+*
+****************************************************************
+*
+llrint   start
+llrintf  entry
+llrintl  entry
+retptr   equ   1
+
+         csubroutine (10:x),4
+         stx   retptr
+         stz   retptr+2
+         
+         tdc
+         clc
+         adc   #x
+         pea   0                        push src address for fcpxx
+         pha
+         pea   llmin|-16                push dst address for fcpxx
+         pea   llmin
+         pea   0                        push operand address for frintx
+         pha
+         FRINTX                         round
+         FCPXX                          compare with LLONG_MIN
+         bne   convert
+         
+         lda   #$8000                   if it is LONG_MIN, use that value
+         ldy   #6
+         sta   [retptr],y
+         asl   a
+         dey
+         dey
+         sta   [retptr],y
+         dey
+         dey
+         sta   [retptr],y
+         sta   [retptr]
+         bra   done
+
+convert  tdc                            if it is not LONG_MIN, call fx2c:
+         clc
+         adc   #x
+         pea   0                          push src address for fx2c
+         pha
+         pei   retptr+2                   push dst address for fx2c
+         pei   retptr
+         FX2C                             convert
+
+done     creturn
+
+llmin    dc    e'-9223372036854775808'
+         end
+
+****************************************************************
+*
 *  double log1p(double x);
 *
 *  Returns ln(1+x).
