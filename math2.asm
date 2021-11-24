@@ -461,6 +461,158 @@ ret      plx                            clean up stack
 
 ****************************************************************
 *
+*  double fmax(double x, double y);
+*
+*  Returns the maximum numeric value of x or y.
+*  If one is a NaN, returns the other.
+*
+****************************************************************
+*
+fmax     start
+fmaxf    entry
+fmaxl    entry
+         using MathCommon2
+
+         phb
+         phk
+         plb
+         phd
+         
+         tsc                            set up direct page
+         clc
+         adc   #7
+         tcd
+         
+         pea   0                        compare x and y
+         pha
+         clc
+         adc   #10
+         pea   0
+         pha
+         FCMPX
+
+         bmi   use_y                    if x < y, return y
+         bvs   use_x                    if x >= y, return x
+         beq   use_x
+
+         pea   0                        if x,y are unordered
+         phd
+         FCLASSX
+         txa
+         and   #$00FE
+         cmp   #$00FC                     if x is not a nan, return x
+         beq   use_y                      else return y
+
+use_x    ldx   #0
+         bra   copyit
+
+use_y    ldx   #10
+
+copyit   lda   0,x                      copy result to t1
+         sta   t1
+         lda   2,x
+         sta   t1+2
+         lda   4,x
+         sta   t1+4
+         lda   6,x
+         sta   t1+6
+         lda   8,x
+         sta   t1+8
+         
+         pld                            clean up stack
+         plx
+         ply
+         tsc
+         clc
+         adc   #20
+         tcs
+         phy
+         phx
+         plb
+
+         ldx   #^t1                     return a pointer to the result
+         lda   #t1
+         rtl
+         end
+
+****************************************************************
+*
+*  double fmin(double x, double y);
+*
+*  Returns the minimum numeric value of x or y.
+*  If one is a NaN, returns the other.
+*
+****************************************************************
+*
+fmin     start
+fminf    entry
+fminl    entry
+         using MathCommon2
+
+         phb
+         phk
+         plb
+         phd
+         
+         tsc                            set up direct page
+         clc
+         adc   #7
+         tcd
+         
+         pea   0                        compare x and y
+         pha
+         clc
+         adc   #10
+         pea   0
+         pha
+         FCMPX
+
+         bmi   use_x                    if x < y, return x
+         bvs   use_y                    if x >= y, return y
+         beq   use_y
+
+         pea   0                        if x,y are unordered
+         phd
+         FCLASSX
+         txa
+         and   #$00FE
+         cmp   #$00FC                     if x is not a nan, return x
+         beq   use_y                      else return y
+
+use_x    ldx   #0
+         bra   copyit
+
+use_y    ldx   #10
+
+copyit   lda   0,x                      copy result to t1
+         sta   t1
+         lda   2,x
+         sta   t1+2
+         lda   4,x
+         sta   t1+4
+         lda   6,x
+         sta   t1+6
+         lda   8,x
+         sta   t1+8
+         
+         pld                            clean up stack
+         plx
+         ply
+         tsc
+         clc
+         adc   #20
+         tcs
+         phy
+         phx
+         plb
+
+         ldx   #^t1                     return a pointer to the result
+         lda   #t1
+         rtl
+         end
+
+****************************************************************
+*
 *  int ilogb(double x);
 *
 *  Returns the binary exponent of x (a signed integer value),
