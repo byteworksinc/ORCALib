@@ -1140,6 +1140,439 @@ nearbyintl entry
 
 ****************************************************************
 *
+*  double nextafter(double x, double y);
+*
+*  Returns next representable value (in double format)
+*  after x in the direction of y.  Returns y if x equals y. 
+*
+****************************************************************
+*
+nextafter start
+         using MathCommon2
+
+         tsc                            x = (double) x
+         clc
+         adc   #4
+         pea   0
+         pha
+         pea   0
+         pha
+         FX2D
+         lda   4,s                      save low bits of x
+         sta   4+8,s
+
+         tsc                            y = (double) y
+         clc
+         adc   #4+10
+         pea   0
+         pha
+         pea   0
+         pha
+         FX2D
+         
+         tsc                            push address of y
+         clc
+         adc   #4+10
+         pea   0
+         pha
+         sbc   #10-1                    push address of x
+         pea   0
+         pha
+         FNEXTD                         x = nextafter x toward y
+
+         tsc                            store x (as extended) in t1
+         clc
+         adc   #4
+         pea   0
+         pha
+         ph4   #t1
+         FD2X
+
+         phb
+         lda   4+8+1,s                  if original x might be 0 then
+         bne   ret
+         tsc
+         clc
+         adc   #4+10+1
+         pea   0
+         pha
+         ph4   #t1
+         FCPXD
+         bne   ret                        if t1 == y then
+         phk
+         plb
+         asl   t1+8                         sign of t1 = sign of y
+         lda   4+10+1+6,s
+         asl   a
+         ror   t1+8
+         
+ret      plx                            move return address
+         ply
+         tsc
+         clc
+         adc   #20
+         tcs
+         phy
+         phx
+         plb
+
+         ldx   #^t1                     return a pointer to the result
+         lda   #t1
+         rtl
+         end
+
+****************************************************************
+*
+*  float nextafterf(float x, float y);
+*
+*  Returns next representable value (in float format)
+*  after x in the direction of y.  Returns y if x equals y. 
+*
+****************************************************************
+*
+nextafterf start
+         using MathCommon2
+
+         tsc                            x = (float) x
+         clc
+         adc   #4
+         pea   0
+         pha
+         pea   0
+         pha
+         FX2S
+         lda   4,s                      save low bits of x
+         sta   4+8,s
+
+         tsc                            y = (float) y
+         clc
+         adc   #4+10
+         pea   0
+         pha
+         pea   0
+         pha
+         FX2S
+         
+         tsc                            push address of y
+         clc
+         adc   #4+10
+         pea   0
+         pha
+         sbc   #10-1                    push address of x
+         pea   0
+         pha
+         FNEXTS                         x = nextafter x toward y
+
+         tsc                            store x (as extended) in t1
+         clc
+         adc   #4
+         pea   0
+         pha
+         ph4   #t1
+         FS2X
+
+         phb
+         lda   4+8+1,s                  if original x might be 0 then
+         bne   ret
+         tsc
+         clc
+         adc   #4+10+1
+         pea   0
+         pha
+         ph4   #t1
+         FCPXS
+         bne   ret                        if t1 == y then
+         phk
+         plb
+         asl   t1+8                         sign of t1 = sign of y
+         lda   4+10+1+2,s
+         asl   a
+         ror   t1+8
+         
+ret      plx                            move return address
+         ply
+         tsc
+         clc
+         adc   #20
+         tcs
+         phy
+         phx
+         plb
+
+         ldx   #^t1                     return a pointer to the result
+         lda   #t1
+         rtl
+         end
+
+****************************************************************
+*
+*  long double nextafterl(long double x, long double y);
+*  long double nexttowardl(long double x, long double y);
+*
+*  Returns next representable value (in extended format)
+*  after x in the direction of y.  Returns y if x equals y. 
+*
+****************************************************************
+*
+nextafterl start
+nexttowardl entry
+         using MathCommon2
+
+         tsc                            push address of x
+         clc
+         adc   #4
+         pea   0
+         pha
+         adc   #10                      push address of y
+         pea   0
+         pha
+         FCPXX
+         bne   getnext                  if x == y then
+         tsc
+         clc
+         adc   #4+10                      return y
+         bra   storeval                 else
+         
+getnext  tsc                              push address of y
+         clc
+         adc   #4+10
+         pea   0
+         pha
+         sbc   #10-1                      push address of x
+         pea   0
+         pha
+         FNEXTX                           x = nextafter x toward y
+
+         tsc                              return x
+         clc
+         adc   #4
+storeval pea   0                        store return value to t1
+         pha
+         ph4   #t1
+         FX2X
+
+         phb                            move return address
+         plx
+         ply
+         tsc
+         clc
+         adc   #20
+         tcs
+         phy
+         phx
+         plb
+
+         ldx   #^t1                     return a pointer to the result
+         lda   #t1
+         rtl
+         end
+
+****************************************************************
+*
+*  double nexttoward(double x, long double y);
+*
+*  Returns next representable value (in double format)
+*  after x in the direction of y.  Returns y if x equals y. 
+*
+****************************************************************
+*
+nexttoward start
+         using MathCommon2
+
+         tsc                            x = (double) x
+         clc
+         adc   #4
+         pea   0
+         pha
+         pea   0
+         pha
+         FX2D
+
+         tsc                            push address of x
+         clc
+         adc   #4
+         pea   0
+         pha
+         adc   #10                      push address of y
+         pea   0
+         pha
+         FCPXD                          compare x and y
+         
+         bvs   x_gt_y
+         bmi   x_lt_y
+         beq   x_eq_y
+         
+         tsc                            x,y unordered case: do nextafter(x,y)
+         clc
+         adc   #4+10
+         pea   0
+         pha
+         pea   0
+         pha
+         pea   0
+         pha
+         FX2D
+         bra   getnext
+
+x_gt_y   ph4   #minusinf                x > y case: do nextafter(x,-inf)
+         bra   getnext
+
+x_lt_y   ph4   #plusinf                 x < y case: do nextafter(x,+inf)
+         bra   getnext
+
+x_eq_y   phb
+         phk
+         plb
+         lda   4+10+1,s                 x == y case: return y
+         sta   t1
+         lda   4+10+1+2,s
+         sta   t1+2
+         lda   4+10+1+4,s
+         sta   t1+4
+         lda   4+10+1+6,s
+         sta   t1+6
+         lda   4+10+1+8,s
+         sta   t1+8
+         bra   ret
+
+getnext  tsc                            compute nextafter(x,...)
+         clc
+         adc   #4+4
+         pea   0
+         pha
+         FNEXTD
+
+         tsc                            store x (as extended) in t1
+         clc
+         adc   #4
+         pea   0
+         pha
+         ph4   #t1
+         FD2X
+
+         phb                            move return address
+ret      plx
+         ply
+         tsc
+         clc
+         adc   #20
+         tcs
+         phy
+         phx
+         plb
+
+         ldx   #^t1                     return a pointer to the result
+         lda   #t1
+         rtl
+
+plusinf  dc    d'+inf'
+minusinf dc    d'-inf'
+         end
+
+****************************************************************
+*
+*  float nexttowardf(float x, long double y);
+*
+*  Returns next representable value (in float format)
+*  after x in the direction of y.  Returns y if x equals y. 
+*
+****************************************************************
+*
+nexttowardf start
+         using MathCommon2
+
+         tsc                            x = (double) x
+         clc
+         adc   #4
+         pea   0
+         pha
+         pea   0
+         pha
+         FX2S
+
+         tsc                            push address of x
+         clc
+         adc   #4
+         pea   0
+         pha
+         adc   #10                      push address of y
+         pea   0
+         pha
+         FCPXS                          compare x and y
+         
+         bvs   x_gt_y
+         bmi   x_lt_y
+         beq   x_eq_y
+         
+         tsc                            x,y unordered case: do nextafter(x,y)
+         clc
+         adc   #4+10
+         pea   0
+         pha
+         pea   0
+         pha
+         pea   0
+         pha
+         FX2S
+         bra   getnext
+
+x_gt_y   ph4   #minusinf                x > y case: do nextafter(x,-inf)
+         bra   getnext
+
+x_lt_y   ph4   #plusinf                 x < y case: do nextafter(x,+inf)
+         bra   getnext
+
+x_eq_y   phb
+         phk
+         plb
+         lda   4+10+1,s                 x == y case: return y
+         sta   t1
+         lda   4+10+1+2,s
+         sta   t1+2
+         lda   4+10+1+4,s
+         sta   t1+4
+         lda   4+10+1+6,s
+         sta   t1+6
+         lda   4+10+1+8,s
+         sta   t1+8
+         bra   ret
+
+getnext  tsc                            compute nextafter(x,...)
+         clc
+         adc   #4+4
+         pea   0
+         pha
+         FNEXTS
+
+         tsc                            store x (as extended) in t1
+         clc
+         adc   #4
+         pea   0
+         pha
+         ph4   #t1
+         FS2X
+
+         phb                            move return address
+ret      plx
+         ply
+         tsc
+         clc
+         adc   #20
+         tcs
+         phy
+         phx
+         plb
+
+         ldx   #^t1                     return a pointer to the result
+         lda   #t1
+         rtl
+
+plusinf  dc    f'+inf'
+minusinf dc    f'-inf'
+         end
+
+****************************************************************
+*
 *  double remainder(double x, double y);
 *
 *  Returns x REM y as specified by IEEE 754: r = x - ny,
