@@ -282,6 +282,82 @@
  inc 2+&a
 ~&SYSCNT ~restm
  mend
+ macro
+&l sub4 &m1,&m2,&m3
+ lclb &yistwo
+ lclc &c
+&l ~setm
+ aif c:&m3,.a
+&c amid "&m2",1,1
+ aif "&c"<>"#",.a
+&c amid "&m1",1,1
+ aif "&c"="{",.a
+ aif "&c"="[",.a
+&c amid "&m2",2,l:&m2-1
+ aif &c>=65536,.a
+ sec
+ ~lda &m1
+ ~op sbc,&m2
+ ~sta &m1
+ bcs ~&SYSCNT
+ ~op.h dec,&m1
+~&SYSCNT anop
+ ago .c
+.a
+ aif c:&m3,.b
+ lclc &m3
+&m3 setc &m1
+.b
+ sec
+ ~lda &m1
+ ~op sbc,&m2
+ ~sta &m3
+ ~lda.h &m1
+ ~op.h sbc,&m2
+ ~sta.h &m3
+.c
+ ~restm
+ mend
+ macro
+&l ~sta &op
+ lclc &c
+&c amid "&op",1,1
+ aif "&c"<>"{",.b
+&c amid "&op",l:&op,1
+ aif "&c"="}",.a
+ mnote "Missing closing '}'",2
+&op setc &op}
+.a
+&op amid "&op",2,l:&op-2
+&op setc (&op)
+.b
+&l sta &op
+ mend
+ macro
+&l ~sta.h &op
+&l anop
+ lclc &c
+&c amid "&op",1,1
+ aif "&c"="[",.b
+ aif "&c"<>"{",.d
+&c amid "&op",l:&op,1
+ aif "&c"="}",.a
+ mnote "Missing closing '}'",2
+&op setc &op}
+.a
+&op amid "&op",2,l:&op-2
+&op setc (&op)
+.b
+ aif &yistwo,.c
+&yistwo setb 1
+ ldy #2
+.c
+&op setc "&op,y"
+ sta &op
+ mexit
+.d
+ sta 2+&op
+ mend
  MACRO
 &LAB FCLASSS
 &LAB PEA $021C
@@ -439,12 +515,6 @@
  JSL $E10000
  MEND
  MACRO
-&LAB FX2D
-&LAB PEA $0110
- LDX #$090A
- JSL $E10000
- MEND
- MACRO
 &LAB FNEXTD
 &LAB PEA $011E
  LDX #$090A
@@ -474,7 +544,33 @@
  LDX #$090A
  JSL $E10000
  MEND
-
-
-
-
+ MACRO
+&LAB FPROCENTRY
+&LAB PEA $0017
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FPROCEXIT
+&LAB PEA $0019
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FTESTXCP
+&LAB PEA $001B
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FADDS
+&LAB PEA $0200
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FSUBS
+&LAB PEA $0202
+ LDX #$090A
+ JSL $E10000
+ MEND

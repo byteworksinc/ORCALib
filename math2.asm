@@ -884,6 +884,86 @@ ret      creturn 4:x                    return it
 
 ****************************************************************
 *
+*  long lround(double x);
+*
+*  Rounds x to the nearest integer, rounding halfway cases
+*  away from 0, and returns it as a long (if representable).
+*
+****************************************************************
+*
+lround   start
+lroundf  entry
+lroundl  entry
+result   equ   1                        result value
+
+         csubroutine (10:x),4
+         
+         phb
+         phk
+         plb
+
+         pha                            save env & set to default
+         tsc
+         inc   a
+         pea   0
+         pha
+         FPROCENTRY
+
+         tdc                            round to integer with default rounding
+         clc
+         adc   #x
+         pea   0
+         pha
+         adc   #result-x
+         pea   0
+         pha
+         FX2L
+
+         pea   INEXACT
+         FTESTXCP                       if there was no inexact exception
+         beq   ret                        we are done: x was an integer/nan/inf
+         
+         FGETENV
+         txa
+         ora   #TOWARDZERO*$4000        set rounding direction to "toward zero"
+         pha
+         FSETENV
+         
+         lda   x+8
+         pha                            save sign of x
+         ora   #$8000
+         sta   x+8                      x = -abs(x)
+         
+         ph4   #onehalf                 x = x - 0.5 (rounded toward 0)
+         tdc
+         clc
+         adc   #x
+         pea   0
+         pha
+         FSUBS
+         tdc                            round to integer
+         clc
+         adc   #x
+         pea   0
+         pha
+         adc   #result-x
+         pea   0
+         pha
+         FX2L
+
+         pla                            if x was positive
+         bmi   ret
+         sub4  #0,result,result           negate result
+         
+ret      FPROCEXIT                      restore env & raise any new exceptions
+         plb
+         creturn 4:result               return the result
+
+onehalf  dc    f'0.5'
+         end
+
+****************************************************************
+*
 *  float modff(float x, float *iptr);
 *
 *  Splits x into integer and fractional parts.  Returns the
