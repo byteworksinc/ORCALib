@@ -16,6 +16,17 @@ math2    private                        dummy segment
          copy  equates.asm
          end
 
+INVALID    gequ $0001                    exceptions
+UNDERFLOW  gequ $0002
+OVERFLOW   gequ $0004
+DIVBYZERO  gequ $0008
+INEXACT    gequ $0010
+
+TONEAREST  gequ 0                       rounding directions
+UPWARD     gequ 1
+DOWNWARD   gequ 2 
+TOWARDZERO gequ 3
+
 ****************************************************************
 *
 *  MathCommon2 - common work areas for the math library
@@ -1736,6 +1747,90 @@ rintl    entry
          ldx   #^t1                     return a pointer to the result
          lda   #t1
          rtl
+         end
+
+****************************************************************
+*
+*  double round(double x);
+*
+*  Rounds x to the nearest integer, rounding halfway cases
+*  away from 0.
+*
+****************************************************************
+*
+round    start
+roundf   entry
+roundl   entry
+         using MathCommon2
+
+         csubroutine (10:x),0
+         
+         phb
+         phk
+         plb
+
+         pha                            save env & set to default
+         tsc
+         inc   a
+         pea   0
+         pha
+         FPROCENTRY
+
+         lda   x                        t1 = x
+         sta   t1
+         lda   x+2
+         sta   t1+2
+         lda   x+4
+         sta   t1+4
+         lda   x+6
+         sta   t1+6
+         lda   x+8
+         sta   t1+8
+
+         ph4   #t1                      round to integer with default rounding
+         FRINTX
+
+         pea   INEXACT
+         FTESTXCP                       if there was no inexact exception
+         beq   ret                        we are done: x was an integer/nan/inf
+         
+         FGETENV
+         txa
+         ora   #TOWARDZERO*$4000        set rounding direction to "toward zero"
+         pha
+         FSETENV
+         
+         lda   x                        t1 = abs(x)
+         sta   t1
+         lda   x+2
+         sta   t1+2
+         lda   x+4
+         sta   t1+4
+         lda   x+6
+         sta   t1+6
+         lda   x+8
+         and   #$7fff
+         sta   t1+8
+         
+         ph4   #onehalf                 t1 = t1 + 0.5 (rounded toward 0)
+         ph4   #t1
+         FADDS
+         ph4   #t1                      round to integer
+         FRINTX
+         asl   t1+8                     restore sign from x
+         asl   x+8
+         ror   t1+8
+         
+ret      FPROCEXIT                      restore env & raise any new exceptions
+         plb
+         
+         lda   #^t1                     return a pointer to the result
+         sta   x+2
+         lda   #t1
+         sta   x
+         creturn 4:x
+
+onehalf  dc    f'0.5'
          end
 
 ****************************************************************
