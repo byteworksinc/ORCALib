@@ -16,7 +16,7 @@ math2    private                        dummy segment
          copy  equates.asm
          end
 
-INVALID    gequ $0001                    exceptions
+INVALID    gequ $0001                   exceptions
 UNDERFLOW  gequ $0002
 OVERFLOW   gequ $0004
 DIVBYZERO  gequ $0008
@@ -682,6 +682,9 @@ ret      creturn 2:x                    return it
 *  Rounds x to an integer using current rounding direction
 *  and returns it as a long long (if representable).
 *
+*  Note: This avoids calling FX2C on negative numbers,
+*  because it is buggy for certain values.
+*
 ****************************************************************
 *
 llrint   start
@@ -706,7 +709,7 @@ retptr   equ   1
          FCPXX                          compare with LLONG_MIN
          bne   convert
          
-         lda   #$8000                   if it is LONG_MIN, use that value
+         lda   #$8000                   if it is LLONG_MIN, use that value
          ldy   #6
          sta   [retptr],y
          asl   a
@@ -717,16 +720,40 @@ retptr   equ   1
          dey
          sta   [retptr],y
          sta   [retptr]
-         bra   done
+         bra   done                     otherwise
 
-convert  tdc                            if it is not LONG_MIN, call fx2c:
+convert  pei   x+8                        save sign of x
+         asl   x+8                        x = abs(x)
+         lsr   x+8
+         tdc
          clc
          adc   #x
          pea   0                          push src address for fx2c
          pha
          pei   retptr+2                   push dst address for fx2c
          pei   retptr
-         FX2C                             convert
+         FX2C                             convert x
+         
+         pla                              if x was negative
+         bpl   done
+         sec
+         lda   #0                           negate result
+         sbc   [retptr]
+         sta   [retptr]
+         ldy   #2
+         lda   #0
+         sbc   [retptr],y
+         sta   [retptr],y
+         iny
+         iny
+         lda   #0
+         sbc   [retptr],y
+         sta   [retptr],y
+         iny
+         iny
+         lda   #0
+         sbc   [retptr],y
+         sta   [retptr],y
 
 done     creturn
 
@@ -861,6 +888,9 @@ logbl    entry
 *  Rounds x to an integer using current rounding direction
 *  and returns it as a long (if representable).
 *
+*  Note: This avoids calling FX2L or FX2C on negative numbers,
+*  because they are buggy for certain values.
+*
 ****************************************************************
 *
 lrint    start
@@ -869,6 +899,10 @@ lrintl   entry
 
          csubroutine (10:x),0
 
+         pei   x+8                      save sign of x
+         asl   x+8                      x = abs(x)
+         lsr   x+8
+
          tdc                            convert to integer
          clc
          adc   #x
@@ -876,7 +910,22 @@ lrintl   entry
          pha
          pea   0
          pha
-         FX2L
+         FX2C
+
+         lda   x+4                      if x is out of range of long
+         ora   x+6
+         bne   flag_inv
+         cmpl  x,#$80000000
+         blt   chk_neg
+         bne   flag_inv
+         lda   1,s
+         bmi   chk_neg
+flag_inv pea   INVALID                    raise "invalid" exception
+         FSETXCP
+
+chk_neg  pla                            if x was negative
+         bpl   ret
+         sub4  #0,x,x                     negate result
          
 ret      creturn 4:x                    return it
          rtl
@@ -889,6 +938,9 @@ ret      creturn 4:x                    return it
 *  Rounds x to the nearest integer, rounding halfway cases
 *  away from 0, and returns it as a long (if representable).
 *
+*  Note: This avoids calling FX2L or FX2C on negative numbers,
+*  because they are buggy for certain values.
+*
 ****************************************************************
 *
 lround   start
@@ -896,7 +948,7 @@ lroundf  entry
 lroundl  entry
 result   equ   1                        result value
 
-         csubroutine (10:x),4
+         csubroutine (10:x),8
          
          phb
          phk
@@ -909,6 +961,10 @@ result   equ   1                        result value
          pha
          FPROCENTRY
 
+         pei   x+8                      save sign of x
+         asl   x+8                      x = abs(x)
+         lsr   x+8
+
          tdc                            round to integer with default rounding
          clc
          adc   #x
@@ -917,30 +973,25 @@ result   equ   1                        result value
          adc   #result-x
          pea   0
          pha
-         FX2L
+         FX2C
 
          pea   INEXACT
          FTESTXCP                       if there was no inexact exception
-         beq   ret                        we are done: x was an integer/nan/inf
+         beq   chkrange                   we are done: x was an integer/nan/inf
          
          FGETENV
          txa
          ora   #TOWARDZERO*$4000        set rounding direction to "toward zero"
          pha
          FSETENV
-         
-         lda   x+8
-         pha                            save sign of x
-         ora   #$8000
-         sta   x+8                      x = -abs(x)
-         
-         ph4   #onehalf                 x = x - 0.5 (rounded toward 0)
+
+         ph4   #onehalf                 x = x + 0.5 (rounded toward 0)
          tdc
          clc
          adc   #x
          pea   0
          pha
-         FSUBS
+         FADDS
          tdc                            round to integer
          clc
          adc   #x
@@ -949,10 +1000,21 @@ result   equ   1                        result value
          adc   #result-x
          pea   0
          pha
-         FX2L
+         FX2C
+         
+chkrange lda   result+4                 if x is out of range of long
+         ora   result+6
+         bne   flag_inv
+         cmpl  result,#$80000000
+         blt   chk_neg
+         bne   flag_inv
+         lda   1,s
+         bmi   chk_neg
+flag_inv pea   INVALID                    raise "invalid" exception
+         FSETXCP
 
-         pla                            if x was positive
-         bmi   ret
+chk_neg  pla                            if x was negative
+         bpl   ret
          sub4  #0,result,result           negate result
          
 ret      FPROCEXIT                      restore env & raise any new exceptions

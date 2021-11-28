@@ -358,6 +358,18 @@
 .d
  sta 2+&op
  mend
+ macro
+&l cmpl &n1,&n2
+ lclb &yistwo
+&l ~setm
+ ~lda.h &n1
+ ~op.h cmp,&n2
+ bne ~a&SYSCNT
+ ~lda &n1
+ ~op cmp,&n2
+~a&SYSCNT anop
+ ~restm
+ mend
  MACRO
 &LAB FCLASSS
 &LAB PEA $021C
@@ -439,12 +451,6 @@
  MACRO
 &LAB FRINTX
 &LAB PEA $0014
- LDX #$090A
- JSL $E10000
- MEND
- MACRO
-&LAB FX2L
-&LAB PEA $0310
  LDX #$090A
  JSL $E10000
  MEND
@@ -569,8 +575,8 @@
  JSL $E10000
  MEND
  MACRO
-&LAB FSUBS
-&LAB PEA $0202
+&LAB FSETXCP
+&LAB PEA $0015
  LDX #$090A
  JSL $E10000
  MEND

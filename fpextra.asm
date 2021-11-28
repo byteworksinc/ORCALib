@@ -75,12 +75,20 @@ fpextra  private                        dummy segment
 *  Inputs:
 *        extended-format real on stack
 *
+*  Note: This avoids calling FX2C on negative numbers,
+*  because it is buggy for certain values.
+*
 ****************************************************************
 *
 ~CompPrecision start
-         tsc
+         lda     4+8,s
+         pha                            save original sign
+         asl     a                      force sign to positive
+         lsr     a
+         sta     6+8,s
+         tsc                            limit precision
          clc
-         adc     #4
+         adc     #6
          ldy     #0
          phy
          pha
@@ -92,6 +100,11 @@ fpextra  private                        dummy segment
          pha
          FX2C
          FC2X
-         rtl
+         pla                            restore original sign
+         bpl     ret
+         lda     4+8,s
+         ora     #$8000
+         sta     4+8,s
+ret      rtl
          end
 
