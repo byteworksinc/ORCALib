@@ -762,6 +762,134 @@ llmin    dc    e'-9223372036854775808'
 
 ****************************************************************
 *
+*  long long llround(double x);
+*
+*  Rounds x to the nearest integer, rounding halfway cases away
+*  from 0, and returns it as a long long (if representable).
+*
+*  Note: This avoids calling FX2C on negative numbers,
+*  because it is buggy for certain values.
+*
+****************************************************************
+*
+llround  start
+llroundf entry
+llroundl entry
+retptr   equ   1
+
+         csubroutine (10:x),4
+         stx   retptr
+         stz   retptr+2
+
+         pha                            save env & set to default
+         tsc
+         inc   a
+         pea   0
+         pha
+         FPROCENTRY
+
+         tdc                            if x == LLONG_MIN
+         clc
+         adc   #x
+         pea   0
+         pha
+         ph4   #llmin
+         FCMPX
+         beq   retllmin                   return LLONG_MIN
+         tdc                            else if x == LLONG_MIN+0.5
+         clc
+         adc   #x
+         pea   0
+         pha
+         ph4   #llminp05
+         FCPXX
+         bne   convert
+         
+         pea   INEXACT                    raise "inexact" exception
+         FSETXCP
+retllmin lda   #$8000                     return LLONG_MIN
+         ldy   #6
+         sta   [retptr],y
+         asl   a
+         dey
+         dey
+         sta   [retptr],y
+         dey
+         dey
+         sta   [retptr],y
+         sta   [retptr]
+         brl   ret                      else
+
+convert  pei   x+8                        save sign of x
+         asl   x+8                        x = abs(x)
+         lsr   x+8
+
+         tdc                              round to integer
+         clc
+         adc   #x
+         pea   0
+         pha
+         pei   retptr+2
+         pei   retptr
+         FX2C
+
+         pea   INEXACT
+         FTESTXCP                         if there was no inexact exception
+         beq   chk_neg                      we're done: x was an integer/nan/inf
+         
+         FGETENV                          else
+         txa
+         ora   #TOWARDZERO*$4000            round toward zero
+         pha
+         FSETENV
+
+         ph4   #onehalf                     x = x + 0.5 (rounded toward 0)
+         tdc
+         clc
+         adc   #x
+         pea   0
+         pha
+         FADDS
+         tdc                                round to integer
+         clc
+         adc   #x
+         pea   0
+         pha
+         pei   retptr+2
+         pei   retptr
+         FX2C
+
+chk_neg  pla                              if x was negative
+         bpl   ret
+         sec
+         lda   #0                           negate result
+         sbc   [retptr]
+         sta   [retptr]
+         ldy   #2
+         lda   #0
+         sbc   [retptr],y
+         sta   [retptr],y
+         iny
+         iny
+         lda   #0
+         sbc   [retptr],y
+         sta   [retptr],y
+         iny
+         iny
+         lda   #0
+         sbc   [retptr],y
+         sta   [retptr],y
+
+ret      FPROCEXIT                      restore env & raise any new exceptions
+         creturn
+
+llmin    dc    e'-9223372036854775808'
+llminp05 dc    e'-9223372036854775807.5'
+onehalf  dc    f'0.5'
+         end
+
+****************************************************************
+*
 *  double log1p(double x);
 *
 *  Returns ln(1+x).
