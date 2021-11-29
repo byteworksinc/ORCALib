@@ -949,10 +949,6 @@ lroundl  entry
 result   equ   1                        result value
 
          csubroutine (10:x),8
-         
-         phb
-         phk
-         plb
 
          pha                            save env & set to default
          tsc
@@ -1018,7 +1014,6 @@ chk_neg  pla                            if x was negative
          sub4  #0,result,result           negate result
          
 ret      FPROCEXIT                      restore env & raise any new exceptions
-         plb
          creturn 4:result               return the result
 
 onehalf  dc    f'0.5'
