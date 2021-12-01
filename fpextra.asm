@@ -81,6 +81,12 @@ fpextra  private                        dummy segment
 ****************************************************************
 *
 ~CompPrecision start
+         tsc                            round to integer
+         clc
+         adc     #4
+         pea     0
+         pha
+         FRINTX
          lda     4+8,s
          pha                            save original sign
          asl     a                      force sign to positive

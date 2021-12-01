@@ -1136,17 +1136,20 @@ lrintl   entry
          csubroutine (10:x),0
 
          pei   x+8                      save sign of x
-         asl   x+8                      x = abs(x)
-         lsr   x+8
 
-         tdc                            convert to integer
+         tdc
          clc
          adc   #x
          pea   0
          pha
          pea   0
          pha
-         FX2C
+         pea   0
+         pha
+         FRINTX                         round x to integer
+         asl   x+8                      x = abs(x)
+         lsr   x+8
+         FX2C                           convert to comp
 
          lda   x+4                      if x is out of range of long
          ora   x+6
