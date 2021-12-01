@@ -222,6 +222,114 @@ lb1      sta   mask
 
 ****************************************************************
 *
+*  double acosh(double x);
+*
+*  Returns the inverse hyperbolic cosine of x.
+*
+****************************************************************
+*
+acosh    start
+acoshf   entry
+acoshl   entry
+         using MathCommon2
+         
+         csubroutine (10:x),0
+         
+         phb
+         phk
+         plb
+         
+         pha                            save env & set to default
+         tsc
+         inc   a
+         pea   0
+         pha
+         FPROCENTRY
+         
+         lda   x                        y = sqrt(x-1)
+         sta   y
+         lda   x+2
+         sta   y+2
+         lda   x+4
+         sta   y+4
+         lda   x+6
+         sta   y+6
+         lda   x+8
+         sta   y+8
+         ph4   #one
+         ph4   #y
+         FSUBI
+         ph4   #y
+         FSQRTX
+
+         lda   x                        t1 = sqrt(x+1)
+         sta   t1
+         lda   x+2
+         sta   t1+2
+         lda   x+4
+         sta   t1+4
+         lda   x+6
+         sta   t1+6
+         lda   x+8
+         sta   t1+8
+         ph4   #one
+         ph4   #t1
+         FADDI
+         ph4   #t1
+         FSQRTX
+
+         ph4   #y                       t1 = ln(1+y*(y+t1))
+         ph4   #t1
+         FADDX
+         ph4   #y
+         ph4   #t1
+         FMULX
+         ph4   #t1
+         FLN1X
+         
+         lda   t1+8                     if t1 = +inf
+         cmp   #32767
+         bne   ret
+         lda   t1+6
+         asl   a
+         ora   t1+4
+         ora   t1+2
+         ora   t1
+         bne   ret
+         
+         pea   0                          clear exceptions
+         FSETENV
+         lda   x                          t1 = ln(x) + ln(2)
+         sta   t1
+         lda   x+2
+         sta   t1+2
+         lda   x+4
+         sta   t1+4
+         lda   x+6
+         sta   t1+6
+         lda   x+8
+         sta   t1+8
+         ph4   #t1
+         FLNX
+         ph4   #ln2
+         ph4   #t1
+         FADDX
+
+ret      FPROCEXIT                      restore env & raise any new exceptions
+         plb
+         lda   #t1                      return t1
+         sta   x
+         lda   #^t1
+         sta   x+2
+         creturn 4:x
+
+y        ds    10                       temporary variable
+one      dc    i'1'                     constants
+ln2      dc    e'0.69314718055994530942'
+         end
+
+****************************************************************
+*
 *  double cbrt(double x);
 *
 *  Returns x^(1/3) (the cube root of x).
