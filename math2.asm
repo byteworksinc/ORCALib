@@ -732,6 +732,156 @@ copyit   lda   0,x                      copy result to t1
 
 ****************************************************************
 *
+*  double hypot(double x, double y);
+*
+*  Returns the square root of x^2 + y^2, without undue overflow
+*  or underflow.
+*
+****************************************************************
+*
+hypot    start
+hypotf   entry
+hypotl   entry
+         using MathCommon2
+scale    equ   1                        scaling factor
+
+         csubroutine (10:x,10:y),2
+         
+         phb
+         phk
+         plb
+
+         pha                            save env & set to default
+         tsc
+         inc   a
+         pea   0
+         pha
+         FPROCENTRY
+         
+         stz   scale                    no scaling by default
+         
+         asl   x+8                      x = abs(x)
+         lsr   x+8
+         asl   y+8                      y = abs(y)
+         lsr   y+8
+         
+         tdc                            if x < y
+         clc
+         adc   #x
+         pea   0
+         pha
+         adc   #y-x
+         pea   0
+         pha
+         FCMPX
+         bpl   sorted
+         
+         ldx   #8                         exchange x and y
+xchgloop lda   x,x
+         ldy   y,x
+         sta   y,x
+         sty   x,x
+         dex
+         dex
+         bpl   xchgloop
+sorted   anop                           at this point, 0 <= y <= x (if ordered)
+
+         lda   x+8                      if x or y is nan or inf
+         ldy   y+8
+         cpy   #32767
+         beq   naninf
+         cmp   #32767
+         beq   naninf                     skip exponent manipulation
+
+         cmp   #8190+16383+1            if exponent of x > 8190
+         blt   chksmall
+         sec                              scale x and y down by 2^8300
+         sbc   #8300
+         sta   x+8
+         lda   #8300
+         sta   scale
+         lda   y+8
+         sec
+         sbc   #8300
+         sta   y+8
+         bpl   compute
+         stz   y                          (zero out y if needed)
+         stz   y+2
+         stz   y+4
+         stz   y+6
+         stz   y+8
+         bra   compute
+         
+chksmall cmp   #-8100+16383             else if exponent of x < -8100
+         bge   compute
+         clc                              scale x and y up by 2^8300
+         adc   #8300
+         sta   x+8
+         lda   y+8
+         clc
+         adc   #8300
+         sta   y+8
+         lda   #-8300
+         sta   scale
+
+compute  tdc                            x = x*x
+         clc
+         adc   #x
+         pea   0
+         pha
+         pea   0
+         pha
+         FMULX
+
+         tdc                            y = y*y
+         clc
+         adc   #y
+         pea   0
+         pha
+         pea   0
+         pha
+         FMULX
+
+naninf   anop                           (we skip to here if x or y is nan/inf)
+         lda   x                        copy x to t1
+         sta   t1
+         lda   x+2
+         sta   t1+2
+         lda   x+4
+         sta   t1+4
+         lda   x+6
+         sta   t1+6
+         lda   x+8
+         sta   t1+8
+         
+         tdc                            t1 = x*x + y*y
+         clc
+         adc   #y
+         pea   0
+         pha
+         ph4   #t1
+         FADDX
+         
+         ph4   #t1                      t1 = sqrt(t1)
+         FSQRTX
+
+         lda   scale                    if scaling is needed
+         beq   done
+         pha                              do it
+         ph4   #t1
+         FSCALBX
+
+done     FPROCEXIT                      restore env
+         lda   #^t1                     return t1
+         sta   x+2
+         lda   #t1
+         sta   x
+         plb
+         creturn 4:x
+         end
+
+****************************************************************
+*
 *  int ilogb(double x);
 *
 *  Returns the binary exponent of x (a signed integer value),
