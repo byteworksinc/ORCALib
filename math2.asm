@@ -340,42 +340,89 @@ cbrt     start
 cbrtf    entry
 cbrtl    entry
          using MathCommon2
-
-         phb                            place the number in a work area
-         plx                              (except exponent/sign word)
-         ply
+scale    equ   1
+         
+         csubroutine (10:x),2
+         
+         phb
          phk
          plb
-         pla
-         sta   t1
-         pla
-         sta   t1+2
-         pla
-         sta   t1+4
-         pla
-         sta   t1+6
-         pla                            get exponent/sign word
-         phy
-         phx
-         
+
+         stz   scale                    scale by 0 by default (for inf/nan)
+
+         lda   x+8
          pha                            save original sign
          and   #$7FFF
-         sta   t1+8                     force sign to +
+         sta   x+8                      force sign to +
+         cmp   #32767                   skip scaling for inf/nan
+         beq   do_calc
+         
+         ldx   x+6                      if number is denormalized
+         bmi   div_exp
+         bne   normaliz
+         ldx   x+4
+         bne   normaliz
+         ldx   x+2
+         bne   normaliz
+         ldx   x
+         beq   div_exp
 
-         ph4   #onethird                compute abs(x)^(1/3)
+normaliz dec   a                          normalize it and adjust exponent
+         asl   x
+         rol   x+2
+         rol   x+4
+         rol   x+6
+         bpl   normaliz
+         
+div_exp  pha                            calculate exponent/3
+         pha
+         pha
+         pea   3
+         _SDivide
+         pla                            a = quotient
+         plx                            x = remainder
+         cpx   #2                       adjust remainder of 2 to -1
+         bne   setscale
+         ldx   #-1
+         inc   a
+         
+setscale sec                            calculate amount to scale result by
+         sbc   #16383/3
+         sta   scale
+         txa                            use remainder as exponent for calc.
+         clc
+         adc   #16383
+do_calc  sta   t1+8
+
+         lda   x                        place mantissa in work area
+         sta   t1
+         lda   x+2
+         sta   t1+2
+         lda   x+4
+         sta   t1+4
+         lda   x+6
+         sta   t1+6
+
+         ph4   #onethird                compute val^(1/3)
          ph4   #t1
          FXPWRY
          
-         pla                            if sign of x was -
-         bpl   ret
+         clc                            apply scaling
          lda   t1+8
-         ora   #$8000
-         sta   t1+8                       set sign of result to -
+         adc   scale
+         sta   t1+8
          
-ret      plb
-         ldx   #^t1                     return a pointer to the result
-         lda   #t1
-         rtl
+         asl   t1+8                     set sign of result to orig. sign of x
+         pla
+         asl   a
+         ror   t1+8
+
+         plb
+         lda   #t1                      return t1
+         sta   x
+         lda   #^t1
+         sta   x+2
+         creturn 4:x
 
 onethird dc    e'0.33333333333333333333'
          end

@@ -616,4 +616,8 @@
  LDX #$0B0A
  JSL $E10000
  MEND
-
+ MACRO
+&lab _SDivide
+&lab ldx #$0A0B
+ jsl $E10000
+ MEND
