@@ -330,6 +330,108 @@ ln2      dc    e'0.69314718055994530942'
 
 ****************************************************************
 *
+*  double atanh(double x);
+*
+*  Returns the inverse hyperbolic tangent of x.
+*
+****************************************************************
+*
+atanh    start
+atanhf   entry
+atanhl   entry
+         using MathCommon2
+         
+         csubroutine (10:x),0
+         
+         phb
+         phk
+         plb
+         
+         pha                            save env & set to default
+         tsc
+         inc   a
+         pea   0
+         pha
+         FPROCENTRY
+
+         pei   x+8                      save sign of x
+         asl   x+8                      x = abs(x)
+         lsr   x+8
+         
+         lda   x                        t1 = x
+         sta   t1
+         lda   x+2
+         sta   t1+2
+         lda   x+4
+         sta   t1+4
+         lda   x+6
+         sta   t1+6
+         lda   x+8
+         sta   t1+8
+
+         lda   x+8                      if x is very small
+         cmp   #-33+16383
+         bge   calc
+         lda   x                          if value is not zero
+         ora   x+2
+         ora   x+4
+         ora   x+6
+         beq   skipcalc
+         pea   INEXACT                      raise "inexact" exception
+         FSETXCP
+skipcalc bra   setsign                    skip next steps (return input value)
+
+calc     ph4   #one                     x = x - 1
+         tdc
+         clc
+         adc   #x
+         pea   0
+         pha
+         FSUBI
+         
+         tdc                            t1 = t1 / x
+         clc
+         adc   #x
+         pea   0
+         pha
+         ph4   #t1
+         FDIVX
+         
+         lda   t1+8                     if t1 is inf/nan
+         asl   a
+         cmp   #32767*2
+         beq   setsign                    skip next steps (so atanh(1) = +inf)
+         
+         ph4   #minustwo                t1 = t1 * -2
+         ph4   #t1
+         FMULI
+         
+         ph4   #t1                      t1 = ln(1+t1)
+         FLN1X
+         
+         ph4   #minustwo                t1 = t1 / -2
+         ph4   #t1
+         FDIVI
+         
+setsign  asl   t1+8                     sign of t1 = original sign of x
+         pla
+         asl   a
+         ror   t1+8
+
+         FPROCEXIT                      restore env & raise any new exceptions
+         plb
+         lda   #t1                      return t1
+         sta   x
+         lda   #^t1
+         sta   x+2
+         creturn 4:x
+
+one      dc    i'1'                     constants
+minustwo dc    i'-2'
+         end
+
+****************************************************************
+*
 *  double cbrt(double x);
 *
 *  Returns x^(1/3) (the cube root of x).
