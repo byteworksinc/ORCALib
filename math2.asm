@@ -330,6 +330,132 @@ ln2      dc    e'0.69314718055994530942'
 
 ****************************************************************
 *
+*  double asinh(double x);
+*
+*  Returns the inverse hyperbolic sine of x.
+*
+****************************************************************
+*
+asinh    start
+asinhf   entry
+asinhl   entry
+         using MathCommon2
+         
+         csubroutine (10:x),0
+         
+         phb
+         phk
+         plb
+         
+         pha                            save env & set to default
+         tsc
+         inc   a
+         pea   0
+         pha
+         FPROCENTRY
+
+         pei   x+8                      save sign of x
+         asl   x+8                      x = abs(x)
+         lsr   x+8
+         
+         lda   x                        t1 = y = z = x
+         sta   y
+         sta   z
+         sta   t1
+         lda   x+2
+         sta   y+2
+         sta   z+2
+         sta   t1+2
+         lda   x+4
+         sta   y+4
+         sta   z+4
+         sta   t1+4
+         lda   x+6
+         sta   y+6
+         sta   z+6
+         sta   t1+6
+         lda   x+8
+         sta   y+8
+         sta   z+8
+         sta   t1+8
+
+         lda   x                        if value is zero (or typical inf)
+         ora   x+2
+         ora   x+4
+         ora   x+6
+         beq   skipcalc                   return the input value
+
+         lda   x+8                      else if x is very small
+         cmp   #-33+16383
+         bge   calc
+         pea   INEXACT                    raise "inexact" exception
+         FSETXCP
+skipcalc brl   setsign                    return the input value
+
+calc     cmp   #16383/2+16383           else if x is very large (or nan)
+         blt   notbig
+         ph4   #z                         z = ln(x) + ln(2)
+         FLNX
+         ph4   #ln2
+         ph4   #z
+         FADDX
+         brl   setsign                  else
+         
+notbig   pea   -2                         t1 = 1 / (t1 * t1)
+         ph4   #t1
+         FXPWRI
+         
+         ph4   #one                       t1 = 1 + t1
+         ph4   #t1
+         FADDI
+
+         ph4   #t1                        t1 = sqrt(t1)
+         FSQRTX
+
+         pea   -1                         y = 1 / y
+         ph4   #y
+         FXPWRI
+
+         ph4   #y                         t1 = t1 + y
+         ph4   #t1
+         FADDX
+
+         ph4   #t1                        z = z / t1
+         ph4   #z
+         FDIVX
+
+         tdc                              z = z + x
+         clc
+         adc   #x
+         pea   0
+         pha
+         ph4   #z
+         FADDX
+
+         ph4   #z                         z = ln(1+z)
+         FLN1X
+         
+setsign  asl   z+8                      sign of z = original sign of x
+         pla
+         asl   a
+         ror   z+8
+
+         FPROCEXIT                      restore env & raise any new exceptions
+         plb
+         lda   #z                       return z
+         sta   x
+         lda   #^z
+         sta   x+2
+         creturn 4:x
+
+y        ds    10                       temporary variables
+z        ds    10
+one      dc    i'1'                     constants
+ln2      dc    e'0.69314718055994530942'
+         end
+
+****************************************************************
+*
 *  double atanh(double x);
 *
 *  Returns the inverse hyperbolic tangent of x.
