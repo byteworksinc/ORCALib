@@ -11,7 +11,7 @@
 LIB     = orca
 SRCS	= cc.asm ctype.asm orca.asm signal2.c stdlib.asm string.asm \
 	  time.asm toolglue.asm vars.asm int64.asm fenv.asm fpextra.asm \
-	  math2.asm
+	  math2.asm locale.asm uchar.asm
 
 buildall .PHONY: build assert.o
 
