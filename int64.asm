@@ -646,6 +646,9 @@ ret      pld
 *  Outputs:
 *        signed long long int on stack
 *
+*  Note: This avoids calling FX2C on negative numbers,
+*  because it is buggy for certain values.
+*
 ****************************************************************
 *
 ~CnvRealLongLong start
@@ -668,11 +671,16 @@ ret      pld
          sta   10,s
          sta   8,s
          sta   6,s
-         bra   done
+         bra   done                     otherwise
          
-convert  tsc                            if it is not LONG_MIN, call fx2c:
+convert  lda   4+8,s
+         pha                              save original sign
+         asl   a                          force sign to positive
+         lsr   a
+         sta   6+8,s
+         tsc
          clc
-         adc   #4
+         adc   #6
          pea   0                          push src address for fx2c
          pha
          pea   0                          push dst address for fx2c
@@ -680,7 +688,22 @@ convert  tsc                            if it is not LONG_MIN, call fx2c:
          inc   a
          pha
          fx2c                             convert
-         
+         pla                              if original value was negative
+         bpl   done
+         sec
+         lda   #0                           negate result
+         sbc   6,s
+         sta   6,s
+         lda   #0
+         sbc   6+2,s
+         sta   6+2,s
+         lda   #0
+         sbc   6+4,s
+         sta   6+4,s
+         lda   #0
+         sbc   6+6,s
+         sta   6+6,s
+
 done     phb                            move return address
          pla
          plx

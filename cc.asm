@@ -730,6 +730,8 @@ lb3      sec
          csubroutine (4:len,4:source),0
 dest     equ   source+4
 
+         pei   dest+2                   save original dest value
+         pei   dest
          ldx   len+2                    move whole banks
          beq   lm2
          ldy   #0
@@ -764,7 +766,11 @@ lb2      lda   [source],Y
          bne   lb2
 lb3      lda   [source]
          sta   [dest]
-lb4      creturn
+lb4      pla                            restore original dest value
+         sta   dest
+         pla
+         sta   dest+2
+         creturn
          end
 
 ****************************************************************
@@ -865,7 +871,9 @@ lb2      lda   [source],Y
          bne   lb2
 lb3      lda   [source]
          sta   [dest]
-lb4      creturn
+lb4      bcc   lb5                      if the move length was odd
+         dec4  dest                       restore original dest value
+lb5      creturn
          end
 
 ****************************************************************

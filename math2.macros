@@ -92,6 +92,285 @@
  rtl
  mend
  MACRO
+&LAB PH4 &N1
+ LCLC &C
+&LAB ANOP
+&C AMID &N1,1,1
+ AIF "&C"="#",.D
+ AIF S:LONGA=1,.A
+ REP #%00100000
+.A
+ AIF "&C"<>"{",.B
+&C AMID &N1,L:&N1,1
+ AIF "&C"<>"}",.G
+&N1 AMID &N1,2,L:&N1-2
+ LDY #2
+ LDA (&N1),Y
+ PHA
+ LDA (&N1)
+ PHA
+ AGO .E
+.B
+ AIF "&C"<>"[",.C
+ LDY #2
+ LDA &N1,Y
+ PHA
+ LDA &N1
+ PHA
+ AGO .E
+.C
+ LDA &N1+2
+ PHA
+ LDA &N1
+ PHA
+ AGO .E
+.D
+&N1 AMID &N1,2,L:&N1-1
+ PEA +(&N1)|-16
+ PEA &N1
+ AGO .F
+.E
+ AIF S:LONGA=1,.F
+ SEP #%00100000
+.F
+ MEXIT
+.G
+ MNOTE "Missing closing '}'",16
+ MEND
+ macro
+&l cmp4 &n1,&n2
+ lclb &yistwo
+&l ~setm
+ ~lda.h &n1
+ ~op.h eor,&n2
+ bpl ~a&SYSCNT
+ ~lda.h &n2
+ ~op.h cmp,&n1
+ bra ~b&SYSCNT
+~a&SYSCNT ~lda.h &n1
+ ~op.h cmp,&n2
+ bne ~b&SYSCNT
+ ~lda &n1
+ ~op cmp,&n2
+~b&SYSCNT anop
+ ~restm
+ mend
+ macro
+&l ~lda &op
+ lclc &c
+&c amid "&op",1,1
+ aif "&c"<>"{",.b
+&c amid "&op",l:&op,1
+ aif "&c"="}",.a
+ mnote "Missing closing '}'",2
+&op setc &op}
+.a
+&op amid "&op",2,l:&op-2
+&op setc (&op)
+.b
+&l lda &op
+ mend
+ macro
+&l ~lda.h &op
+&l anop
+ lclc &c
+&c amid "&op",1,1
+ aif "&c"="[",.b
+ aif "&c"<>"{",.d
+&c amid "&op",l:&op,1
+ aif "&c"="}",.a
+ mnote "Missing closing '}'",2
+&op setc &op}
+.a
+&op amid "&op",2,l:&op-2
+&op setc (&op)
+.b
+ aif &yistwo,.c
+&yistwo setb 1
+ ldy #2
+.c
+&op setc "&op,y"
+ lda &op
+ mexit
+.d
+ aif "&c"<>"#",.e
+&op amid "&op",2,l:&op-1
+&op setc "#^&op"
+ lda &op
+ mexit
+.e
+ lda 2+&op
+ mend
+ macro
+&l ~op &opc,&op
+ lclc &c
+&c amid "&op",1,1
+ aif "&c"<>"{",.b
+&c amid "&op",l:&op,1
+ aif "&c"="}",.a
+ mnote "Missing closing '}'",2
+&op setc &op}
+.a
+&op amid "&op",2,l:&op-2
+&op setc (&op)
+.b
+&l &opc &op
+ mend
+ macro
+&l ~op.h &opc,&op
+&l anop
+ lclc &c
+&c amid "&op",1,1
+ aif "&c"="[",.b
+ aif "&c"<>"{",.d
+&c amid "&op",l:&op,1
+ aif "&c"="}",.a
+ mnote "Missing closing '}'",2
+&op setc &op}
+.a
+&op amid "&op",2,l:&op-2
+&op setc (&op)
+.b
+ aif &yistwo,.c
+&yistwo setb 1
+ ldy #2
+.c
+&op setc "&op,y"
+ &opc &op
+ mexit
+.d
+ aif "&c"<>"#",.e
+&op amid "&op",2,l:&op-1
+&op setc "#^&op"
+ &opc &op
+ mexit
+.e
+ &opc 2+&op
+ mend
+ macro
+&l ~restm
+&l anop
+ aif (&~la+&~li)=2,.i
+ sep #32*(.not.&~la)+16*(.not.&~li)
+ aif &~la,.h
+ longa off
+.h
+ aif &~li,.i
+ longi off
+.i
+ mend
+ macro
+&l ~setm
+&l anop
+ aif c:&~la,.b
+ gblb &~la
+ gblb &~li
+.b
+&~la setb s:longa
+&~li setb s:longi
+ aif s:longa.and.s:longi,.a
+ rep #32*(.not.&~la)+16*(.not.&~li)
+ longa on
+ longi on
+.a
+ mend
+ macro
+&l inc4 &a
+&l ~setm
+ inc &a
+ bne ~&SYSCNT
+ inc 2+&a
+~&SYSCNT ~restm
+ mend
+ macro
+&l sub4 &m1,&m2,&m3
+ lclb &yistwo
+ lclc &c
+&l ~setm
+ aif c:&m3,.a
+&c amid "&m2",1,1
+ aif "&c"<>"#",.a
+&c amid "&m1",1,1
+ aif "&c"="{",.a
+ aif "&c"="[",.a
+&c amid "&m2",2,l:&m2-1
+ aif &c>=65536,.a
+ sec
+ ~lda &m1
+ ~op sbc,&m2
+ ~sta &m1
+ bcs ~&SYSCNT
+ ~op.h dec,&m1
+~&SYSCNT anop
+ ago .c
+.a
+ aif c:&m3,.b
+ lclc &m3
+&m3 setc &m1
+.b
+ sec
+ ~lda &m1
+ ~op sbc,&m2
+ ~sta &m3
+ ~lda.h &m1
+ ~op.h sbc,&m2
+ ~sta.h &m3
+.c
+ ~restm
+ mend
+ macro
+&l ~sta &op
+ lclc &c
+&c amid "&op",1,1
+ aif "&c"<>"{",.b
+&c amid "&op",l:&op,1
+ aif "&c"="}",.a
+ mnote "Missing closing '}'",2
+&op setc &op}
+.a
+&op amid "&op",2,l:&op-2
+&op setc (&op)
+.b
+&l sta &op
+ mend
+ macro
+&l ~sta.h &op
+&l anop
+ lclc &c
+&c amid "&op",1,1
+ aif "&c"="[",.b
+ aif "&c"<>"{",.d
+&c amid "&op",l:&op,1
+ aif "&c"="}",.a
+ mnote "Missing closing '}'",2
+&op setc &op}
+.a
+&op amid "&op",2,l:&op-2
+&op setc (&op)
+.b
+ aif &yistwo,.c
+&yistwo setb 1
+ ldy #2
+.c
+&op setc "&op,y"
+ sta &op
+ mexit
+.d
+ sta 2+&op
+ mend
+ macro
+&l cmpl &n1,&n2
+ lclb &yistwo
+&l ~setm
+ ~lda.h &n1
+ ~op.h cmp,&n2
+ bne ~a&SYSCNT
+ ~lda &n1
+ ~op cmp,&n2
+~a&SYSCNT anop
+ ~restm
+ mend
+ MACRO
 &LAB FCLASSS
 &LAB PEA $021C
  LDX #$090A
@@ -119,5 +398,250 @@
 &LAB FX2D
 &LAB PEA $0110
  LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FCMPX
+&LAB PEA $0008
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FEXP2X
+&LAB PEA $000A
+ LDX #$0B0A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FEXP1X
+&LAB PEA $000C
+ LDX #$0B0A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FLN1X
+&LAB PEA $0004
+ LDX #$0B0A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FLOG2X
+&LAB PEA $0002
+ LDX #$0B0A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FLOGBX
+&LAB PEA $001A
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FX2I
+&LAB PEA $0410
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FTINTX
+&LAB PEA $0016
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FRINTX
+&LAB PEA $0014
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FXPWRY
+&LAB PEA $0012
+ LDX #$0B0A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FREMX
+&LAB PEA $000C
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FSCALBX
+&LAB PEA $0018
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FSUBX
+&LAB PEA $0002
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FGETENV
+&LAB PEA $03
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FSETENV
+&LAB PEA $01
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FX2C
+&LAB PEA $0510
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FCPXX
+&LAB PEA $0A
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FNEXTX
+&LAB PEA $001E
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FX2X
+&LAB PEA $0010
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FCPXD
+&LAB PEA $010A
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FNEXTD
+&LAB PEA $011E
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FD2X
+&LAB PEA $010E
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FS2X
+&LAB PEA $020E
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FNEXTS
+&LAB PEA $021E
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FCPXS
+&LAB PEA $020A
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FPROCENTRY
+&LAB PEA $0017
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FPROCEXIT
+&LAB PEA $0019
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FTESTXCP
+&LAB PEA $001B
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FADDS
+&LAB PEA $0200
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FSETXCP
+&LAB PEA $0015
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FADDX
+&LAB PEA $0000
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FADDI
+&LAB PEA $0400
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FSUBI
+&LAB PEA $0402
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FMULX
+&LAB PEA $0004
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FSQRTX
+&LAB PEA $0012
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FLNX
+&LAB PEA $0000
+ LDX #$0B0A
+ JSL $E10000
+ MEND
+ MACRO
+&lab _SDivide
+&lab ldx #$0A0B
+ jsl $E10000
+ MEND
+ MACRO
+&LAB FMULI
+&LAB PEA $0404
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FDIVI
+&LAB PEA $0406
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FDIVX
+&LAB PEA $0006
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FXPWRI
+&LAB PEA $0010
+ LDX #$0B0A
  JSL $E10000
  MEND

@@ -640,6 +640,47 @@ lldiv_t  ds    16
 
 ****************************************************************
 *
+*  int mblen(const char *s, size_t n)
+*
+*  Inputs:
+*        s - NULL or pointer to character
+*        n - maximum number of bytes to inspect
+*
+*  Outputs:
+*        If s is NULL, returns 0, indicating encodings are not
+*        state-dependent.  Otherwise, returns 0 if s points to a
+*        null character, -1 if the next n or fewer bytes do not
+*        form a valid character, or the number of bytes forming
+*        a valid character.
+*
+*  Note: This implementation assumes we do not support actual
+*        multi-byte or state-dependent character encodings.
+*
+****************************************************************
+*
+mblen    start
+
+         csubroutine (4:s,4:n)
+         ldx   #0
+         lda   s                        if s == NULL
+         ora   s+2
+         beq   ret                        return 0
+         lda   n                        if n == 0
+         ora   n+2
+         bne   readchar
+         dex                              return -1
+         bra   ret
+readchar lda   [s]                      if *s == '\0'
+         and   #$00FF
+         beq   ret                        return 0
+         inx                            else return 1
+
+ret      stx   n
+         creturn 2:n
+         end
+
+****************************************************************
+*
 *  void qsort(base, count, size, compar)
 *        void *base;
 *        size_t count, size;
@@ -875,6 +916,31 @@ srand    start
          phx
          plb
          brl   ~RANX2
+         end
+
+****************************************************************
+*
+*  strtof - convert a string to a float
+*  strtold - convert a string to a long double
+*
+*  Inputs:
+*        str - pointer to the string
+*        ptr - pointer to a pointer; a pointer to the first
+*              char past the number is placed here.  If ptr is
+*              nil, no pointer is returned
+*
+*  Outputs:
+*        X-A - pointer to result
+*
+*  Note: These are currently implemented by just calling strtod
+*        (in SysFloat).  As such, all of these function really
+*        return values in the SANE extended format.
+*
+****************************************************************
+*
+strtold  start
+strtof   entry
+         jml   strtod
          end
 
 ****************************************************************
@@ -1610,8 +1676,37 @@ empty    ds    2
 
 ****************************************************************
 *
-*  void __va_end(list)
-*        va_list list;
+*  void __record_va_info(va_list ap);
+*
+*  Record that a traversal of variable arguments has finished.
+*  Data is recorded in the internal va info that will be used
+*  to remove variable arguments at the end of the function.
+*
+*  Inputs:
+*        ap - the va_list
+*
+****************************************************************
+*
+__record_va_info start
+va_info_ptr equ 1                       pointer to the internal va info
+
+         csubroutine (4:ap),4
+         ldy   #4                       get pointer to internal va info
+         lda   [ap],y
+         sta   va_info_ptr
+         stz   va_info_ptr+2
+
+         lda   [ap]                     update end of variable arguments
+         cmp   [va_info_ptr]
+         blt   ret
+         sta   [va_info_ptr]
+
+ret      creturn
+         end
+
+****************************************************************
+*
+*  void __va_end(internal_va_info *list);
 *
 *  Remove variable length arguments from the stack.
 *

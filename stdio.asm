@@ -2179,7 +2179,7 @@ rts	creturn 4:s
 ****************************************************************
 *
 perror	start
-maxErr	equ	ENOSPC	max error in sys_errlist
+maxErr	equ	EILSEQ	max error in sys_errlist
 
 s	equ	4	string address
 
@@ -3010,6 +3010,7 @@ sys_errlist start
 	dc	a4'EACCESS'
 	dc	a4'EEXISTS'
 	dc	a4'ENOSPC'
+	dc	a4'EILSEQ'
 
 ! Note: if more errors are added, change maxErr in perror() and strerror().
 
@@ -3025,6 +3026,7 @@ EMFILE	cstr	'too many files are open'
 EACCESS	cstr	'access bits prevent the operation'
 EEXISTS	cstr	'the file exists'
 ENOSPC	cstr	'the file is too large'
+EILSEQ	cstr	'encoding error'
 	end
 
 ****************************************************************

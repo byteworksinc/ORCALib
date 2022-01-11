@@ -280,11 +280,6 @@
 ~&SYSCNT ~RESTM
  MEND
  MACRO
-&LAB JEQ &BP
-&LAB BNE *+5
- BRL &BP
- MEND
- MACRO
 &LAB LONG &A,&B
  LCLB &I
  LCLB &M
@@ -538,4 +533,13 @@
  tya
 .j
  rtl
+ mend
+ macro
+&l dec4 &a
+&l ~setm
+ lda &a
+ bne ~&SYSCNT
+ dec 2+&a
+~&SYSCNT dec &a
+ ~restm
  mend

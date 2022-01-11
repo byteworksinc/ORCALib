@@ -19,6 +19,7 @@ EMFILE   gequ  8                        too many files are open
 EACCES   gequ  9                        access bits prevent the operation
 EEXIST   gequ  10                       the file exists
 ENOSPC   gequ  11                       the file is too large
+EILSEQ   gequ  12                       encoding error
 ;
 ;  masks for the __ctype array
 ;
