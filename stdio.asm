@@ -2473,31 +2473,34 @@ cpNewPathName ds 4
 
 ****************************************************************
 *
-*  int rewind(stream)
+*  void rewind(stream)
 *	FILE *stream;
 *
-*  Change the read/write location for the stream.
+*  Rewind the read/write location for the stream.
 *
 *  Inputs:
 *	stream - file to change
 *
-*  Outputs:
-*	Returns non-zero for error
-*
 ****************************************************************
 *
 rewind	start
-err	equ	1	return code
+	csubroutine (4:stream),0
 
-	csubroutine (4:stream),2
+	ph4	stream	verify that stream exists
+	jsl	~VerifyStream
+	bcs	ret
 
 	ph2	#SEEK_SET
 	ph4	#0
 	ph4	stream
 	jsl	__fseek
-	sta	err
+        
+	ldy	#FILE_flag	clear the error flag
+	lda	[stream],Y
+	and	#$FFFF-_IOERR
+	sta	[stream],Y
 
-	creturn 2:err
+ret	creturn
 	end
 
 ****************************************************************
