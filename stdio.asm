@@ -4484,7 +4484,7 @@ orVal    ds    2                        for setting the case of characters
          iny
          txa
          sta   [stream],Y
-         ldy   #FILE_base                 set the end of buffer mark
+         ldy   #FILE_base               set the end of buffer mark
          lda   [stream],Y
          ldy   #FILE_size
          clc
@@ -4500,13 +4500,20 @@ orVal    ds    2                        for setting the case of characters
          dey
          dey
          sta   [stream],Y
-         ldy   #FILE_size                 set the number of chars the buffer
+         ldy   #FILE_flag               if read stream
+         lda   [stream],Y
+         bit   _IOREAD
+         beq   ib1
+         lda   #0                         set count of chars in buffer to 0
+         tax
+         bra   ib2                      else
+ib1      ldy   #FILE_size                 set the number of chars the buffer
          lda   [stream],Y                  can hold
          tax
          iny
          iny
          lda   [stream],Y
-         ldy   #FILE_cnt+2
+ib2      ldy   #FILE_cnt+2
          sta   [stream],Y
          dey
          dey
