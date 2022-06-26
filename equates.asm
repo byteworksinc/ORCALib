@@ -63,6 +63,7 @@ _IOEOF   gequ  $0080                    has an EOF been found?
 _IOERR   gequ  $0100                    has an error occurred?
 _IOTEXT  gequ  $0200                    is this file a text file?
 _IOTEMPFILE gequ $0400                  was this file created by tmpfile()?
+_IOAPPEND gequ $0800                    is this file open in append mode?
 
 !                                       record structure
 !                                       ----------------

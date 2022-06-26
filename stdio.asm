@@ -336,8 +336,9 @@ fa3      lda   #EOF                     assume there is an error
          jcs   rts
          ldy   #FILE_flag               if the mode is not writing, quit
          lda   [stream],Y
-         and   #_IOWRT
-         beq   fl1
+         bit   #_IOWRT
+         beq   fl1a
+         tax
          ldy   #FILE_file               set the reference number
          lda   [stream],Y
          sta   wrRefNum
@@ -360,7 +361,12 @@ fa3      lda   #EOF                     assume there is an error
          sta   wrRequestCount+2
          ora   wrRequestCount           skip the write if there are no
          beq   fl1                       characters
-         OSwrite wr                     write the info
+         txa
+         bit   #_IOAPPEND               if append mode, force to EOF
+         beq   fa4
+         lda   wrRefNum
+         jsr   ~ForceToEOF
+fa4      OSwrite wr                     write the info
          bcc   fl1
          ph4   stream
          jsr   ~ioerror
@@ -368,7 +374,7 @@ fa3      lda   #EOF                     assume there is an error
 
 fl1      ldy   #FILE_flag               if the file is open for read/write then
          lda   [stream],Y
-         bit   #_IORW
+fl1a     bit   #_IORW
          beq   fl3
          bit   #_IOREAD                   if the file is being read then
          beq   fl2
@@ -837,20 +843,14 @@ of2      lda   fileType                 if the file type is 'w' then
          lda   opRefNum                   reset it
          sta   efRefNum
          OSSet_EOF ef
-         bcc   ar1                        allow "not a block device error"
-         cmp   #$0058
-         beq   ar1
-         bra   errEIO                     flag the error
+         bra   of4
 of3      cmp   #'a'                     else if the file type is 'a' then
          bne   ar1
          lda   opRefNum
-         sta   gfRefNum
-         sta   smRefNum
-         OSGet_EOF gf                     append to it
-         bcs   errEIO
-         move4 gfEOF,smDisplacement
-         OSSet_Mark sm
-         bcs   errEIO
+         jsr   ~ForceToEOF                append to it
+of4      bcc   ar1                      allow "not a block device error"
+         cmp   #$0058
+         bne   errEIO                   flag any other error
 ;
 ;  allocate and fill in the file record
 ;
@@ -926,7 +926,11 @@ ar6      ldy   #FILE_flag
          cpx   #BIN
          beq   ar6a
          ora   #_IOTEXT
-ar6a     sta   [fileBuff],Y
+ar6a     ldx   fileType
+         cpx   #'a'
+         bne   ar6b
+         ora   #_IOAPPEND
+ar6b     sta   [fileBuff],Y
          ldy   #FILE_cnt                no chars in buffer
          lda   #0
          sta   [fileBuff],Y
@@ -977,15 +981,6 @@ op       dc    i'3'                     parameter block for OSopen
 opRefNum ds    2
 opName   ds    4
 opAccess ds    2
-
-gf       dc    i'2'                     GetEOF record
-gfRefNum ds    2
-gfEOF    ds    4
-
-sm       dc    i'3'                     SetMark record
-smRefNum ds    2
-smBase   dc    i'0'
-smDisplacement ds 4
 
 ef       dc    i'3'                     parameter block for OSSet_EOF
 efRefNum ds    2
@@ -1150,11 +1145,18 @@ of1a     OSopen op                      open the file
 
 of2      lda   fileType                 if the file type is 'w', reset it
          cmp   #'w'
-         bne   ar1
+         bne   of3
          lda   opRefNum
          sta   efRefNum
          OSSet_EOF ef
-         bcs   errEIO
+         bra   of4
+of3      cmp   #'a'                     else if the file type is 'a' then
+         bne   ar1
+         lda   opRefNum
+         jsr   ~ForceToEOF                append to it
+of4      bcc   ar1                      allow "not a block device error"
+         cmp   #$0058
+         bne   errEIO                   flag any other error
 ;
 ;  fill in the file record
 ;
@@ -1209,7 +1211,11 @@ ar6      ldy   #FILE_flag
          cpx   #BIN
          beq   ar6a
          ora   #_IOTEXT
-ar6a     sta   [fileBuff],Y
+ar6a     ldx   fileType
+         cpx   #'a'
+         bne   ar6b
+         ora   #_IOAPPEND
+ar6b     sta   [fileBuff],Y
          ldy   #FILE_cnt                no chars in buffer
          lda   #0
          sta   [fileBuff],Y
@@ -2029,10 +2035,10 @@ lb1      lda   [ptr]                      write the bytes
          ora   wrRequestCount+2
          bne   lb1
          move4 count,wrTransferCount    set the # of elements written
-         bra   lb6
+         brl   lb6
 
 lb2      cmp   #stderrID                if the file is stderr then
-         bne   lb6
+         jne   lb6
 lb3      lda   [ptr]                      write the bytes
          pha
          jsl   SYSCHARERROUT
@@ -2048,7 +2054,13 @@ lb4      sta   wrRefNum                 set the reference number
          ph4   stream                   purge the file
          jsl   fflush
          move4 ptr,wrDataBuffer         set the start address
-         OSWrite wr                     write the bytes
+         ldy   #FILE_flag               if append mode, force to EOF
+         lda   [stream],Y
+         bit   #_IOAPPEND
+         beq   lb4a
+         lda   wrRefNum
+         jsr   ~ForceToEOF
+lb4a     OSWrite wr                     write the bytes
          bcc   lb5
          ph4   stream                   I/O error
          jsr   ~ioerror
@@ -6150,6 +6162,30 @@ ch       ds    2                        temp storage
 ~va_arg_ptr ds 4                        pointer to next variable argument
 ~va_list_ptr ds 4                       pointer to the va_list array
 ~isVarArgs ds  2                        is this a varargs call (vscanf etc.)?
+         end
+
+****************************************************************
+*
+*  ~ForceToEOF - force file mark to EOF
+*
+*  Inputs:
+*        A - GS/OS refNum for file
+*
+*  Outputs:
+*        Carry set on GS/OS error, error code in A
+*
+****************************************************************
+*
+~ForceToEOF private
+
+         sta   smRefNum
+         OSSet_Mark sm
+         rts
+
+sm       dc    i'3'                     SetMark record
+smRefNum ds    2
+smBase   dc    i'1'                     EOF-displacement mode
+smDisplacement dc i4'0'                 displacement = 0
          end
 
 ****************************************************************
