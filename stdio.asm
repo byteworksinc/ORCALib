@@ -3194,8 +3194,11 @@ char     equ   1                        character to return
          and   #$00FF
          sta   [stream],Y
          sta   char
-rts      long  M
-         creturn 2:char
+         ldy   #FILE_flag               clear the EOF flag
+         lda   [stream],Y
+         and   #$FFFF-_IOEOF
+         sta   [stream],Y
+rts      creturn 2:char
          end
 
 ****************************************************************
