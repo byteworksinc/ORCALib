@@ -437,14 +437,16 @@ lb0      lda   #EOF
 
 lb1      ldy   #FILE_pbk                if there is a char in the putback buffer
          lda   [stream],Y
-         and   #$0080
-         bne   lb2
-         lda   [stream],Y                 return it
-         and   #$00FF
+         bmi   lb2
+         and   #$00FF                     return it
          sta   c
-         lda   [stream],Y                 pop the putback buffer
-         xba
-         ora   #$FF00
+         ldy   #FILE_pbk+2                pop the putback buffer
+         lda   [stream],Y
+         tax   
+         lda   #$FFFF
+         sta   [stream],Y
+         ldy   #FILE_pbk
+         txa
          sta   [stream],Y
          brl   gc9
 
@@ -940,6 +942,8 @@ ar6b     sta   [fileBuff],Y
          ldy   #FILE_pbk                nothing in the putback buffer
          lda   #$FFFF
          sta   [fileBuff],Y
+         ldy   #FILE_pbk+2
+         sta   [fileBuff],Y
          ldy   #FILE_file               set the file ID
          lda   opRefNum
          sta   [fileBuff],Y
@@ -1227,6 +1231,8 @@ ar6b     sta   [fileBuff],Y
          sta   [fileBuff],Y
          ldy   #FILE_pbk                nothing in the putback buffer
          lda   #$FFFF
+         sta   [fileBuff],Y
+         ldy   #FILE_pbk+2
          sta   [fileBuff],Y
          ldy   #FILE_file               set the file ID
          lda   opRefNum
@@ -1824,6 +1830,8 @@ lb6      ldy   #FILE_flag               clear the EOF , READ, WRITE flags
          ldy   #FILE_pbk                nothing in the putback buffer
          lda   #$FFFF
          sta   [stream],Y
+         ldy   #FILE_pbk+2
+         sta   [stream],Y
 
          stz   err
 rts      plb
@@ -1937,12 +1945,15 @@ lb1      move4 gmPosition,pos           set the position
          lda   pos+2
          sbc   [stream],Y
          sta   pos+2
-         ldy   #FILE_pbk                  if there is a char in the putback
-         lda   [stream],Y                   buffer then
-         and   #$0080
-         bne   rts
-         dec4  pos                          dec pos by 1
-         ldy   #FILE_file                 set the file's mark
+         ldy   #FILE_pbk                  dec pos by 1 for each char in the
+         lda   [stream],Y                   putback buffer then
+         bmi   lb2
+         dec4  pos
+         ldy   #FILE_pbk+2
+         lda   [stream],Y
+         bmi   lb2
+         dec4  pos
+lb2      ldy   #FILE_file                 set the file's mark
          lda   [stream],Y
          sta   spRefNum
          move4 pos,spPosition
@@ -2048,7 +2059,7 @@ lb5      div4  wrTransferCount,element_size,count
 lb6      plb
          creturn 4:count                return
 
-wr       dc    i'5'                     parameter block for OSRead
+wr       dc    i'5'                     parameter block for OSWrite
 wrRefNum ds    2
 wrDataBuffer ds 4
 wrRequestCount ds 4
@@ -2084,15 +2095,13 @@ getchar  start
 ;  get the char from the keyboard
 ;
          lda   >stdin+4+FILE_pbk        if there is a char in the putback
-         and   #$0080                    buffer then
-         bne   lb1
-         lda   >stdin+4+FILE_pbk          save it in x
-         and   #$00FF
-         tax
-         lda   >stdin+4+FILE_pbk          pop the buffer
-         xba
-         ora   #$FF00
+         bmi   lb1                       buffer then
+         and   #$00FF                     save it in X
+         tax   
+         lda   >stdin+4+FILE_pbk+2        pop the buffer
          sta   >stdin+4+FILE_pbk
+         lda   #$FFFF
+         sta   >stdin+4+FILE_pbk+2
          txa                              restore the char
          bra   lb2
 
@@ -3173,21 +3182,18 @@ char     equ   1                        character to return
          lda   c                        error if EOF is pushed
          cmp   #EOF
          beq   rts
-         ldy   #FILE_pbk+1              error if the buffer is full
-         short M
+         ldy   #FILE_pbk+2              error if the buffer is full
          lda   [stream],Y
          bpl   rts
-         dey                            push the old character (if any)
+         ldy   #FILE_pbk                push the old character (if any)
          lda   [stream],Y
-         iny
+         ldy   #FILE_pbk+2
          sta   [stream],Y
-         dey
-         lda   c                        put back the character
+         ldy   #FILE_pbk                put back the character
+         lda   c
+         and   #$00FF
          sta   [stream],Y
          sta   char
-         stz   char+1
-         bpl   rts
-         dec   char+1
 rts      long  M
          creturn 2:char
          end

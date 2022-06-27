@@ -45,12 +45,12 @@ _toolErr entry                          last error in a tool call (C)
 *
 ~InitIO  start
 
-         ldx   #24                      set up the file records
-lb1      lda   stderr+34,X
+         ldx   #sizeofFILE-4-2          set up the file records
+lb1      lda   stderr+4+sizeofFILE,X
          sta   stderr+8,X
-         lda   stdin+34,X
+         lda   stdin+4+sizeofFILE,X
          sta   stdin+8,X
-         lda   stdout+34,X
+         lda   stdout+4+sizeofFILE,X
          sta   stdout+8,X
          dex
          dex
@@ -77,7 +77,7 @@ lb1      dc    a4'0'                    next file
          dc    a4'0'                    end of the file buffer
          dc    i4'0'                    size of the file buffer
          dc    i4'0'                    count
-         dc    i'EOF'                   putback buffer
+         dc    i'EOF,EOF'               putback buffer
          dc    i'_IONBF+_IOWRT+_IOTEXT' no buffering; allow writes; text file
          dc    i'stderrID'              error out
 
@@ -86,7 +86,7 @@ lb1      dc    a4'0'                    next file
          dc    a4'0'                    end of the file buffer
          dc    i4'0'                    size of the file buffer
          dc    i4'0'                    count
-         dc    i'EOF'                   putback buffer
+         dc    i'EOF,EOF'               putback buffer
          dc    i'_IONBF+_IOWRT+_IOTEXT' no buffering; allow writes; text file
          dc    i'stderrID'              error out
          end
@@ -107,7 +107,7 @@ lb1      dc    a4'stdout+4'             next file
          dc    a4'0'                    end of the file buffer
          dc    i4'0'                    size of the file buffer
          dc    i4'0'                    count
-         dc    i'EOF'                   putback buffer
+         dc    i'EOF,EOF'               putback buffer
          dc    i'_IONBF+_IOREAD+_IOTEXT' no buffering; allow reads; text file
          dc    i'stdinID'               standard in
 
@@ -116,7 +116,7 @@ lb1      dc    a4'stdout+4'             next file
          dc    a4'0'                    end of the file buffer
          dc    i4'0'                    size of the file buffer
          dc    i4'0'                    count
-         dc    i'EOF'                   putback buffer
+         dc    i'EOF,EOF'               putback buffer
          dc    i'_IONBF+_IOREAD+_IOTEXT' no buffering; allow reads; text file
          dc    i'stdinID'               standard in
          end
@@ -137,7 +137,7 @@ lb1      dc    a4'stderr+4'             next file
          dc    a4'0'                    end of the file buffer
          dc    i4'0'                    size of the file buffer
          dc    i4'0'                    count
-         dc    i'EOF'                   putback buffer
+         dc    i'EOF,EOF'               putback buffer
          dc    i'_IONBF+_IOWRT+_IOTEXT' no buffering; allow writes; text file
          dc    i'stdoutID'              standard out
 
@@ -146,7 +146,7 @@ lb1      dc    a4'stderr+4'             next file
          dc    a4'0'                    end of the file buffer
          dc    i4'0'                    size of the file buffer
          dc    i4'0'                    count
-         dc    i'EOF'                   putback buffer
+         dc    i'EOF,EOF'               putback buffer
          dc    i'_IONBF+_IOWRT+_IOTEXT' no buffering; allow writes; text file
          dc    i'stdoutID'              standard out
          end
