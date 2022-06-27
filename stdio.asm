@@ -1582,23 +1582,42 @@ temp     equ   1
 
          stz   rdTransferCount          set the # of elements read
          stz   rdTransferCount+2
+         stz   pbkCount                 no putback characters read yet
          ph4   stream                   verify that stream exists
          jsl   ~VerifyStream
          jcs   lb6
-         ph4   stream                   reset file pointer
-         jsl   ~SetFilePointer
          mul4  element_size,count,rdRequestCount set the # of bytes
-         lda   rdRequestCount           quit if the request count is 0
+         move4 rdRequestCount,temp      save full request count
+pb1      lda   rdRequestCount           quit if the request count is 0
          ora   rdRequestCount+2
-         jeq   lb6
+         jeq   lb4
+         ldy   #FILE_pbk                if there is a putback character
+         lda   [stream],Y
+         bmi   lb0
+         short M                          read it in
+         sta   [ptr]
+         long  M
+         inc4  ptr                        adjust pointer and counts
+         dec4  rdRequestCount
+         inc   pbkCount
+         ldy   #FILE_pbk+2                pop the putback buffer
+         lda   [stream],Y
+         tax   
+         lda   #$FFFF
+         sta   [stream],Y
+         ldy   #FILE_pbk
+         txa
+         sta   [stream],Y
+         bra   pb1                        loop to check for another putback chr
+
+lb0      ph4   stream                   reset file pointer
+         jsl   ~SetFilePointer
          ldy   #FILE_file               set the file ID number
          lda   [stream],Y
          bpl   lb2                      branch if it is a file
 
          cmp   #stdinID                 if the file is stdin then
          jne   lb6
-         stz   rdTransferCount
-         stz   rdTransferCount+2
          lda   >stdin+4+FILE_flag
          and   #_IOEOF
          jne   lb6
@@ -1609,7 +1628,7 @@ lb1      jsl   SYSKEYIN                   read the bytes
          ora   >stdin+4+FILE_flag
          sta   >stdin+4+FILE_flag
          jsl   SYSKEYIN                   read the closing cr
-         brl   lb6
+         bra   lb4
 lb1a     short M                          set character
          sta   [ptr]
          long  M
@@ -1619,27 +1638,33 @@ lb1a     short M                          set character
          lda   rdRequestCount
          ora   rdRequestCount+2
          bne   lb1
-         bra   lb6
+         bra   lb4
 
 lb2      sta   rdRefNum                 set the reference number
          move4 ptr,rdDataBuffer         set the start address
          OSRead rd                      read the bytes
-         bcc   lb5
+         bcc   lb4
          cmp   #$4C                     if the error was $4C then
          bne   lb3
          jsr   SetEOF                     set the EOF flag
-         bra   lb5
+         bra   lb4
 lb3      ph4   stream                   I/O error
          jsr   ~ioerror
-!                                       set the # records read
-lb5      div4  rdTransferCount,element_size
-         lda   count                    if there were too few elements read then
+lb4      clc                            rdTransferCount += pbkCount
+         lda   rdTransferCount
+         adc   pbkCount
+         sta   rdTransferCount
+         bcc   lb5
+         inc   rdTransferCount+2
+lb5      lda   temp                     if there were too few elements read then
          cmp   rdTransferCount
          bne   lb5a
-         lda   count+2
+         lda   temp+2
          cmp   rdTransferCount+2
-         beq   lb6
+         beq   lb5b
 lb5a     jsr   SetEOF                     set the EOF flag
+!                                       set the # records read
+lb5b     div4  rdTransferCount,element_size
 lb6      move4 rdTransferCount,temp
          plb
 
@@ -1653,6 +1678,8 @@ rdDataBuffer ds 4
 rdRequestCount ds 4
 rdTransferCount ds 4
          dc    i'1'
+
+pbkCount ds    2                        number of characters read from putback
 ;
 ;  Set the EOF flag
 ;
