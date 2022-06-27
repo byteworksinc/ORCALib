@@ -1079,7 +1079,10 @@ cl1      ldy   #FILE_file               branch if the file is not a disk file
 ;
 ;  create a GS/OS file name
 ;
-cn1      ph4   filename                 get the length of the name buffer
+cn1      lda   filename                 bail out if filename is NULL
+         ora   filename+2                 (reopening same file not supported)
+         jeq   rt2
+         ph4   filename                 get the length of the name buffer
          jsl   ~osname
          sta   OSname
          stx   OSname+2
@@ -1259,33 +1262,9 @@ crFileType ds  2
 cl       dc    i'1'                     parameter block for OSclose
 clRefNum ds    2
 ;
-;  Patch for standard out
+;  Force inclusion of functions that have weak references elsewhere
 ;
-stdoutFile jmp stdoutPatch
-
-stdoutPatch phb
-         plx
-         ply
-         pla
-         pha
-         pha
-         pha
-         phy
-         phx
-         plb
-         lda   >stdout
-         sta   6,S
-         lda   >stdout+2
-         sta   8,S
-         brl   fputc
-;
-;  Patch for standard in
-;
-stdinFile jmp stdinPatch
-
-stdinPatch ph4 #stdin+4
-         jsl   fgetc
-         rtl
+         dc    r'fputc,fgetc'
          end
 
 ****************************************************************
