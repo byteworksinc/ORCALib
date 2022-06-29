@@ -4529,7 +4529,7 @@ orVal    ds    2                        for setting the case of characters
          sta   [stream],Y
          ldy   #FILE_flag               if read stream
          lda   [stream],Y
-         bit   _IOREAD
+         bit   #_IOREAD
          beq   ib1
          lda   #0                         set count of chars in buffer to 0
          tax
