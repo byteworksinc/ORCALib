@@ -68,10 +68,10 @@ addr     equ   1                        work pointer
          pha
          pha
          pha
-         ph2   aRegValue
-         ph2   xRegValue
-         ph2   yRegValue
-         ph2   eModeEntryPt
+         ph2   <aRegValue
+         ph2   <xRegValue
+         ph2   <yRegValue
+         ph2   <eModeEntryPt
          _FWEntry
          sta   >~TOOLERROR
          pl2   >yRegExit
@@ -278,8 +278,8 @@ addr     equ   1
          sec
          sbc   #8
          tcs
-         ph4   dividend
-         ph4   divisor
+         ph4   <dividend
+         ph4   <divisor
          _LongDivide
          sta   >~TOOLERROR
          pl4   >quotient
@@ -313,8 +313,8 @@ addr     equ   1
          sec
          sbc   #8
          tcs
-         ph4   multiplicand
-         ph4   multiplier
+         ph4   <multiplicand
+         ph4   <multiplier
          _LongMul
          sta   >~TOOLERROR
          pl4   >lsResult
@@ -346,8 +346,8 @@ addr     equ   1
 
          pha
          pha
-         ph2   dividend
-         ph2   divisor
+         ph2   <dividend
+         ph2   <divisor
          _SDivide
          sta   >~TOOLERROR
          pl2   >quotient
@@ -379,8 +379,8 @@ addr     equ   1
 
          pha
          pha
-         ph2   dividend
-         ph2   divisor
+         ph2   <dividend
+         ph2   <divisor
          _UDivide
          sta   >~TOOLERROR
          pl2   >quotient
@@ -421,9 +421,9 @@ addr     equ   1
          sec
          sbc   #10
          tcs
-         ph2   uID
-         ph4   stAddr
-         ph2   dpAddr
+         ph2   <uID
+         ph4   <stAddr
+         ph2   <dpAddr
          _InitialLoad
          sta   >~TOOLERROR
          pl2   >userID
@@ -464,10 +464,10 @@ addr     equ   1
          sec
          sbc   #10
          tcs
-         ph2   uID
-         ph4   buffAddr
-         ph2   flagWord
-         ph2   inputType
+         ph2   <uID
+         ph4   <buffAddr
+         ph2   <flagWord
+         ph2   <inputType
          _InitialLoad2
          sta   >~TOOLERROR
          pl2   >userID
@@ -508,9 +508,9 @@ addr     equ   1
          sec
          sbc   #10
          tcs
-         ph2   uID
-         ph4   fName
-         ph4   sName
+         ph2   <uID
+         ph4   <fName
+         ph4   <sName
          _LoadSegName
          sta   >~TOOLERROR
          pl4   >segAddr
@@ -551,7 +551,7 @@ addr     equ   1
          sec
          sbc   #10
          tcs
-         ph2   uID
+         ph2   <uID
          _Restart
          sta   >~TOOLERROR
          pl2   >userID
@@ -590,7 +590,7 @@ addr     equ   1
          pha
          pha
          pha
-         ph4   segaddr
+         ph4   <segaddr
          _UnloadSeg
          sta   >~TOOLERROR
          pl2   >userID

@@ -112,7 +112,7 @@ lb2      asl   A                        get the signal handler address
          long  M
          tya
          sta   >jsl+1
-         ph2   sig                      call the user signal handler
+         ph2   <sig                     call the user signal handler
 jsl      jsl   jsl
 
 lb3      creturn 2:val

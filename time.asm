@@ -138,7 +138,7 @@ tm_wday  equ   12
          phk
          plb
 
-         ph4   timeptr                  convert to a time record
+         ph4   <timeptr                 convert to a time record
          jsl   localtime
          sta   timeptr
          stx   timeptr+2

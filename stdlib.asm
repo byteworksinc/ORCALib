@@ -351,8 +351,8 @@ lb1      clc                            test = (left+right)/2
          ror   test
          mul4  test,size,addr           addr = test*size + base
          add4  addr,base
-         ph4   addr                     compare the array elements
-         ph4   key
+         ph4   <addr                    compare the array elements
+         ph4   <key
 jsl      jsl   jsl
          tax                            quit if *addr = *key
          beq   lb6
@@ -588,8 +588,8 @@ addr     equ   1
          phb                            use local addressing
          phk
          plb
-         ph4   n                        do the divide
-         ph4   d
+         ph4   <n                       do the divide
+         ph4   <d
          jsl   ~DIV4
          pl4   div_t
          pl4   div_t+4
@@ -717,8 +717,8 @@ qsort    start
          lda   compar+1
          sta   jsl1+2
          sta   jsl2+2
-         ph4   count                    do the sort
-         ph4   base
+         ph4   <count                   do the sort
+         ph4   <base
          jsl   rsort
 
 done     plb
@@ -781,8 +781,8 @@ sr1a     move4 last,right               right = last
          move4 first,left               left = first
          bra   sr3
 sr2      add4  left,lsize               inc left until *left >= *last
-sr3      ph4   last
-         ph4   left
+sr3      ph4   <last
+         ph4   <left
 jsl1     entry
          jsl   jsl1
          tax
@@ -794,14 +794,14 @@ sr4      lda   right                    quit if right = first
          cmp   first+2
          beq   sr4b
 sr4a     sub4  right,lsize              dec right until *right <= *last
-         ph4   last
-         ph4   right
+         ph4   <last
+         ph4   <right
 jsl2     entry
          jsl   jsl2
          dec   A
          bpl   sr4
-sr4b     ph4   left                     swap left/right entries
-         ph4   right
+sr4b     ph4   <left                    swap left/right entries
+         ph4   <right
          jsr   swap
          lda   left+2                   loop if left < right
          cmp   right+2
@@ -809,15 +809,15 @@ sr4b     ph4   left                     swap left/right entries
          lda   left
          cmp   right
 sr5      blt   sr2
-         ph4   right                    swap left/right entries
-         ph4   left
+         ph4   <right                   swap left/right entries
+         ph4   <left
          jsr   swap
-         ph4   left                     swap left/last entries
-         ph4   last
+         ph4   <left                    swap left/last entries
+         ph4   <last
          jsr   swap
          sub4  left,lsize,right         sort left part of array
-         ph4   right
-         ph4   first
+         ph4   <right
+         ph4   <first
          jsl   rsort
          add4  left,lsize,first         sort right part of array
          brl   sr0
@@ -1007,10 +1007,10 @@ cn1      cmp   #'+'                     else if the char is '+' then
          bne   cn3
 cn2      inc4  str                        ++str
 
-cn3      ph4   str                      save the starting string
-         ph2   base                     convert the unsigned number
-         ph4   ptr
-         ph4   str
+cn3      ph4   <str                     save the starting string
+         ph2   <base                    convert the unsigned number
+         ph4   <ptr
+         ph4   <str
          jsl   ~strtoul
          stx   val+2
          sta   val
@@ -1194,9 +1194,9 @@ cn3      cmp   base                     branch if the digit is too big
          pha
          pha
          pha
-         ph4   val
+         ph4   <val
          pea   0
-         ph2   base
+         ph2   <base
          _LongMul
          pl4   val
          pla                            branch if there was an error
@@ -1329,10 +1329,10 @@ cn1      cmp   #'+'                     else if the char is '+' then
          bne   cn3
 cn2      inc4  str                        ++str
 
-cn3      ph4   str                      save the starting string
-         ph2   base                     convert the unsigned number
-         ph4   ptr
-         ph4   str
+cn3      ph4   <str                     save the starting string
+         ph2   <base                    convert the unsigned number
+         ph4   <ptr
+         ph4   <str
          tdc
          clc
          adc   #val
@@ -1539,7 +1539,7 @@ cn3      cmp   base                     branch if the digit is too big
          pea   0
          pea   0
          pea   0
-         ph2   base
+         ph2   <base
          jsl   ~UMUL8
          pl8   val
          pla                            get the saved digit

@@ -42,7 +42,7 @@ stream   equ   4                        input stream
          tsc
          phd
          tcd
-         ph4   stream                   verify that stream exists
+         ph4   <stream                  verify that stream exists
          jsl   ~VerifyStream
          bcs   lb1
          ldy   #FILE_flag               clear the error flag
@@ -85,11 +85,11 @@ stdfile  equ   7                        is this a standard file?
 
          lda   #EOF                     assume we will get an error
          sta   err
-         ph4   stream                   verify that stream exists
+         ph4   <stream                  verify that stream exists
          jsl   ~VerifyStream
          jcs   rts
 
-         ph4   stream                   do any pending I/O
+         ph4   <stream                  do any pending I/O
          jsl   fflush
          tax
          jne   rts
@@ -156,7 +156,7 @@ cl3b     sta   dsPathname
          sta   clRefNum
          OSClose cl
          DestroyGS ds                     DestroyGS(ds)
-cl3c     ph4   p                          free(p)
+cl3c     ph4   <p                         free(p)
          jsl   free
          bra   cl3e                     else
 cl3d     ldy   #FILE_file                 close the file
@@ -178,7 +178,7 @@ cl3e     ldy   #FILE_flag               if the buffer was allocated by fopen the
          jsl   free
 cl4      lda   stdfile                  if this is not a standard file then
          bne   cl5
-         ph4   stream                     dispose of the file buffer
+         ph4   <stream                    dispose of the file buffer
          jsl   free
          bra   cl7                      else
 cl5      add4  stream,#sizeofFILE-4,p     reset the standard out stuff
@@ -225,7 +225,7 @@ stream   equ   4                        input stream
          tsc
          phd
          tcd
-         ph4   stream                   verify that stream exists
+         ph4   <stream                  verify that stream exists
          jsl   ~VerifyStream
          ldx   #_IOEOF
          bcs   lb1
@@ -263,7 +263,7 @@ stream   equ   4                        input stream
          tsc
          phd
          tcd
-         ph4   stream                   verify that stream exists
+         ph4   <stream                  verify that stream exists
          jsl   ~VerifyStream
          ldx   #_IOERR
          bcs   lb1
@@ -316,7 +316,7 @@ sp       equ   3                        stream work pointer
 fa1      lda   sp                         while sp <> nil
          ora   sp+2
          jeq   rts
-         ph4   sp                           fflush(sp);
+         ph4   <sp                          fflush(sp);
          jsl   fflush
          tax                                if returned value <> 0 then
          beq   fa2
@@ -331,7 +331,7 @@ fa2      ldy   #2                           sp = sp^.next
 
 fa3      lda   #EOF                     assume there is an error
          sta   err
-         ph4   stream                   verify that stream exists
+         ph4   <stream                  verify that stream exists
          jsl   ~VerifyStream
          jcs   rts
          ldy   #FILE_flag               if the mode is not writing, quit
@@ -368,7 +368,7 @@ fa3      lda   #EOF                     assume there is an error
          jsr   ~ForceToEOF
 fa4      OSwrite wr                     write the info
          bcc   fl1
-         ph4   stream
+         ph4   <stream
          jsr   ~ioerror
          bra   rts
 
@@ -378,13 +378,13 @@ fl1a     bit   #_IORW
          beq   fl3
          bit   #_IOREAD                   if the file is being read then
          beq   fl2
-         ph4   stream                       use ftell to set the mark
+         ph4   <stream                      use ftell to set the mark
          jsl   ftell
          ldy   #FILE_flag
          lda   [stream],Y
 fl2      and   #$FFFF-_IOWRT-_IOREAD      turn off the reading and writing flags
          sta   [stream],Y
-fl3      ph4   stream                   prepare file for output
+fl3      ph4   <stream                  prepare file for output
          jsl   ~InitBuffer
          stz   err                      no error found
 rts      plb
@@ -424,7 +424,7 @@ p        equ   3                        work pointer
          phk
          plb
 
-         ph4   stream                   verify that stream exists
+         ph4   <stream                  verify that stream exists
          jsl   ~VerifyStream
          bcs   lb0
          ldy   #FILE_flag               quit with error if the end of file
@@ -467,7 +467,7 @@ lb2      ldy   #FILE_file               branch if this is a disk file
 st1      sta   c
          brl   gc9
 
-gc1      ph4   stream                   else flag the error
+gc1      ph4   <stream                  else flag the error
          jsr   ~ioerror
          lda   #EOF
          sta   c
@@ -661,10 +661,10 @@ disp     equ   1                        disp in s
 
          csubroutine (4:s,2:n,4:stream),2
 
-         ph4   stream                   verify that stream exists
+         ph4   <stream                  verify that stream exists
          jsl   ~VerifyStream
          bcs   err1
-         ph4   stream                   quit with NULL if at EOF
+         ph4   <stream                  quit with NULL if at EOF
          jsl   feof
          tax
          beq   lb0
@@ -677,7 +677,7 @@ lb0      stz   disp                     no characters processed so far
          dec   n                        leave room for the null terminator
          bmi   err
          beq   err
-lb1      ph4   stream                   get a character
+lb1      ph4   <stream                  get a character
          jsl   fgetc
          tax                            quit with error if it is an EOF
          bpl   lb2
@@ -716,7 +716,7 @@ err      equ   1                        error code
 
          csubroutine (4:stream,4:pos),2
 
-         ph4   stream                   get the position
+         ph4   <stream                  get the position
          jsl   ftell
          cmp   #-1                      if the position = -1 then
          bne   lb1
@@ -786,7 +786,7 @@ OSname   equ   11                       pointer to the GS/OS file name
 ;  create a GS/OS file name
 ;
 cn1      stx   opAccess                 set the access flags
-         ph4   filename                 get the length of the name buffer
+         ph4   <filename                get the length of the name buffer
          jsl   ~osname
          sta   OSname
          stx   OSname+2
@@ -868,7 +868,7 @@ ar1      ph4   #sizeofFILE              get space for the file record
          stx   buffStart+2
          ora   buffStart+2
          bne   ar3
-         ph4   fileBuff                 memory error
+         ph4   <fileBuff                memory error
          jsl   free
 ar2      lda   #ENOMEM
          sta   >errno
@@ -950,7 +950,7 @@ ar6b     sta   [fileBuff],Y
 ;
 ;  return the result
 ;
-rt1      ph4   OSname                   dispose of the file name buffer
+rt1      ph4   <OSname                  dispose of the file name buffer
          jsl   free
 rt2      plb                            restore caller's data bank
          creturn 4:fileBuff             return
@@ -1040,7 +1040,7 @@ fileBuff equ   11                       file buffer to return
          stz   fileBuff                 the open is not legal, yet
          stz   fileBuff+2
 
-         ph4   stream                   verify that stream exists
+         ph4   <stream                  verify that stream exists
          jsl   ~VerifyStream
          jcs   rt2
          lda   [type]                   make sure the file type is in ['a','r','w']
@@ -1062,7 +1062,7 @@ cl1      ldy   #FILE_file               branch if the file is not a disk file
          lda   [stream],Y
          bmi   cn1
 
-         ph4   stream                   do any pending I/O
+         ph4   <stream                  do any pending I/O
          jsl   fflush
          ldy   #FILE_file               close the file
          lda   [stream],Y
@@ -1086,7 +1086,7 @@ cl1      ldy   #FILE_file               branch if the file is not a disk file
 cn1      lda   filename                 bail out if filename is NULL
          ora   filename+2                 (reopening same file not supported)
          jeq   rt2
-         ph4   filename                 get the length of the name buffer
+         ph4   <filename                get the length of the name buffer
          jsl   ~osname
          sta   OSname
          stx   OSname+2
@@ -1133,7 +1133,7 @@ nl3      OSopen op                      try to open an existing file
          lda   fileType                 if the type is 'r', flag an error
          cmp   #'r'
          bne   of1
-errEIO   ph4   stream
+errEIO   ph4   <stream
          jsr   ~ioerror
          brl   rt1
 
@@ -1142,7 +1142,7 @@ of1      move4 OSname,crPathName        create the file
          bcc   of1a
          cmp   #$0047                   check for dupPathname error=>file exists
          bne   errEIO
-         ph4   stream
+         ph4   <stream
          jsr   ~ioerror
          lda   #EEXIST
          sta   >errno
@@ -1240,7 +1240,7 @@ ar6b     sta   [fileBuff],Y
 ;
 ;  return the result
 ;
-rt1      ph4   OSname                   dispose of the file name buffer
+rt1      ph4   <OSname                  dispose of the file name buffer
          jsl   free
 rt2      plb                            restore caller's data bank
          creturn 4:fileBuff             return
@@ -1383,7 +1383,7 @@ p        equ   1                        work pointer
 
          csubroutine (2:c,4:stream),6
 
-         ph4   stream                   verify that stream exists
+         ph4   <stream                  verify that stream exists
          jsl   ~VerifyStream
          bcs   lb0
          ldy   #FILE_flag               quit with error if the end of file
@@ -1408,7 +1408,7 @@ lb2      ldy   #FILE_file               branch if this is a disk file
 
          cmp   #stdoutID                if stream = stdout then
          bne   pc1
-         ph2   c                          write the character
+         ph2   <c                         write the character
          jsl   ~stdout
          brl   pc8
 pc1      cmp   #stderrID                else if stream = stderr then
@@ -1420,7 +1420,7 @@ pc1      cmp   #stderrID                else if stream = stderr then
 pc1a     pha                              write to error out
          jsl   SYSCHARERROUT
          brl   pc8
-pc2      ph4   stream                   else stream = stdin; flag the error
+pc2      ph4   <stream                  else stream = stdin; flag the error
          jsr   ~ioerror
          lda   #EOF
          sta   c
@@ -1446,7 +1446,7 @@ pc3a     ldy   #FILE_cnt                if the buffer is full then
 pc3b     ldy   #FILE_flag                 purge it
          lda   [stream],Y
          pha
-         ph4   stream
+         ph4   <stream
          jsl   fflush
          ldy   #FILE_flag
          pla
@@ -1502,7 +1502,7 @@ pc6      ldy   #FILE_flag                 or is flag & _IONBF then
 pc7      ldy   #FILE_flag                 flush the stream
          lda   [stream],Y
          pha
-         ph4   stream
+         ph4   <stream
          jsl   fflush
          ldy   #FILE_flag
          pla
@@ -1525,7 +1525,7 @@ err      equ   1                        return code
 
          csubroutine (4:s,4:stream),2
 
-         ph4   stream                   verify that stream exists
+         ph4   <stream                  verify that stream exists
          jsl   ~VerifyStream
          lda   #EOF
          sta   err
@@ -1533,7 +1533,7 @@ err      equ   1                        return code
          stz   err                      no error so far
          bra   lb2                      skip initial increment
 lb1      inc4  s                        next char
-lb2      ph4   stream                   push the stream, just in case...
+lb2      ph4   <stream                  push the stream, just in case...
          lda   [s]                      exit loop if at end of string
          and   #$00FF
          beq   lb3
@@ -1583,7 +1583,7 @@ temp     equ   1
          stz   rdTransferCount          set the # of elements read
          stz   rdTransferCount+2
          stz   pbkCount                 no putback characters read yet
-         ph4   stream                   verify that stream exists
+         ph4   <stream                  verify that stream exists
          jsl   ~VerifyStream
          jcs   lb6
          mul4  element_size,count,rdRequestCount set the # of bytes
@@ -1610,7 +1610,7 @@ pb1      lda   rdRequestCount           quit if the request count is 0
          sta   [stream],Y
          bra   pb1                        loop to check for another putback chr
 
-lb0      ph4   stream                   reset file pointer
+lb0      ph4   <stream                  reset file pointer
          jsl   ~SetFilePointer
          ldy   #FILE_file               set the file ID number
          lda   [stream],Y
@@ -1648,7 +1648,7 @@ lb2      sta   rdRefNum                 set the reference number
          bne   lb3
          jsr   SetEOF                     set the EOF flag
          bra   lb4
-lb3      ph4   stream                   I/O error
+lb3      ph4   <stream                  I/O error
          jsr   ~ioerror
 lb4      clc                            rdTransferCount += pbkCount
          lda   rdTransferCount
@@ -1790,10 +1790,10 @@ err      equ   1                        return value
 
          lda   #-1                      assume we will get an error
          sta   err
-         ph4   stream                   verify that stream exists
+         ph4   <stream                  verify that stream exists
          jsl   ~VerifyStream
          jcs   rts
-         ph4   stream                   purge the file
+         ph4   <stream                  purge the file
          jsl   fflush
          ldy   #FILE_file               set the file reference
          lda   [stream],Y
@@ -1809,7 +1809,7 @@ err      equ   1                        return value
          bra   lb3
 lb2      cmp   #SEEK_CUR                else if relative to current position then
          bne   lb3
-         ph4   stream                     get the current position
+         ph4   <stream                    get the current position
          jsl   ftell
          clc                              add it to the offset
          adc   offset
@@ -1864,7 +1864,7 @@ lb6      ldy   #FILE_flag               clear the EOF , READ, WRITE flags
 rts      plb
          creturn 2:err
 
-erEIO    ph4   stream                   flag an IO error
+erEIO    ph4   <stream                  flag an IO error
          jsr   ~ioerror
          bra   rts
 
@@ -1903,7 +1903,7 @@ err      equ   1                        error code
          pha
          lda   [pos]
          pha
-         ph4   stream
+         ph4   <stream
          jsl   fseek
          sta   err
 
@@ -1937,14 +1937,14 @@ pos      equ   1                        position in the file
          lda   #-1                      assume an error
          sta   pos
          sta   pos+2
-         ph4   stream                   verify that stream exists
+         ph4   <stream                  verify that stream exists
          jsl   ~VerifyStream
          jcs   rts
          ldy   #FILE_flag               if the file is being written then
          lda   [stream],Y
          bit   #_IOWRT
          beq   lb0
-         ph4   stream                     do any pending writes
+         ph4   <stream                    do any pending writes
          jsl   fflush
          tax
          bne   rts
@@ -1953,7 +1953,7 @@ lb0      ldy   #FILE_file               get the file's mark
          sta   gmRefNum
          OSGet_Mark gm
          bcc   lb1
-         ph4   stream
+         ph4   <stream
          jsr   ~ioerror
          bra   rts
 
@@ -2030,7 +2030,7 @@ fwrite   start
 
          stz   wrTransferCount          set the # of elements written
          stz   wrTransferCount+2
-         ph4   stream                   verify that stream exists
+         ph4   <stream                  verify that stream exists
          jsl   ~VerifyStream
          jcs   lb6
          mul4  element_size,count,wrRequestCount set the # of bytes
@@ -2068,7 +2068,7 @@ lb3      lda   [ptr]                      write the bytes
          bra   lb6
 
 lb4      sta   wrRefNum                 set the reference number
-         ph4   stream                   purge the file
+         ph4   <stream                  purge the file
          jsl   fflush
          move4 ptr,wrDataBuffer         set the start address
          ldy   #FILE_flag               if append mode, force to EOF
@@ -2079,7 +2079,7 @@ lb4      sta   wrRefNum                 set the reference number
          jsr   ~ForceToEOF
 lb4a     OSWrite wr                     write the bytes
          bcc   lb5
-         ph4   stream                   I/O error
+         ph4   <stream                  I/O error
          jsr   ~ioerror
 !                                       set the # records written
 lb5      div4  wrTransferCount,element_size,count
@@ -2222,7 +2222,7 @@ s        equ   4                        string address
          beq   lb0
 
          ph4   >stderr                  write the error string
-         ph4   s
+         ph4   <s
          jsl   fputs
          ph4   >stderr                  write ': '
          pea   ':'
@@ -2420,7 +2420,7 @@ err      equ   1                        return code
          phk
          plb
 
-         ph4   filename                 convert to a GS/OS file name
+         ph4   <filename                convert to a GS/OS file name
          jsl   ~osname
          sta   dsPathName
          stx   dsPathName+2
@@ -2465,7 +2465,7 @@ err      equ   1                        return code
          phk
          plb
 
-         ph4   oldname                  convert oldname to a GS/OS file name
+         ph4   <oldname                 convert oldname to a GS/OS file name
          jsl   ~osname
          sta   cpPathName
          stx   cpPathName+2
@@ -2474,7 +2474,7 @@ err      equ   1                        return code
          lda   #$FFFF
          sta   err
          bra   lb4
-lb1      ph4   newname                  convert newname to a GS/OS file name
+lb1      ph4   <newname                 convert newname to a GS/OS file name
          jsl   ~osname
          sta   cpNewPathName
          stx   cpNewPathName+2
@@ -2513,13 +2513,13 @@ cpNewPathName ds 4
 rewind   start
          csubroutine (4:stream),0
 
-         ph4   stream                   verify that stream exists
+         ph4   <stream                  verify that stream exists
          jsl   ~VerifyStream
          bcs   ret
 
          ph2   #SEEK_SET
          ph4   #0
-         ph4   stream
+         ph4   <stream
          jsl   __fseek
         
          ldy   #FILE_flag               clear the error flag
@@ -2600,8 +2600,8 @@ err      equ   1                        return code
          bra   lb2
 lb1      ph4   #BUFSIZ
          ph2   #_IOFBF
-lb2      ph4   buf
-         ph4   stream
+lb2      ph4   <buf
+         ph4   <stream
          jsl   __setvbuf
          sta   err
 
@@ -2642,7 +2642,7 @@ err      equ   1                        return code
          plb
          lda   #-1                      assume we will get an error
          sta   err
-         ph4   stream                   verify that stream exists
+         ph4   <stream                  verify that stream exists
          jsl   ~VerifyStream
          jcs   rts
          ldy   #FILE_ptr                make sure the buffer is not in use
@@ -2672,7 +2672,7 @@ lb1      lda   type                     error if type is not one of these
 lb2      lda   buf                      if the buffer is not supplied by the
          ora   buf+2                      caller then
          bne   sb1
-         ph4   size                       allocate a buffer
+         ph4   <size                      allocate a buffer
          jsl   malloc
          sta   buf
          stx   buf+2
@@ -3120,7 +3120,7 @@ lb4      long  M                        append the two strings
          ora   buf+2
          beq   lb5
          ph4   #cname                      move the string
-         ph4   buf
+         ph4   <buf
          jsl   strcpy
          bra   lb6
 
@@ -4129,7 +4129,7 @@ bcdnum   ds    10
          using ~printfCommon
 argp     equ   7                        argument pointer
 
-         ph4   argp                     save the original argp
+         ph4   <argp                    save the original argp
          ldy   #2                       dereference argp
          lda   [argp],Y
          tax
@@ -4280,7 +4280,7 @@ al3      long  I,M
          using ~printfCommon
 argp     equ   7                        argument pointer
 
-         ph4   argp                     save the original argp
+         ph4   <argp                    save the original argp
          ldy   #2                       dereference argp
          lda   [argp],Y
          tax
@@ -4298,7 +4298,7 @@ lb1      iny
 
 ~Format_b entry
 ~Format_P entry
-         ph4   argp                     save the original argp
+         ph4   <argp                    save the original argp
          ldy   #2                       dereference argp
          lda   [argp],Y
          tax
@@ -4637,7 +4637,7 @@ ptr      equ   3                        pointer to return
 
          csubroutine (4:filename),6
 
-         ph4   filename                 get the length of the name buffer
+         ph4   <filename                get the length of the name buffer
          jsl   strlen
          sta   namelen
          inc   A
@@ -4656,7 +4656,7 @@ lb1      lda   namelen                  set the name length
          sta   [ptr]
          pea   0                        copy the file name to the OS name buffer
          pha
-         ph4   filename
+         ph4   <filename
          clc
          lda   ptr
          ldx   ptr+2
@@ -6227,7 +6227,7 @@ smDisplacement dc i4'0'                 displacement = 0
          beq   lb1
          ph2   #SEEK_CUR                  fseek(stream, 0L, SEEK_CUR)
          ph4   #0
-         ph4   stream
+         ph4   <stream
          jsl   fseek
 
 lb1      anop

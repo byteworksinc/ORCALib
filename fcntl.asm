@@ -99,7 +99,7 @@ err      equ   1                        error return code
          lda   mode                     convert mode to ProDOS format
          jsr   unixtoprodos
          sta   siAccess
-         ph4   path                     set the path name
+         ph4   <path                    set the path name
          jsl   ctoosstr
          sta   siPathname
          stx   siPathname+2
@@ -209,8 +209,8 @@ err      equ   1                        error return code
          csubroutine (4:path,2:mode),2
 
          ph2   #O_WRONLY+O_TRUNC+O_CREAT
-         ph2   mode
-         ph4   path
+         ph2   <mode
+         ph4   <path
          jsl   openfile
          sta   err
 
@@ -239,7 +239,7 @@ err      equ   1                        error return code
 
          ph2   #0
          ph2   #F_DUPFD
-         ph2   old
+         ph2   <old
          jsl   fcntl
          sta   err
 
@@ -453,9 +453,9 @@ err      equ   1                        error return code
 
          csubroutine (4:path,2:oflag),2
 
-         ph2   oflag
+         ph2   <oflag
          ph2   #$7180
-         ph4   path
+         ph4   <path
          jsl   openfile
          sta   err
 
@@ -515,7 +515,7 @@ lb1      lda   files,X
          brl   lb11
 lb2      stx   index                    save the index to the file
 
-         ph4   path                     convert the path to an OS string
+         ph4   <path                    convert the path to an OS string
          jsl   ctoosstr
          sta   opPathname
          stx   opPathname+2
@@ -546,8 +546,8 @@ lb4      sta   crFileType
          lda   #ENOENT
          sta   >errno
          bra   lb11
-lb4a     ph2   mode                       set the access bits
-         ph4   path
+lb4a     ph2   <mode                      set the access bits
+         ph4   <path
          jsl   chmod
          bra   lb8                      else
 lb5      lda   oflag                      if O_CREAT is not set then
@@ -827,7 +827,7 @@ lb0a     move4 buf,wrDataBuffer         set the location to write from
          and   #O_BINARY
          bne   lb0g
          pea   0                          reserve a file buffer
-         ph2   n
+         ph2   <n
          jsl   malloc
          sta   nbuff
          stx   nbuff+2
@@ -869,7 +869,7 @@ lb1      ldy   wrTransferCount          return the bytes read
          lda   nbuff                    if nbuff <> NULL then
          ora   nbuff+2
          beq   lb2
-         ph4   nbuff                      dispose of the buffer
+         ph4   <nbuff                     dispose of the buffer
          jsl   free
 lb2      anop
 

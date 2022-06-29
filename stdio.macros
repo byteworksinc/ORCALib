@@ -1,4 +1,95 @@
  macro
+&l ph2 &n1
+&l anop
+ aif "&n1"="*",.f
+ lclc &c
+&c amid &n1,1,1
+ aif "&c"="#",.d
+ aif s:longa=1,.a
+ rep #%00100000
+.a
+ aif "&c"<>"{",.b
+&c amid &n1,l:&n1,1
+ aif "&c"<>"}",.g
+&n1 amid &n1,2,l:&n1-2
+ lda (&n1)
+ pha
+ ago .e
+.b
+ aif "&c"="<",.c
+ lda &n1
+ pha
+ ago .e
+.c
+&n1 amid &n1,2,l:&n1-1
+ pei &n1
+ ago .e
+.d
+&n1 amid &n1,2,l:&n1-1
+ pea &n1
+ ago .f
+.e
+ aif s:longa=1,.f
+ sep #%00100000
+.f
+ mexit
+.g
+ mnote "Missing closing '}'",16
+ mend
+ macro
+&l ph4 &n1
+&l anop
+ aif "&n1"="*",.f
+ lclc &c
+&c amid &n1,1,1
+ aif "&c"="#",.d
+ aif s:longa=1,.a
+ rep #%00100000
+.a
+ aif "&c"<>"{",.b
+&c amid &n1,l:&n1,1
+ aif "&c"<>"}",.g
+&n1 amid &n1,2,l:&n1-2
+ ldy #2
+ lda (&n1),y
+ pha
+ lda (&n1)
+ pha
+ ago .e
+.b
+ aif "&c"<>"[",.c
+ ldy #2
+ lda &n1,y
+ pha
+ lda &n1
+ pha
+ ago .e
+.c
+ aif "&c"<>"<",.c1
+&n1 amid &n1,2,l:&n1-1
+ pei &n1+2
+ pei &n1
+ ago .e
+.c1
+ lda &n1+2
+ pha
+ lda &n1
+ pha
+ ago .e
+.d
+&n1 amid &n1,2,l:&n1-1
+ pea +(&n1)|-16
+ pea &n1
+ ago .f
+.e
+ aif s:longa=1,.f
+ sep #%00100000
+.f
+ mexit
+.g
+ mnote "Missing closing '}'",16
+ mend
+ macro
 &l negate8 &n1
 &l ~setm
  sec
@@ -567,84 +658,6 @@
  AIF &LI,.I
  LONGI OFF
 .I
- MEND
- MACRO
-&LAB PH2 &N1
- LCLC &C
-&LAB ANOP
-&C AMID &N1,1,1
- AIF "&C"="#",.D
- AIF S:LONGA=1,.A
- REP #%00100000
-.A
- AIF "&C"<>"{",.B
-&C AMID &N1,L:&N1,1
- AIF "&C"<>"}",.G
-&N1 AMID &N1,2,L:&N1-2
- LDA (&N1)
- PHA
- AGO .E
-.B
- LDA &N1
- PHA
- AGO .E
-.D
-&N1 AMID &N1,2,L:&N1-1
- PEA &N1
- AGO .F
-.E
- AIF S:LONGA=1,.F
- SEP #%00100000
-.F
- MEXIT
-.G
- MNOTE "Missing closing '}'",16
- MEND
- MACRO
-&LAB PH4 &N1
- LCLC &C
-&LAB ANOP
-&C AMID &N1,1,1
- AIF "&C"="#",.D
- AIF S:LONGA=1,.A
- REP #%00100000
-.A
- AIF "&C"<>"{",.B
-&C AMID &N1,L:&N1,1
- AIF "&C"<>"}",.G
-&N1 AMID &N1,2,L:&N1-2
- LDY #2
- LDA (&N1),Y
- PHA
- LDA (&N1)
- PHA
- AGO .E
-.B
- AIF "&C"<>"[",.C
- LDY #2
- LDA &N1,Y
- PHA
- LDA &N1
- PHA
- AGO .E
-.C
- LDA &N1+2
- PHA
- LDA &N1
- PHA
- AGO .E
-.D
-&N1 AMID &N1,2,L:&N1-1
- PEA +(&N1)|-16
- PEA &N1
- AGO .F
-.E
- AIF S:LONGA=1,.F
- SEP #%00100000
-.F
- MEXIT
-.G
- MNOTE "Missing closing '}'",16
  MEND
  MACRO
 &LAB PL4 &N1

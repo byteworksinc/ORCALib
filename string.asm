@@ -295,7 +295,7 @@ rtl      equ   1                        return address
          phd
          tcd
 
-         ph4   p1                       save the dest pointer
+         ph4   <p1                      save the dest pointer
 
          lda   len                      if there are an odd # of bytes then
          lsr   A
@@ -377,7 +377,7 @@ rtl      equ   1                        return address
          phd
          tcd
 
-         ph4   p1                       save the dest pointer
+         ph4   <p1                      save the dest pointer
 
          lda   p1+2                     if p1 < p2 then
          cmp   p2+2
@@ -480,7 +480,7 @@ rtl      equ   1                        return address
          phd
          tcd
 
-         ph4   p                        save the pointer
+         ph4   <p                       save the pointer
 
          short M
          lda   val                      form a 2 byte value
@@ -1560,7 +1560,7 @@ rtl      equ   workLen+1                return address
          lda   src                      if the string to search is null,
          ora   src+2                     return null
          beq   fl2
-         ph4   sub                      get the length of the search string
+         ph4   <sub                     get the length of the search string
          jsl   strlen
          stx   strset+2
          sta   strset
@@ -1568,7 +1568,7 @@ rtl      equ   workLen+1                return address
          sta   lensub
          ora   lensub+2                 if the length is 0 then
          jeq   rt1                        return the search string
-         ph4   src                      get the length of the string to search
+         ph4   <src                     get the length of the string to search
          jsl   strlen
          sec                            subtract off the length of the search
          sbc   lensub                    string
@@ -1845,14 +1845,14 @@ strxfrm start
          csubroutine (4:s1,4:s2,4:n),4
 len      equ   1                        length of s2
          
-         ph4   s2                       len = strlen(s2)
+         ph4   <s2                      len = strlen(s2)
          jsl   strlen
          sta   len
          stx   len+2
          cmpl  len,n                    if len < n
          bge   ret
-         ph4   s2
-         ph4   s1
+         ph4   <s2
+         ph4   <s1
          jsl   strcpy                     strcpy(s1,s2)
 ret      creturn 4:len                  return len
          end
