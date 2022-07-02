@@ -1574,15 +1574,17 @@ lb4      creturn 2:err
 *
 fread    start
 temp     equ   1
+p        equ   5
 
-         csubroutine (4:ptr,4:element_size,4:count,4:stream),4
+         csubroutine (4:ptr,4:element_size,4:count,4:stream),8
          phb
          phk
          plb
 
          stz   rdTransferCount          set the # of elements read
          stz   rdTransferCount+2
-         stz   pbkCount                 no putback characters read yet
+         stz   extraCount               no putback characters read yet
+         stz   extraCount+2
          ph4   <stream                  verify that stream exists
          jsl   ~VerifyStream
          jcs   lb6
@@ -1599,7 +1601,7 @@ pb1      lda   rdRequestCount           quit if the request count is 0
          long  M
          inc4  ptr                        adjust pointer and counts
          dec4  rdRequestCount
-         inc   pbkCount
+         inc4  extraCount
          ldy   #FILE_pbk+2                pop the putback buffer
          lda   [stream],Y
          tax   
@@ -1610,9 +1612,7 @@ pb1      lda   rdRequestCount           quit if the request count is 0
          sta   [stream],Y
          bra   pb1                        loop to check for another putback chr
 
-lb0      ph4   <stream                  reset file pointer
-         jsl   ~SetFilePointer
-         ldy   #FILE_file               set the file ID number
+lb0      ldy   #FILE_file               set the file ID number
          lda   [stream],Y
          bpl   lb2                      branch if it is a file
 
@@ -1628,7 +1628,7 @@ lb1      jsl   SYSKEYIN                   read the bytes
          ora   >stdin+4+FILE_flag
          sta   >stdin+4+FILE_flag
          jsl   SYSKEYIN                   read the closing cr
-         bra   lb4
+         brl   lb4
 lb1a     short M                          set character
          sta   [ptr]
          long  M
@@ -1638,10 +1638,55 @@ lb1a     short M                          set character
          lda   rdRequestCount
          ora   rdRequestCount+2
          bne   lb1
-         bra   lb4
+         brl   lb4
 
 lb2      sta   rdRefNum                 set the reference number
-         move4 ptr,rdDataBuffer         set the start address
+         ldy   #FILE_flag               if the file is being read then
+         lda   [stream],Y
+         bit   #_IOREAD
+         beq   lb2c
+lb2a     ldy   #FILE_cnt                  while there is buffered data...
+         lda   [stream],Y
+         iny
+         iny
+         ora   [stream],Y
+         beq   lb2c
+         lda   rdRequestCount             ...and the request count is not 0
+         ora   rdRequestCount+2
+         beq   lb4
+         ldy   #FILE_ptr                    get the next character
+         lda   [stream],Y
+         sta   p
+         clc
+         adc   #1
+         sta   [stream],Y
+         iny
+         iny
+         lda   [stream],Y
+         sta   p+2
+         adc   #0
+         sta   [stream],Y
+         short M
+         lda   [p]
+         sta   [ptr]
+         long  M
+         ldy   #FILE_cnt                    dec the # chars in the buffer
+         sec
+         lda   [stream],Y
+         sbc   #1
+         sta   [stream],Y
+         bcs   lb2b
+         iny
+         iny
+         lda   [stream],Y
+         dec   A
+         sta   [stream],Y
+lb2b     inc4  ptr                          adjust pointer and counts
+         dec4  rdRequestCount
+         inc4  extraCount
+         bra   lb2a
+
+lb2c     move4 ptr,rdDataBuffer         set the start address
          OSRead rd                      read the bytes
          bcc   lb4
          cmp   #$4C                     if the error was $4C then
@@ -1650,12 +1695,7 @@ lb2      sta   rdRefNum                 set the reference number
          bra   lb4
 lb3      ph4   <stream                  I/O error
          jsr   ~ioerror
-lb4      clc                            rdTransferCount += pbkCount
-         lda   rdTransferCount
-         adc   pbkCount
-         sta   rdTransferCount
-         bcc   lb5
-         inc   rdTransferCount+2
+lb4      add4  rdTransferCount,extraCount
 lb5      lda   temp                     if there were too few elements read then
          cmp   rdTransferCount
          bne   lb5a
@@ -1679,7 +1719,7 @@ rdRequestCount ds 4
 rdTransferCount ds 4
          dc    i'1'
 
-pbkCount ds    2                        number of characters read from putback
+extraCount ds  4                        # characters read from putback or buffer
 ;
 ;  Set the EOF flag
 ;
@@ -6201,37 +6241,6 @@ sm       dc    i'3'                     SetMark record
 smRefNum ds    2
 smBase   dc    i'1'                     EOF-displacement mode
 smDisplacement dc i4'0'                 displacement = 0
-         end
-
-****************************************************************
-*
-*  ~SetFilePointer - makes sure nothing is in the input buffer
-*
-*  Inputs:
-*        stream - stream to check
-*
-****************************************************************
-*
-~SetFilePointer private
-
-         csubroutine (4:stream),0
-
-         ldy   #FILE_pbk                if stream->FILE_pbk != -1
-         lda   [stream],Y
-         inc   A
-         ldy   #FILE_cnt                  or stream->FILE_cnt != 0 then
-         ora   [stream],Y
-         iny
-         iny
-         ora   [stream],Y
-         beq   lb1
-         ph2   #SEEK_CUR                  fseek(stream, 0L, SEEK_CUR)
-         ph4   #0
-         ph4   <stream
-         jsl   fseek
-
-lb1      anop
-         creturn
          end
 
 ****************************************************************
