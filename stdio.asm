@@ -486,7 +486,7 @@ gc1      ph4   <stream                  else flag the error
          jsr   ~ioerror
          lda   #EOF
          sta   c
-         brl   gc9
+         brl   gc10
 
 gc2      ldy   #FILE_flag               if the file is not read enabled then
          lda   [stream],Y
@@ -535,6 +535,8 @@ gc4      ldy   #FILE_file               set the file reference number
          ldy   #FILE_flag
          cmp   #$4C                       if it was eof then
          bne   gc5
+         jsr   endreads                     end reading state
+         ldy   #FILE_flag
          lda   #_IOEOF                      set the EOF flag
          bra   gc6                        else
 gc5      lda   #_IOERR                      set the error flag
@@ -542,7 +544,7 @@ gc6      ora   [stream],Y
          sta   [stream],Y
          lda   #EOF                       return EOF
          sta   c
-         brl   gc9
+         brl   gc10
 
 gc7      ldy   #FILE_flag               we're done if the read is unbuffered
          lda   [stream],Y
@@ -558,18 +560,7 @@ gc7      ldy   #FILE_flag               we're done if the read is unbuffered
          lda   rdDataBuffer+2
          adc   rdTransferCount+2
          sta   [stream],Y
-         ldy   #FILE_base               reset the file pointer
-         lda   [stream],Y
-         tax
-         iny
-         iny
-         lda   [stream],Y
-         ldy   #FILE_ptr+2
-         sta   [stream],Y
-         dey
-         dey
-         txa
-         sta   [stream],Y
+         jsr   resetptr                 reset the file pointer
          ldy   #FILE_cnt                set the # chars in the buffer
          lda   rdTransferCount
          sta   [stream],Y
@@ -619,10 +610,7 @@ gc8a     ldy   #FILE_flag               if the file is read/write
          iny
          ora   [stream],Y
          bne   gc9
-         ldy   #FILE_flag                 note that no chars are left
-         lda   [stream],Y
-         eor   #_IOREAD
-         sta   [stream],Y
+         jsr   endreads                   end reading state
 
 gc9      lda   c                        if c = \r then
          cmp   #13
@@ -636,6 +624,28 @@ gc9      lda   c                        if c = \r then
 
 gc10     plb
          creturn 2:c
+;
+;  Local subroutine - end "reading" state to prepare for possible writes
+;
+endreads ldy   #FILE_flag               if the file is read/write
+         lda   [stream],Y
+         bit   #_IORW
+         beq   resetptr
+         and   #$FFFF-_IOREAD             end reading state
+         sta   [stream],Y
+resetptr ldy   #FILE_base               reset the file pointer (alt entry point)
+         lda   [stream],Y
+         tax
+         iny
+         iny
+         lda   [stream],Y
+         ldy   #FILE_ptr+2
+         sta   [stream],Y
+         dey
+         dey
+         txa
+         sta   [stream],Y
+         rts
 ;
 ;  Local data
 ;
@@ -1401,9 +1411,9 @@ p        equ   1                        work pointer
          ph4   <stream                  verify that stream exists
          jsl   ~VerifyStream
          bcs   lb0
-         ldy   #FILE_flag               quit with error if the end of file
-         lda   [stream],Y                has been reached or an error has been
-         and   #_IOEOF+_IOERR            encountered
+         ldy   #FILE_flag               quit with error if an error has been
+         lda   [stream],Y                encountered 
+         and   #_IOERR
          beq   lb1
 lb0      lda   #EOF
          sta   c
@@ -1738,9 +1748,24 @@ extraCount ds  4                        # characters read from putback or buffer
 ;
 ;  Set the EOF flag
 ;
-SetEOF   ldy   #FILE_flag                 set the eof flag
+SetEOF   ldy   #FILE_flag               set the eof flag
          lda   [stream],Y
          ora   #_IOEOF
+         bit   #_IORW                   if file is read/write
+         beq   se1
+         and   #$FFFF-_IOREAD             turn off the read flag
+se1      sta   [stream],Y
+         ldy   #FILE_base               reset ptr to prepare for possible writes
+         lda   [stream],Y
+         tax
+         iny
+         iny
+         lda   [stream],Y
+         ldy   #FILE_ptr+2
+         sta   [stream],Y
+         dey
+         dey
+         txa
          sta   [stream],Y
          rts
          end
