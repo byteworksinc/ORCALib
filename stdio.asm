@@ -2008,8 +2008,8 @@ lb0      ldy   #FILE_file               get the file's mark
          sta   gmRefNum
          OSGet_Mark gm
          bcc   lb1
-         ph4   <stream
-         jsr   ~ioerror
+         lda   #EIO
+         sta   >errno
          bra   rts
 
 lb1      move4 gmPosition,pos           set the position
