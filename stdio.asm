@@ -372,27 +372,27 @@ fa4      OSwrite wr                     write the info
          jsr   ~ioerror
          bra   rts
 
-fl1      ldy   #FILE_flag               if the file is open for read/write then
+fl1      ldy   #FILE_flag               get flags
          lda   [stream],Y
-fl1a     bit   #_IORW
-         beq   fl3
-         bit   #_IOREAD                   if the file is being read then
-         beq   fl2
-         ph4   <stream                      set the mark to current position
+fl1a     bit   #_IOREAD                 if the file is being read then
+         beq   fl2a
+         ph4   <stream                    set the mark to current position
          jsl   ftell
          cmp   #-1
-         bne   fl1b
+         bne   fl2b
          cpx   #-1
-         beq   fl1c
-fl1b     sta   smPosition
+         beq   fl2
+fl2b     sta   smPosition
          stx   smPosition+2
          ldy   #FILE_file
          lda   [stream],Y
          sta   smRefNum
          OSSet_Mark sm
-fl1c     ldy   #FILE_flag
+fl2      ldy   #FILE_flag               get flags
          lda   [stream],Y
-fl2      and   #$FFFF-_IOWRT-_IOREAD      turn off the reading and writing flags
+fl2a     bit   #_IORW                   if the file is open for read/write then
+         beq   fl3
+         and   #$FFFF-_IOWRT-_IOREAD      turn off the reading and writing flags
          sta   [stream],Y
 fl3      ph4   <stream                  prepare file for output
          jsl   ~InitBuffer
