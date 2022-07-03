@@ -378,9 +378,19 @@ fl1a     bit   #_IORW
          beq   fl3
          bit   #_IOREAD                   if the file is being read then
          beq   fl2
-         ph4   <stream                      use ftell to set the mark
+         ph4   <stream                      set the mark to current position
          jsl   ftell
-         ldy   #FILE_flag
+         cmp   #-1
+         bne   fl1b
+         cpx   #-1
+         beq   fl1c
+fl1b     sta   smPosition
+         stx   smPosition+2
+         ldy   #FILE_file
+         lda   [stream],Y
+         sta   smRefNum
+         OSSet_Mark sm
+fl1c     ldy   #FILE_flag
          lda   [stream],Y
 fl2      and   #$FFFF-_IOWRT-_IOREAD      turn off the reading and writing flags
          sta   [stream],Y
@@ -396,6 +406,11 @@ wrDataBuffer ds 4
 wrRequestCount ds 4
          ds    4
          dc    i'1'
+
+sm       dc    i'3'                     parameter block for OSSet_Mark
+smRefNum ds    2
+         dc    i'0'
+smPosition ds  4
          end
 
 ****************************************************************
@@ -2014,25 +2029,15 @@ lb1      move4 gmPosition,pos           set the position
          sta   pos+2
          ldy   #FILE_pbk                  dec pos by 1 for each char in the
          lda   [stream],Y                   putback buffer then
-         bmi   lb2
+         bmi   rts
          dec4  pos
          ldy   #FILE_pbk+2
          lda   [stream],Y
-         bmi   lb2
+         bmi   rts
          dec4  pos
-lb2      ldy   #FILE_file                 set the file's mark
-         lda   [stream],Y
-         sta   spRefNum
-         move4 pos,spPosition
-         OSSet_Mark sp
 
 rts      plb
          creturn 4:pos
-
-sp       dc    i'3'                     parameter block for OSSet_Mark
-spRefNum ds    2
-         dc    i'0'
-spPosition ds  4
 
 gm       dc    i'2'                     parameter block for OSGetMark
 gmRefNum ds    2
