@@ -4623,6 +4623,11 @@ ib2      ldy   #FILE_cnt+2
          dey
          txa
          sta   [stream],Y
+         ldy   #FILE_pbk                nothing in the putback buffer
+         lda   #$FFFF
+         sta   [stream],Y
+         ldy   #FILE_pbk+2
+         sta   [stream],Y
 
          creturn
          end
