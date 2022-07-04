@@ -1916,10 +1916,13 @@ lb5      move4 offset,spPosition
          OSSet_Mark sp
          bcs   erEIO
 
-lb6      ldy   #FILE_flag               clear the EOF , READ, WRITE flags
-         lda   #$FFFF-_IOEOF-_IOREAD-_IOWRT
-         and   [stream],Y
-         sta   [stream],Y
+lb6      ldy   #FILE_flag               clear the EOF flag
+         lda   [stream],Y
+         and   #$FFFF-_IOEOF
+         bit   #_IORW                   if file is open for reading and writing
+         beq   lb6a
+         and   #$FFFF-_IOREAD-_IOWRT      clear the READ and WRITE flags
+lb6a     sta   [stream],Y
          ldy   #FILE_cnt                clear the character count
          lda   #0
          sta   [stream],Y
