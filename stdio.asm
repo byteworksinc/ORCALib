@@ -1613,6 +1613,10 @@ p        equ   5
          ph4   <stream                  verify that stream exists
          jsl   ~VerifyStream
          jcs   lb6
+         ldy   #FILE_flag               quit if end of file has been reached
+         lda   [stream],Y
+         bit   #_IOEOF
+         jne   lb6
          mul4  element_size,count,rdRequestCount set the # of bytes
          move4 rdRequestCount,temp      save full request count
 pb1      lda   rdRequestCount           quit if the request count is 0
