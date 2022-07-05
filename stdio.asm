@@ -1860,11 +1860,7 @@ stream   ds    4
 ****************************************************************
 *
 fseek    start
-         jmp   __fseek
-         end
-
-__fseek  start
-
+__fseek  entry
 err      equ   1                        return value
 
          csubroutine (4:stream,4:offset,2:wherefrom),2
@@ -2706,10 +2702,7 @@ lb2      ph4   <buf
 ****************************************************************
 *
 setvbuf  start
-         jmp   __setvbuf
-         end
-
-__setvbuf start
+__setvbuf entry
 err      equ   1                        return code
 
          csubroutine (4:stream,4:buf,2:type,4:size),2
