@@ -377,6 +377,63 @@ targv    ds    4
 
 ****************************************************************
 *
+*  ~CUMul2 - unsigned multiply
+*
+*  Inputs:
+*        X,A - operands
+*
+*  Outputs:
+*        A - result
+*
+*  Notes:
+*        This routine is used for array index calculations and
+*        for unsigned multiplies.  It returns the low-order
+*        16 bits of the true result in case of overflow.
+*
+****************************************************************
+*
+~CUMul2  start
+n1       equ   3
+n2       equ   5
+;
+;  Initialization
+;
+         phx                            save the operands
+         pha
+         phd                            set up our DP
+         tsc
+         tcd
+         cpx   n1                       make sure n1 is the smaller argument
+         bge   in1
+         lda   n1
+         stx   n1
+         sta   n2
+in1      anop
+;
+;  Do the multiply
+;
+         lda   #0
+
+         lsr   n1
+lb0      bcc   lb1
+         clc
+         adc   n2
+lb1      asl   n2
+
+         lsr   n1
+         bne   lb0          
+         bcc   aa1
+         clc
+         adc   n2
+
+aa1      pld                            return the result
+         plx
+         plx
+         rtl
+         end
+
+****************************************************************
+*
 *  ~Exit - call exit routines and clean up open files
 *
 *  Inputs:
