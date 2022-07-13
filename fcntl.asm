@@ -148,7 +148,6 @@ err      equ   1                        error return code
 
          stz   err                      err = 0 {no error}
          lda   filds                    error if there are too many open files
-         bmi   lb2
          cmp   #OPEN_MAX
          bge   lb2
          asl   A                        get the file reference number
@@ -280,7 +279,6 @@ flags    equ   5                        file flags
          bra   lb7
 
 lb1      lda   filds                    error if there are too many open files
-         bmi   lb2
          cmp   #OPEN_MAX
          bge   lb2
          asl   A                        get the file reference number
@@ -297,7 +295,6 @@ lb3      sta   refnum
          sta   flags
 
          lda   arg                      find a new filds
-         bmi   lb5
          cmp   #OPEN_MAX
          bge   lb5
          asl   A
@@ -376,7 +373,6 @@ mark     equ   1                        new file mark
          sta   mark
          sta   mark+2
          lda   filds                    get the file refnum
-         bmi   lb1
          cmp   #OPEN_MAX
          bge   lb1
          asl   A
@@ -634,7 +630,6 @@ err      equ   1                        error return code
          phk
          plb
          lda   filds                    error if the file has not been opened
-         bmi   lb0
          cmp   #OPEN_MAX
          bge   lb0
          asl   A                        get the file reference number
@@ -797,7 +792,6 @@ nbuff    equ   3                        new buffer pointer
          phk
          plb
          lda   filds                    error if the file has not been opened
-         bmi   lb0
          cmp   #OPEN_MAX
          bge   lb0
          asl   A                        get the file reference number
