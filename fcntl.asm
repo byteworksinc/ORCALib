@@ -800,6 +800,7 @@ nbuff    equ   3                        new buffer pointer
          lda   files,X
          beq   lb0
          sta   wrRefnum
+         sta   smRefnum
          stx   filds
          lda   files+2,X                make sure the file is open for writing
          and   #O_WRONLY+O_RDWR
@@ -851,7 +852,12 @@ lb0e     sta   [nbuff]
          long  M
 lb0f     move4 nbuff,wrDataBuffer         set the data buffer start
 
-lb0g     OSWrite wrRec                  write the bytes
+lb0g     ldx   filds                    if the file is in O_APPEND mode then
+         lda   files+2,X
+         and   #O_APPEND
+         beq   lb0h
+         OSSet_Mark smRec                 set mark to EOF
+lb0h     OSWrite wrRec                  write the bytes
          bcc   lb1                      if an error occurred then
          lda   #EIO                       errno = EIO
          sta   >errno
@@ -875,4 +881,9 @@ wrRefnum ds    2
 wrDataBuffer ds 4
 wrRequestCount ds 4
 wrTransferCount ds 4
+
+smRec    dc    i'3'                     SetMark record
+smRefnum ds    2
+smBase   dc    i'1'                     EOF-displacement mode
+smDisplacement dc i4'0'                 displacement = 0
          end
