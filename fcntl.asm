@@ -380,43 +380,56 @@ mark     equ   1                        new file mark
          tax
          lda   >files,X
          bne   lb2
-lb1      lda   #EBADF                   bad refnum error
-         sta   >errno
-         bra   lb4
+lb1      bra   lb4a                     bad refnum error
 
 lb2      sta   >smRefnum                set the file refnum
          sta   >gmRefnum
          lda   whence                   convert from UNIX whence to GS/OS base
-         beq   lb3
-         eor   #$0003
-         cmp   #4
-         bge   lb2a
-         cmp   #2
-         bne   lb3
-         sta   >smBase
-         lda   offset+2
-         bpl   lb3a
-         sub4  #0,offset,offset
-         lda   #3
+         cmp   #SEEK_SET                if whence == 0 (SEEK_SET)
+         bne   lb2a
+         lda   offset+2                   if offset is negative
+         bmi   lb4                          fail with EINVAL
+         lda   #0                         set mark to offset
          bra   lb3
-lb2a     lda   #EINVAL                  invalid whence flag
-         sta   >errno
-         bra   lb4
+lb2a     cmp   #SEEK_END                else if whence == 2 (SEEK_END)
+         bne   lb2c
+         lda   offset+2                   if offset > 0
+         bmi   lb2b
+         ora   offset
+         bne   lb4                          fail with EINVAL
+lb2b     sub4  #0,offset,offset           negate offset
+         lda   #1                         set mark to EOF - offset
+         bra   lb3
+lb2c     cmp   #SEEK_CUR                else if whence == 1 (SEEK_CUR)
+         bne   lb4
+         lda   offset                     if offset is positive or 0
+         bmi   lb2d
+         lda   #2                           set mark to old mark + offset
+         bra   lb3                        else
+lb2d     sub4  #0,offset,offset             negate offset
+         lda   #3                           set mark to old mark - offset
 lb3      sta   >smBase                  save the base parameter
 lb3a     lda   offset                   set the displacement
          sta   >smDisplacement
          lda   offset+2
          sta   >smDisplacement+2
          OSSet_Mark smRec               set the file mark
-         bcs   lb1
-         OSGet_Mark gmRec               get the new mark
-         bcs   lb1
+         bcc   lb5
+         cmp   #$4D                     out of range error => fail with EINVAL
+         bne   lb4a
+lb4      lda   #EINVAL
+         bra   lb4b           
+lb4a     lda   #EBADF                   bad refnum error
+lb4b     sta   >errno
+         bra   lb6
+lb5      OSGet_Mark gmRec               get the new mark
+         bcs   lb4a
          lda   >gmDisplacement
          sta   mark
          lda   >gmDisplacement+2
          sta   mark+2
 
-lb4      creturn 4:mark
+lb6      creturn 4:mark
 
 smRec    dc    i'3'                     SetMark record
 smRefnum ds    2
