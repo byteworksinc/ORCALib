@@ -99,7 +99,7 @@ err      equ   1                        error return code
          lda   mode                     convert mode to ProDOS format
          jsr   unixtoprodos
          sta   siAccess
-         ph4   path                     set the path name
+         ph4   <path                    set the path name
          jsl   ctoosstr
          sta   siPathname
          stx   siPathname+2
@@ -148,7 +148,6 @@ err      equ   1                        error return code
 
          stz   err                      err = 0 {no error}
          lda   filds                    error if there are too many open files
-         bmi   lb2
          cmp   #OPEN_MAX
          bge   lb2
          asl   A                        get the file reference number
@@ -209,8 +208,8 @@ err      equ   1                        error return code
          csubroutine (4:path,2:mode),2
 
          ph2   #O_WRONLY+O_TRUNC+O_CREAT
-         ph2   mode
-         ph4   path
+         ph2   <mode
+         ph4   <path
          jsl   openfile
          sta   err
 
@@ -239,7 +238,7 @@ err      equ   1                        error return code
 
          ph2   #0
          ph2   #F_DUPFD
-         ph2   old
+         ph2   <old
          jsl   fcntl
          sta   err
 
@@ -280,7 +279,6 @@ flags    equ   5                        file flags
          bra   lb7
 
 lb1      lda   filds                    error if there are too many open files
-         bmi   lb2
          cmp   #OPEN_MAX
          bge   lb2
          asl   A                        get the file reference number
@@ -297,7 +295,6 @@ lb3      sta   refnum
          sta   flags
 
          lda   arg                      find a new filds
-         bmi   lb5
          cmp   #OPEN_MAX
          bge   lb5
          asl   A
@@ -376,7 +373,6 @@ mark     equ   1                        new file mark
          sta   mark
          sta   mark+2
          lda   filds                    get the file refnum
-         bmi   lb1
          cmp   #OPEN_MAX
          bge   lb1
          asl   A
@@ -384,43 +380,56 @@ mark     equ   1                        new file mark
          tax
          lda   >files,X
          bne   lb2
-lb1      lda   #EBADF                   bad refnum error
-         sta   >errno
-         bra   lb4
+lb1      bra   lb4a                     bad refnum error
 
 lb2      sta   >smRefnum                set the file refnum
          sta   >gmRefnum
          lda   whence                   convert from UNIX whence to GS/OS base
-         beq   lb3
-         eor   #$0003
-         cmp   #4
-         bge   lb2a
-         cmp   #2
-         bne   lb3
-         sta   >smBase
-         lda   offset+2
-         bpl   lb3a
-         sub4  #0,offset,offset
-         lda   #3
+         cmp   #SEEK_SET                if whence == 0 (SEEK_SET)
+         bne   lb2a
+         lda   offset+2                   if offset is negative
+         bmi   lb4                          fail with EINVAL
+         lda   #0                         set mark to offset
          bra   lb3
-lb2a     lda   #EINVAL                  invalid whence flag
-         sta   >errno
-         bra   lb4
+lb2a     cmp   #SEEK_END                else if whence == 2 (SEEK_END)
+         bne   lb2c
+         lda   offset+2                   if offset > 0
+         bmi   lb2b
+         ora   offset
+         bne   lb4                          fail with EINVAL
+lb2b     sub4  #0,offset,offset           negate offset
+         lda   #1                         set mark to EOF - offset
+         bra   lb3
+lb2c     cmp   #SEEK_CUR                else if whence == 1 (SEEK_CUR)
+         bne   lb4
+         lda   offset                     if offset is positive or 0
+         bmi   lb2d
+         lda   #2                           set mark to old mark + offset
+         bra   lb3                        else
+lb2d     sub4  #0,offset,offset             negate offset
+         lda   #3                           set mark to old mark - offset
 lb3      sta   >smBase                  save the base parameter
 lb3a     lda   offset                   set the displacement
          sta   >smDisplacement
          lda   offset+2
          sta   >smDisplacement+2
          OSSet_Mark smRec               set the file mark
-         bcs   lb1
-         OSGet_Mark gmRec               get the new mark
-         bcs   lb1
+         bcc   lb5
+         cmp   #$4D                     out of range error => fail with EINVAL
+         bne   lb4a
+lb4      lda   #EINVAL
+         bra   lb4b           
+lb4a     lda   #EBADF                   bad refnum error
+lb4b     sta   >errno
+         bra   lb6
+lb5      OSGet_Mark gmRec               get the new mark
+         bcs   lb4a
          lda   >gmDisplacement
          sta   mark
          lda   >gmDisplacement+2
          sta   mark+2
 
-lb4      creturn 4:mark
+lb6      creturn 4:mark
 
 smRec    dc    i'3'                     SetMark record
 smRefnum ds    2
@@ -453,9 +462,9 @@ err      equ   1                        error return code
 
          csubroutine (4:path,2:oflag),2
 
-         ph2   oflag
+         ph2   <oflag
          ph2   #$7180
-         ph4   path
+         ph4   <path
          jsl   openfile
          sta   err
 
@@ -515,7 +524,7 @@ lb1      lda   files,X
          brl   lb11
 lb2      stx   index                    save the index to the file
 
-         ph4   path                     convert the path to an OS string
+         ph4   <path                    convert the path to an OS string
          jsl   ctoosstr
          sta   opPathname
          stx   opPathname+2
@@ -546,8 +555,8 @@ lb4      sta   crFileType
          lda   #ENOENT
          sta   >errno
          bra   lb11
-lb4a     ph2   mode                       set the access bits
-         ph4   path
+lb4a     ph2   <mode                      set the access bits
+         ph4   <path
          jsl   chmod
          bra   lb8                      else
 lb5      lda   oflag                      if O_CREAT is not set then
@@ -634,7 +643,6 @@ err      equ   1                        error return code
          phk
          plb
          lda   filds                    error if the file has not been opened
-         bmi   lb0
          cmp   #OPEN_MAX
          bge   lb0
          asl   A                        get the file reference number
@@ -797,7 +805,6 @@ nbuff    equ   3                        new buffer pointer
          phk
          plb
          lda   filds                    error if the file has not been opened
-         bmi   lb0
          cmp   #OPEN_MAX
          bge   lb0
          asl   A                        get the file reference number
@@ -806,6 +813,7 @@ nbuff    equ   3                        new buffer pointer
          lda   files,X
          beq   lb0
          sta   wrRefnum
+         sta   smRefnum
          stx   filds
          lda   files+2,X                make sure the file is open for writing
          and   #O_WRONLY+O_RDWR
@@ -827,7 +835,7 @@ lb0a     move4 buf,wrDataBuffer         set the location to write from
          and   #O_BINARY
          bne   lb0g
          pea   0                          reserve a file buffer
-         ph2   n
+         ph2   <n
          jsl   malloc
          sta   nbuff
          stx   nbuff+2
@@ -857,7 +865,12 @@ lb0e     sta   [nbuff]
          long  M
 lb0f     move4 nbuff,wrDataBuffer         set the data buffer start
 
-lb0g     OSWrite wrRec                  write the bytes
+lb0g     ldx   filds                    if the file is in O_APPEND mode then
+         lda   files+2,X
+         and   #O_APPEND
+         beq   lb0h
+         OSSet_Mark smRec                 set mark to EOF
+lb0h     OSWrite wrRec                  write the bytes
          bcc   lb1                      if an error occurred then
          lda   #EIO                       errno = EIO
          sta   >errno
@@ -869,7 +882,7 @@ lb1      ldy   wrTransferCount          return the bytes read
          lda   nbuff                    if nbuff <> NULL then
          ora   nbuff+2
          beq   lb2
-         ph4   nbuff                      dispose of the buffer
+         ph4   <nbuff                     dispose of the buffer
          jsl   free
 lb2      anop
 
@@ -881,4 +894,9 @@ wrRefnum ds    2
 wrDataBuffer ds 4
 wrRequestCount ds 4
 wrTransferCount ds 4
+
+smRec    dc    i'3'                     SetMark record
+smRefnum ds    2
+smBase   dc    i'1'                     EOF-displacement mode
+smDisplacement dc i4'0'                 displacement = 0
          end

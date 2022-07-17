@@ -26,8 +26,8 @@ fpextra  private                        dummy segment
 ~SinglePrecision start
          tsc
          clc
-         adc     #4
-         ldy     #0
+         adc   #4
+         ldy   #0
          phy
          pha
          phy
@@ -53,8 +53,8 @@ fpextra  private                        dummy segment
 ~DoublePrecision start
          tsc
          clc
-         adc     #4
-         ldy     #0
+         adc   #4
+         ldy   #0
          phy
          pha
          phy
@@ -83,19 +83,19 @@ fpextra  private                        dummy segment
 ~CompPrecision start
          tsc                            round to integer
          clc
-         adc     #4
-         pea     0
+         adc   #4
+         pea   0
          pha
          FRINTX
-         lda     4+8,s
+         lda   4+8,s
          pha                            save original sign
-         asl     a                      force sign to positive
-         lsr     a
-         sta     6+8,s
+         asl   a                        force sign to positive
+         lsr   a
+         sta   6+8,s
          tsc                            limit precision
          clc
-         adc     #6
-         ldy     #0
+         adc   #6
+         ldy   #0
          phy
          pha
          phy
@@ -107,10 +107,10 @@ fpextra  private                        dummy segment
          FX2C
          FC2X
          pla                            restore original sign
-         bpl     ret
-         lda     4+8,s
-         ora     #$8000
-         sta     4+8,s
+         bpl   ret
+         lda   4+8,s
+         ora   #$8000
+         sta   4+8,s
 ret      rtl
          end
 
