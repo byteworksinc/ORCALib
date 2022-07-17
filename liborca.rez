@@ -2,7 +2,7 @@
 
 resource rVersion (0x1, purgeable3) {
 	{
-		2,2,0,beta,5
+		2,2,0,beta,6
 	},
 	verUS,
 	"ORCALib (GNO Version)",
