@@ -688,24 +688,26 @@ disp     equ   1                        disp in s
 
          ph4   <stream                  verify that stream exists
          jsl   ~VerifyStream
-         bcs   err1
-         ph4   <stream                  quit with NULL if at EOF
-         jsl   feof
-         tax
-         beq   lb0
-err1     stz   s
-         stz   s+2
-         bra   rts
-lb0      stz   disp                     no characters processed so far
-         lda   #0
-         sta   [s]
+         bcs   err
+         stz   disp                     no characters processed so far
          dec   n                        leave room for the null terminator
          bmi   err
-         beq   err
+         bne   lb1
+         short M                        n = 1: store null terminator only
+         lda   #0
+         sta   [s]
+         long  M
+         bra   rts
 lb1      ph4   <stream                  get a character
          jsl   fgetc
-         tax                            quit with error if it is an EOF
+         tax                            if error or EOF encountered
          bpl   lb2
+         lda   disp                       if no characters read, return NULL
+         beq   err
+         ldy   #FILE_flag                 if error encountered, return NULL
+         lda   [stream],Y
+         and   #_IOERR
+         beq   rts                        else return s
 err      stz   s
          stz   s+2
          bra   rts
@@ -2249,9 +2251,15 @@ disp     equ   1                        disp in s
 
          stz   disp                     no characters processed so far
 lb1      jsl   getchar                  get a character
-         tax                            quit with error if it is an EOF
+         tax                            if error or EOF encountered
          bpl   lb2
-         stz   s
+         lda   disp                       if no characters read, return NULL
+         beq   err
+         ph4   >stdin                     if error encountered, return NULL
+         jsl   ferror
+         tax
+         beq   rts                        else return s
+err      stz   s
          stz   s+2
          bra   rts
 lb2      cmp   #LF                      quit if it was a \n
