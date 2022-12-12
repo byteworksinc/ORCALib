@@ -377,6 +377,60 @@ targv    ds    4
 
 ****************************************************************
 *
+*  ~CDevCleanup - cleanup code run after a CDev call
+*
+*  Inputs:
+*        A+X - CDev result value
+*        1,S - Original data bank to restore
+*        2,S - Return address
+*        5,S - Message code passed to CDev
+*        7,S - Old user ID from before the call (0 if none)
+*
+*  Notes:
+*        This routine handles cases where the CDev is going
+*        away and so the user ID allocated for it needs to be
+*        disposed of to avoid being leaked.
+*
+****************************************************************
+*
+~CDevCleanup start
+MachineCDEV equ 1
+BootCDEV equ 2
+CloseCDEV equ 5
+AboutCDEV equ 8
+
+         tay                            stash low word of result
+
+         lda    5,s                     if message == CloseCDEV
+         cmp    #CloseCDEV
+         beq    cleanup
+         cmp    #BootCDEV               or message == BootCDEV
+         beq    cleanup
+         cmp    #AboutCDEV              or message == AboutCDEV
+         bne    lb1
+         lda    7,s                       and original user ID was 0
+         beq    cleanup                   (i.e. CDev window was not open)
+         bra    ret
+lb1      cmp    #MachineCDEV            or message == MachineCDEV
+         bne    ret
+         tya                              and return value is 0
+         bne    ret
+         txa
+         bne    ret
+
+cleanup  pea    0                       ...then dispose of user ID
+         jsl    >~DAID
+
+ret      tya                            store return value in result space
+         sta    5,s
+         txa
+         sta    7,s
+         plb                            restore data bank
+         rtl                            return to original caller
+         end
+
+****************************************************************
+*
 *  ~CUMul2 - unsigned multiply
 *
 *  Inputs:
