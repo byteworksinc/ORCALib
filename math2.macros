@@ -377,6 +377,16 @@
 ~a&SYSCNT anop
  ~restm
  mend
+ macro
+&l jmi &bp
+&l bpl *+5
+ brl &bp
+ mend
+ macro
+&l jpl &bp
+&l bmi *+5
+ brl &bp
+ mend
  MACRO
 &LAB FCLASSS
 &LAB PEA $021C
@@ -650,5 +660,23 @@
 &LAB FXPWRI
 &LAB PEA $0010
  LDX #$0B0A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FCMPS
+&LAB PEA $0208
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FEXPX
+&LAB PEA $0008
+ LDX #$0B0A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FCMPI
+&LAB PEA $0408
+ LDX #$090A
  JSL $E10000
  MEND

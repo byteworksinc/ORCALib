@@ -704,6 +704,300 @@ copysignl entry
 
 ****************************************************************
 *
+*  double erf(double x);
+*
+*  Returns the error function of x.
+*
+*  double erfc(double x);
+*
+*  Returns the complementary error function of x, 1 - erf(x).
+*
+*  This implementation is based on W. J. Cody's article 
+*  "Rational Chebyshev Approximations for the Error Function."
+*
+****************************************************************
+*
+erf      start
+erff     entry
+erfl     entry
+         using MathCommon2
+x_offset equ   9                        stack offset of x (in most of the code)
+
+         clc
+         bra   lb1
+
+erfc     entry
+erfcf    entry
+erfcl    entry
+
+         sec
+
+lb1      phb                            save & set data bank
+         phk
+         plb
+
+         pha                            make space for saved SANE environment
+         
+         lda   x_offset-2+8,s
+         ror   a                        save erf/erfc flag (high bit)
+         pha                              and original sign (next bit)
+
+         rol   a                        t1 := |x|
+         rol   a
+         lsr   a
+         sta   t1+8
+         lda   x_offset+6,s
+         sta   t1+6
+         lda   x_offset+4,s
+         sta   t1+4
+         lda   x_offset+2,s
+         sta   t1+2
+         lda   x_offset,s
+         sta   t1
+
+         tsc                            save env & set to default
+         clc
+         adc   #3
+         pea   0
+         pha
+         FPROCENTRY
+;
+; Computation using approximation of erf, for small enough x values
+;
+         ph4   #threshold               if |x| <= 0.5 then
+         ph4   #t1
+         FCMPS
+         jmi   use_erfc
+         
+         ph4   #t1                        t1 := x^2
+         ph4   #t1
+         FMULX
+
+         ph4   #y                         y := P1(t1)
+         pea   4
+         ph4   #P1
+         jsl   poly
+
+         ph4   #z                         z := Q1(t1)
+         pea   4
+         ph4   #Q1
+         jsl   poly
+
+         ph4   #z                         y := y/z
+         ph4   #y
+         FDIVX
+
+         tsc                              y := x * y
+         clc
+         adc   #x_offset
+         pea   0
+         pha
+         ph4   #y
+         FMULX
+
+         pla
+         jpl   clearxcp                   if computing erfc then
+         
+         ph4   #one                         y := y - 1
+         ph4   #y
+         FSUBX
+         brl   flipsign                     y := -y
+;
+; Computation using approximations of erfc, for larger x values
+;
+use_erfc ph4   #four                    else
+         ph4   #t1
+         FCMPI
+         jmi   big_erfc                   if |x| <= 4 then
+
+         ph4   #y                           y := P2(t1)
+         pea   8
+         ph4   #P2
+         jsl   poly
+
+         ph4   #z                           z := Q2(t1)
+         pea   8
+         ph4   #Q2
+         jsl   poly
+
+         ph4   #z                           y := y/z
+         ph4   #y
+         FDIVX
+
+         ph4   #t1                          t1 := e^(-x^2)
+         ph4   #t1
+         FMULX
+         lda   t1+8
+         eor   #$8000
+         sta   t1+8
+         ph4   #t1
+         FEXPX
+         
+         ph4   #t1                          y := t1 * y
+         ph4   #y
+         FMULX
+         
+         brl   end_erfc                   else (if |x| > 4 or NAN)
+
+big_erfc pea   -2                           t1 := 1 / x^2
+         ph4   #t1
+         FXPWRI
+
+         ph4   #y                           y := P3(t1)
+         pea   5
+         ph4   #P3
+         jsl   poly
+
+         ph4   #z                           z := Q3(t1)
+         pea   5
+         ph4   #Q3
+         jsl   poly
+
+         ph4   #z                           y := y/z
+         ph4   #y
+         FDIVX
+         
+         ph4   #t1                          y := t1 * y
+         ph4   #y
+         FMULX
+         
+         ph4   #one_over_sqrt_pi            y := 1/sqrt(pi) + y
+         ph4   #y
+         FADDX
+         
+         lda   x_offset+8,s                 y := y / |x|
+         and   #$7fff
+         sta   x_offset+8,s
+         tsc
+         clc
+         adc   #x_offset
+         ldx   #0
+         phx                                (push operands of below calls)
+         pha
+         phx
+         pha
+         phx
+         pha
+         phx
+         pha
+         phx
+         pha
+         ph4   #y
+         FDIVX
+
+         FMULX                              y := e^(-x^2) * y
+         lda   x_offset+8+8,s
+         eor   #$8000
+         sta   x_offset+8+8,s
+         FEXPX       
+         ph4   #y
+         FMULX
+
+end_erfc pla
+         bpl   erf_from_erfc              if computing erfc then
+
+         ldx   #$1300                       (set allowed exception mask)
+         asl   a
+         bpl   rstr_env                     if x < 0
+         
+         ph4   #two                           y := y - 2
+         ph4   #y
+         FSUBI
+         bra  flipsign                        y :=  -y
+         
+erf_from_erfc anop
+         pha
+         ph4   #one                       if computing erf then
+         ph4   #y
+         FSUBX                              y := y - 1
+         
+         pla
+         asl   a
+         bmi   clearxcp                     if x > 0 then
+
+flipsign lda   y+8                            y := -y
+         eor   #$8000
+         sta   y+8
+
+clearxcp ldx   #$1100                   ignore overflow, div-by-zero
+rstr_env stx   z                        (& underflow unless doing erfc for x>.5)
+         FGETENV
+         txa
+         and   z
+         ora   1,s
+         sta   1,s
+         FSETENV                        unless computing erfc for x > 4
+
+         pla                            clean up stack
+         sta   9,s
+         pla
+         sta   9,s
+         tsc
+         clc
+         adc   #6
+         tcs
+         plb
+         ldx   #^y                      return a pointer to the result
+         lda   #y
+         rtl
+
+threshold dc   f'0.5'                   threshold for computing erf or erfc
+
+; constants
+two      dc    i2'2'
+four     dc    i2'4'
+one_over_sqrt_pi dc e'0.564189583547756286924'
+; coefficients for erf calculation, |x| <= .5
+P1       dc    e'1.857777061846031526730e-1'
+         dc    e'3.161123743870565596947e+0'
+         dc    e'1.138641541510501556495e+2'
+         dc    e'3.774852376853020208137e+2'
+         dc    e'3.209377589138469472562e+3'
+one      anop
+Q1       dc    e'1.0'
+         dc    e'2.360129095234412093499e+1'
+         dc    e'2.440246379344441733056e+2'
+         dc    e'1.282616526077372275645e+3'
+         dc    e'2.844236833439170622273e+3'
+; coefficients for erfc calculation, .46875 <= x <= 4
+P2       dc    e'2.15311535474403846343e-8'
+         dc    e'5.64188496988670089180e-1'
+         dc    e'8.88314979438837594118e+0'
+         dc    e'6.61191906371416294775e+1'
+         dc    e'2.98635138197400131132e+2'
+         dc    e'8.81952221241769090411e+2'
+         dc    e'1.71204761263407058314e+3'
+         dc    e'2.05107837782607146532e+3'
+         dc    e'1.23033935479799725272e+3'
+Q2       dc    e'1.0'
+         dc    e'1.57449261107098347253e+1'
+         dc    e'1.17693950891312499305e+2'
+         dc    e'5.37181101862009857509e+2'
+         dc    e'1.62138957456669018874e+3'
+         dc    e'3.29079923573345962678e+3'
+         dc    e'4.36261909014324715820e+3'
+         dc    e'3.43936767414372163696e+3'
+         dc    e'1.23033935480374942043e+3'
+; coefficients for erfc calculation, x >= 4
+P3       dc    e'-1.63153871373020978498e-2'
+         dc    e'-3.05326634961232344035e-1'
+         dc    e'-3.60344899949804439429e-1'
+         dc    e'-1.25781726111229246204e-1'
+         dc    e'-1.60837851487422766278e-2'
+         dc    e'-6.58749161529837803157e-4'
+Q3       dc    e'1.0'
+         dc    e'2.56852019228982242072e+0'
+         dc    e'1.87295284992346047209e+0'
+         dc    e'5.27905102951428412248e-1'
+         dc    e'6.05183413124413191178e-2'
+         dc    e'2.33520497626869185443e-3'
+;                                        temporaries / return values
+y        ds    10
+z        ds    10
+         end
+
+****************************************************************
+*
 *  double exp2(double x);
 *
 *  Returns 2^x.
@@ -2381,6 +2675,53 @@ ret      plx
 
 plusinf  dc    f'+inf'
 minusinf dc    f'-inf'
+         end
+
+****************************************************************
+*
+*  poly: evaluate a polynomial
+*
+*  Evaluates sum from i=0 to n of K_i * x^i
+*  
+*  Inputs:
+*        coeffs: array of coefficients, K_n down to K_0
+*        n: degree of polynomial
+*        result: pointer to location for result
+*        t1: x value
+*
+*  Note: The coeffs array is assumed not to cross banks.
+*
+****************************************************************
+*
+poly     private
+         using MathCommon2
+
+         csubroutine (4:coeffs,2:n,4:result),0
+         
+         ldy   #8                       val := K_n
+loop1    lda   [coeffs],y
+         sta   [result],y
+         dey
+         dey
+         bpl   loop1
+
+loop2    lda   coeffs                   for i := n-1 downto 0
+         clc
+         adc   #10
+         sta   coeffs
+
+         ph4   #t1                        val := val * x
+         ph4   <result
+         FMULX
+         
+         ph4   <coeffs                    val := val + K_i
+         ph4   <result
+         FADDX
+         
+         dec   n
+         bne   loop2
+         
+         creturn
          end
 
 ****************************************************************
