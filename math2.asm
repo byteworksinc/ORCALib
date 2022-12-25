@@ -3164,30 +3164,57 @@ lp1      lda   one,y
          dey
          bpl   lp1
 
-lp2      ph4   #cutoff                  while x < 9.375 then
-         tdc
-         clc
-         adc   #x
-         pea   0
-         pha
-         FCMPS
-         bvc   stirling
-         
-         tdc                              denom := denom * x
-         clc
-         adc   #x
-         pea   0
-         pha
-         ph4   #denom
-         FMULX
+         ph4   #cutoff
+         ph4   #z
+         FS2X
 
-         ph4   #one                       x := x + 1
+         tdc                            z := 10.375 - x
+         clc
+         adc   #x
+         pea   0
+         pha
+         ph4   #z
+         FSUBX
+         
+         lda   z+8                      if z < 0 (or NAN)
+         jmi   stirling                   just use Stirling series approx.
+         cmp   #$7fff
+         jeq   stirling
+         
+         ph4   #z                       truncate z to integer
+         FTINTX
+         
+         ph4   #z                       x := x + z
          tdc
          clc
          adc   #x
          pea   0
          pha
          FADDX
+         
+         tdc                            y := x
+         clc
+         adc   #x
+         pea   0
+         pha
+         ph4   #y
+         FX2X
+         
+         ph4   #z                       repeat z times :
+         ph4   #z
+         FX2I
+         
+lp2      dec   z
+         bmi   stirling
+
+         ph4   #one                       y := y - 1
+         ph4   #y
+         FSUBX
+         
+         ph4   #y                         denom := denom * y
+         ph4   #denom
+         FMULX
+         
          bra   lp2
          
 * For x >= 9.375, calculate Gamma(x) using a Stirling series approximation
@@ -3296,7 +3323,7 @@ done     FPROCEXIT                      restore env & raise any new exceptions
          sta   x
          creturn 4:x
 
-cutoff   dc    f'9.375'                 cutoff for using Stirling approximation
+cutoff   dc    f'10.375'                cutoff for Stirling approximation (+1)
 
 one_half dc    f'0.5'
 two      dc    i2'2'
