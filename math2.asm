@@ -3096,6 +3096,245 @@ scalbnl  entry
 
 ****************************************************************
 *
+*  double tgamma(double x);
+*
+*  Computes the gamma function of x.
+*
+****************************************************************
+*
+tgamma   start
+tgammaf  entry
+tgammal  entry
+         using MathCommon2
+
+         csubroutine (10:x),0
+
+         phb
+         phk
+         plb
+
+         pha                            save env & set to default
+         tsc
+         inc   a
+         pea   0
+         pha
+         FPROCENTRY
+
+* For x < 0.5, use Gamma(x) = pi / (sin(x * pi) * Gamma(1 - x))
+         stz   reflect
+         ph4   #one_half                if x < 0.5 then
+         tdc
+         clc
+         adc   #x
+         pea   0
+         pha
+         FCMPS
+         bvc   lb1
+         inc   reflect
+
+         ldx   #8                         orig_x := x
+lp0      lda   x,x
+         sta   fracpart,x
+         sta   orig_x,x
+         dex
+         dex
+         bpl   lp0
+         
+         ph4   #two                       fracpart := x REM 2
+         ph4   #fracpart
+         FREMI
+
+         ph4   #one                       x := x-1
+         tdc
+         clc
+         adc   #x
+         pea   0
+         pha
+         FSUBX
+         
+         lda   x+8
+         eor   #$8000
+         sta   x+8
+
+* For 0 <= x <= 9.375, use the identity Gamma(x) = Gamma(x+1)/x
+lb1      ldy   #8                       denom := 1
+lp1      lda   one,y
+         sta   denom,y
+         dey
+         dey
+         bpl   lp1
+
+lp2      ph4   #cutoff                  while x < 9.375 then
+         tdc
+         clc
+         adc   #x
+         pea   0
+         pha
+         FCMPS
+         bvc   stirling
+         
+         tdc                              denom := denom * x
+         clc
+         adc   #x
+         pea   0
+         pha
+         ph4   #denom
+         FMULX
+
+         ph4   #one                       x := x + 1
+         tdc
+         clc
+         adc   #x
+         pea   0
+         pha
+         FADDX
+         bra   lp2
+         
+* For x >= 9.375, calculate Gamma(x) using a Stirling series approximation
+stirling lda   x                        t1 := x
+         sta   y                        y := x
+         sta   z                        z := x
+         sta   t1
+         lda   x+2
+         sta   y+2
+         sta   z+2
+         sta   t1+2
+         lda   x+4
+         sta   y+4
+         sta   z+4
+         sta   t1+4
+         lda   x+6
+         sta   y+6
+         sta   z+6
+         sta   t1+6
+         lda   x+8
+         sta   y+8
+         sta   z+8
+         sta   t1+8
+
+         ph4   #e                       z := x/e
+         ph4   #z
+         FDIVX
+         ph4   #one_half                y := x - 1/2
+         ph4   #y
+         FSUBS
+         ph4   #y                       z := (x/e)^(x-1/2)
+         ph4   #z
+         FXPWRY
+
+         pea   -1                       t1 := 1/x
+         ph4   #t1
+         FXPWRI
+         ph4   #y                       y := P(t1)
+         pea   17
+         ph4   #P
+         jsl   poly
+         
+         ph4   #y                       z := z * y * sqrt(2*pi/e)
+         ph4   #z
+         FMULX
+         ph4   #sqrt_2pi_over_e
+         ph4   #z
+         FMULX
+
+* Adjust result as necessary for small or negative x values
+         ph4   #denom                   z := z / denom
+         ph4   #z                         (for cases where initial x was small)
+         FDIVX
+
+         lda   reflect                  if doing reflection
+         jeq   done
+
+         ph4   #pi                        fracpart := sin(x*pi)
+         ph4   #fracpart
+         FMULX
+         ph4   #fracpart
+         FSINX
+
+         ph4   #fracpart                  if sin(x*pi)=0 (i.e. x was an integer)
+         FCLASSX
+         txa
+         inc   a
+         and   #$00ff
+         bne   lb2
+         
+         asl   fracpart+8                   take sign from original x (for +-0)
+         asl   orig_x+8
+         ror   fracpart+8
+         
+         lda   orig_x                       if original x was not 0
+         ora   orig_x+2
+         ora   orig_x+4
+         ora   orig_x+6
+         beq   lb2
+         
+         lda   #32767                         force NAN result
+         sta   z+8
+         sta   z+6
+         
+         pea   $0100                          raise "invalid" exception (only)
+         FSETENV
+
+lb2      ph4   #z                         z := pi / (fracpart * z)
+         ph4   #fracpart
+         FMULX
+         
+         ph4   #pi
+         ph4   #z
+         FX2X
+         
+         ph4   #fracpart
+         ph4   #z
+         FDIVX
+
+done     FPROCEXIT                      restore env & raise any new exceptions
+         plb
+
+         lda   #^z                      return a pointer to the result
+         sta   x+2
+         lda   #z
+         sta   x
+         creturn 4:x
+
+cutoff   dc    f'9.375'                 cutoff for using Stirling approximation
+
+one_half dc    f'0.5'
+two      dc    i2'2'
+e        dc    e'2.7182818284590452353602874713526624977572'
+pi       dc    e'3.1415926535897932384626433'
+sqrt_2pi_over_e dc e'1.520346901066280805611940146754975627'
+
+P        anop                           Stirling series constants
+         dc    e'+1.79540117061234856108e-01'
+         dc    e'-2.48174360026499773092e-03'
+         dc    e'-2.95278809456991205054e-02'
+         dc    e'+5.40164767892604515180e-04'
+         dc    e'+6.40336283380806979482e-03'
+         dc    e'-1.62516262783915816899e-04'
+         dc    e'-1.91443849856547752650e-03'
+         dc    e'+7.20489541602001055909e-05'
+         dc    e'+8.39498720672087279993e-04'
+         dc    e'-5.17179090826059219337e-05'
+         dc    e'-5.92166437353693882865e-04'
+         dc    e'+6.97281375836585777429e-05'
+         dc    e'+7.84039221720066627474e-04'
+         dc    e'-2.29472093621399176955e-04'
+         dc    e'-2.68132716049382716049e-03'
+         dc    e'+3.47222222222222222222e-03'
+         dc    e'+8.33333333333333333333e-02'
+one      dc    e'+1.00000000000000000000e+00'
+
+y        ds    10
+z        ds    10
+denom    ds    10
+fracpart ds    10
+
+reflect  ds    2                        flag: do reflection?
+orig_x   ds    10                        original x value
+         end
+
+****************************************************************
+*
 *  double trunc(double x);
 *
 *  Truncates x to an integer (discarding fractional part).

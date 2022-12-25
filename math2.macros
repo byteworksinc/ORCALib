@@ -387,6 +387,11 @@
 &l bmi *+5
  brl &bp
  mend
+ macro
+&l jeq &bp
+&l bne *+5
+ brl &bp
+ mend
  MACRO
 &LAB FCLASSS
 &LAB PEA $021C
@@ -677,6 +682,24 @@
  MACRO
 &LAB FCMPI
 &LAB PEA $0408
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FSUBS
+&LAB PEA $0202
+ LDX #$090A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FSINX
+&LAB PEA $001A
+ LDX #$0B0A
+ JSL $E10000
+ MEND
+ MACRO
+&LAB FREMI
+&LAB PEA $040C
  LDX #$090A
  JSL $E10000
  MEND
