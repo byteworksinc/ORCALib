@@ -1098,12 +1098,56 @@ Y_skip   inx
          rts
 
 ;%z - offset from UTC, if available
-;we print nothing, because time zone info is not available
-fmt_z    rts
-
 ;%Z - time zone name or abbreviation, if available
-;we print nothing, because time zone info is not available
-fmt_Z    rts
+;we print the numeric offset for both, or nothing if time zone is not available
+fmt_z    anop
+fmt_Z    pha                            check if time tool is active
+         _tiStatus
+         pla
+         bcs   z_ret
+         beq   z_ret
+         pea   0                        push pointer to string buffer
+         tdc
+;        clc
+         adc   #numstr
+         pha
+         pha                            make space for TZ preferences record
+         pha
+         pea   1                        get one record element only (TZ offset)
+         tsc                            get time zone preference
+         inc   a
+         pea   0
+         pha
+         _tiGetTimePrefs
+         pla
+         bcc   z_dst
+z_bail   pla                            bail out in case of error
+         pla
+         pla
+         pla
+z_ret    rts
+z_dst    ldy   #tm_isdst                adjust for DST (+1 hour) if needed
+         lda   [timeptr],y
+         bmi   z_bail                   bail out if DST is unknown
+         beq   z_fmtstr
+;        clc
+         pla
+         adc   #60*60
+         tay
+         pla
+         adc   #0
+         pha
+         phy
+z_fmtstr pea   0                        no DST mangling
+         _tiOffset2TimeZoneString       get TZ offset string
+         bcs   z_ret
+         ldx   #1
+z_loop   lda   numstr,x                 print the digits
+         jsr   writech
+         inx
+         cpx   #5+1
+         blt   z_loop
+         rts
 
 fmt_invalid rts
 

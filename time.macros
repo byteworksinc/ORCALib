@@ -631,3 +631,8 @@
 &lab ldx #$0938
  jsl $E10000
  MEND
+ MACRO
+&lab _tiOffset2TimeZoneString
+&lab ldx #$1138
+ jsl $E10000
+ MEND
