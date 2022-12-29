@@ -285,40 +285,158 @@ lb3      add4  t2,#300                  count := count -
 
 ****************************************************************
 *
+*  struct tm *gmtime(t)
+*        time_t *t;
+*
+*  Inputs:
+*        t - pointer to # of seconds since 1 Jan 1970
+*
+*  Outputs:
+*        returns a pointer to a time record for UTC time
+*
+****************************************************************
+*
+gmtime   start
+t        equ   6                        
+
+         phd
+         tsc
+         tcd
+         ldy   #2                       dereference the pointer to time_t
+         lda   [t],Y
+         tax
+         lda   [t]
+         tay
+         pld
+         
+         phb
+         pla                            move return address
+         sta   3,s
+         pla
+         sta   3,s
+         plb
+
+         pea   0                        push tm_isdst value (no DST for UTC)        
+         phx                            push time_t value to convert
+         phy
+         
+         pha                            check if time tool is active
+         _tiStatus
+         pla
+         bcs   lb2
+         beq   lb2
+         
+         pha                            make space for TZ preferences record
+         pha
+         pea   1                        get one record element only (TZ offset)
+
+         tsc                            get time zone preference
+         inc   a
+         pea   0
+         pha
+         _tiGetTimePrefs
+         pla
+         bcs   lb1
+         
+         sec                            adjust for time zone (standard time)
+         lda   5,s
+         sbc   1,s
+         sta   5,s
+         lda   7,s
+         sbc   3,s
+         sta   7,s
+
+         pha                            determine if it's daylight savings
+         ph2   #$5E
+         _ReadBParam
+         pla
+         lsr   a
+         lsr   a
+         bcs   lb1
+         
+;        clc
+         lda   #-60*60                  adjust for DST (+1 hour) if needed
+         adc   5,s
+         sta   5,s
+         lda   #$ffff
+         adc   7,s
+         sta   7,s
+
+lb1      pla                            remove time zone offset from stack
+         pla
+         
+lb2      jsl   ~gmlocaltime             use common gmtime/localtime code
+         rtl
+         end
+
+****************************************************************
+*
 *  struct tm *localtime(t)
 *        time_t *t;
 *
 *  Inputs:
-*        t - # seconds since 1 Jan 1970
+*        t - pointer to # of seconds since 1 Jan 1970
+*
+*  Outputs:
+*        returns a pointer to a time record for local time
+*
+****************************************************************
+*
+localtime start
+         using TimeCommon
+t        equ   6                        
+
+         phd
+         tsc
+         tcd
+         ldy   #2                       dereference the pointer to time_t
+         lda   [t],Y
+         tax
+         lda   [t]
+         tay
+         pld
+         
+         phb
+         pla                            move return address
+         sta   3,s
+         pla
+         sta   3,s
+         
+         lda   #-1                      default DST setting = -1 (unknown)
+         cpy   lasttime                 determine DST setting, if we can
+         bne   lb1
+         cpx   lasttime+2
+         bne   lb1
+         lda   lastDST
+lb1      plb
+
+         pha                            push tm_isdst value         
+         phx                            push time_t value to convert
+         phy
+         jsl   ~gmlocaltime             use common gmtime/localtime code
+         rtl
+         end
+
+****************************************************************
+*
+*  ~gmlocaltime - common code for gmtime and localtime
+*
+*  Inputs:
+*        t - time_t value (# of seconds since 1 Jan 1970)
+*        isdst - value for tm_isdst flag
 *
 *  Outputs:
 *        returns a pointer to a time record
 *
 ****************************************************************
 *
-localtime start
-gmtime   entry
+~gmlocaltime private
          using TimeCommon
 
-         csubroutine (4:t),0
+         csubroutine (4:t,2:isdst),0
          phb
          phk
          plb
-
-         ldy   #2                       dereference the pointer
-         lda   [t],Y
-         tax
-         lda   [t]
-         sta   t
-         stx   t+2
-
-         ldy   #-1                      default DST setting = -1 (unknown)
-         cmp   lasttime                 determine DST setting, if we can
-         bne   lb0
-         cpx   lasttime+2
-         bne   lb0
-         ldy   lastDST
-lb0      sty   tm_isdst
 
          lda   #69                      find the year
          sta   year
@@ -377,6 +495,8 @@ lb2a     ble   lb2
          ph4   #tm_sec                  set the day of week/year
          jsl   mktime
          lla   t,tm_sec
+         lda   isdst                    set the DST flag
+         sta   tm_isdst
          plb
          creturn 4:t
 

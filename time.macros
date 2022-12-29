@@ -621,3 +621,13 @@
 &LAB LDX #$260B
  JSL $E10000
  MEND
+ MACRO
+&lab _tiStatus
+&lab ldx #$0638
+ jsl $E10000
+ MEND
+ MACRO
+&lab _tiGetTimePrefs
+&lab ldx #$0938
+ jsl $E10000
+ MEND
