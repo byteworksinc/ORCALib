@@ -30,7 +30,7 @@ Time     start                          dummy segment
 *
 TimeCommon privdata
 ;
-;  For conversion to/from seconds since 1970
+;  For conversion to/from seconds since 13 Nov 1969
 ;
 year     ds    4                        year    0..99
 month    ds    4                        month   1..12
@@ -38,7 +38,7 @@ day      ds    4                        day     1..31
 hour     ds    4                        hour    0..23
 minute   ds    4                        minute  0..59
 second   ds    4                        second  0..59
-count    ds    4                        seconds since 1 Jan 1970
+count    ds    4                        seconds since 13 Nov 1969
 t1       ds    4                        work variable
 t2       ds    4                        work variable
 
@@ -225,20 +225,20 @@ mk1      inx
 
 ****************************************************************
 *
-*  factor - compute the seconds since 1 Jan 1970 from date
+*  factor - compute the seconds since 13 Nov 1969 from date
 *
 *  Inputs:
 *        year,month,day,hour,minute,second - time to convert
 *
 *  Outputs:
-*        count - seconds since 1 Jan 1970
+*        count - seconds since 13 Nov 1969
 *
 ****************************************************************
 *
 factor   private
          using TimeCommon
 ;
-;  compute the # of days since 1 Jan 1970
+;  compute the # of days since 13 Nov 1969
 ;
          mul4  year,#365,count          count := 365*year + day + 31*(month-1)
          add4  count,day
@@ -269,8 +269,9 @@ lb3      add4  t2,#300                  count := count -
          mul4  t2,#3
          div4  t2,#4
          sub4  count,t2
-         sub4  count,#25516             subtract off days between 1 Jan 00 and
-!                                        1 Jan 70
+         sub4  count,#25516             subtract off days between 1 Jan 1900
+!                                        and 13 Nov 1969, minus 2 to adjust for
+!                                        skipped leap days in 1700 and 1800
 ;
 ;  Convert to seconds and add in time of day in seconds
 ;
@@ -289,7 +290,7 @@ lb3      add4  t2,#300                  count := count -
 *        time_t *t;
 *
 *  Inputs:
-*        t - pointer to # of seconds since 1 Jan 1970
+*        t - pointer to # of seconds since 13 Nov 1969
 *
 *  Outputs:
 *        returns a pointer to a time record for UTC time
@@ -375,7 +376,7 @@ lb2      jsl   ~gmlocaltime             use common gmtime/localtime code
 *        time_t *t;
 *
 *  Inputs:
-*        t - pointer to # of seconds since 1 Jan 1970
+*        t - pointer to # of seconds since 13 Nov 1969
 *
 *  Outputs:
 *        returns a pointer to a time record for local time
@@ -422,7 +423,7 @@ lb1      plb
 *  ~gmlocaltime - common code for gmtime and localtime
 *
 *  Inputs:
-*        t - time_t value (# of seconds since 1 Jan 1970)
+*        t - time_t value (# of seconds since 13 Nov 1969)
 *        isdst - value for tm_isdst flag
 *
 *  Outputs:
@@ -522,7 +523,7 @@ tm_isdst ds    2                        daylight savings? 1 = yes, 0 = no
 *  Outputs:
 *        tmptr->wday - day of week
 *        tmptr->yday - day of year
-*        returns the ime in seconds since 1 Jan 1970
+*        returns the ime in seconds since 13 Nov 1969
 *
 ****************************************************************
 *
@@ -561,7 +562,7 @@ temp2    equ   5                        temp variable
          sta   minute
          lda   [tmptr]
          sta   second
-         jsr   factor                   compute seconds since 1970
+         jsr   factor                   compute seconds since 13 Nov 1969
          move4 count,temp               save the value for later return
          lda   #1                       compute the days since the start of the
          sta   month                     year
