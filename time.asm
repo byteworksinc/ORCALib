@@ -33,7 +33,7 @@ TimeCommon privdata
 ;  For conversion to/from seconds since 13 Nov 1969
 ;
 year     ds    4                        year    0..99
-month    ds    4                        month   1..12
+month    ds    4                        month   0..11
 day      ds    4                        day     1..31
 hour     ds    4                        hour    0..23
 minute   ds    4                        minute  0..59
@@ -269,19 +269,18 @@ lb0d     stz  second+2
 ;
 ;  compute the # of days since 13 Nov 1969
 ;
-lb0e     mul4  year,#365,count          count := 365*year + day + 31*(month-1)
+lb0e     mul4  year,#365,count          count := 365*year + day + 31*month
          add4  count,day
          mul4  month,#31,t1
          add4  count,t1
-         sub4  count,#31
          add4  year,#32800,t2           t2 := year + 32800 (so it is positive)
          lda   month                    if January or February then
-         cmp   #3
+         cmp   #2
          bge   lb1
          dec4  t2                         year := year-1
          bra   lb2                      else
-lb1      mul4  month,#4,t1                count := count - (month*4+23) div 10
-         add4  t1,#23
+lb1      mul4  month,#4,t1                count := count - (month*4+27) div 10
+         add4  t1,#27
          div4  t1,#10
          sub4  count,t1
 lb2      div4  t2,#4,t1                 count := count + (year+32800) div 4
@@ -504,8 +503,8 @@ lb1      plb
          lda   #69                      find the year
          sta   year
          lda   #1
-         sta   month
          sta   day
+         stz   month
          stz   hour
          stz   minute
          stz   second
@@ -531,7 +530,6 @@ lb2a     ble   lb2
          lda   year                     set the year
          sta   tm_year
          lda   month                    set the month
-         dec   A
          sta   tm_mon
          sub4  t,count                  find the number of seconds
          move4 t,t1
@@ -605,7 +603,6 @@ temp2    equ   5                        temp variable
          dey
          dey
          lda   [tmptr],Y
-         inc   A
          sta   month
          dey
          dey
@@ -631,8 +628,8 @@ temp2    equ   5                        temp variable
          brl   lb1
 lb0      move4 count,temp               save the value for later return
          lda   #1                       compute the days since the start of the
-         sta   month                     year
-         sta   day
+         sta   day                       year
+         stz   month
          jsr   factor
          sub4  temp,count,count
          div4  count,#60*60*24
@@ -681,20 +678,16 @@ time     start
          and   #$00FF
          inc   A
          sta   day
-         lda   5,S                      set the month
-         and   #$FF00
-         xba
-         inc   A
+         lda   6,S                      set the month
+         and   #$00FF
          sta   month
-         lda   3,S                      set the year
-         and   #$FF00
-         xba
+         lda   4,S                      set the year
+         and   #$00FF
          sta   year
          lda   3,S                      set the hour
          and   #$00FF
          sta   hour
-         lda   1,S                      set the minute
-         xba
+         lda   2,S                      set the minute
          and   #$00FF
          sta   minute
          pla                            set the second
