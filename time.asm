@@ -227,9 +227,13 @@ mk1      inx
 *
 *  factor - compute the seconds since 13 Nov 1969 from date
 *
+*  factor_second32 - alt entry point taking second as a
+*        signed 32-bit input value
+*
 *  Inputs:
 *        year,month,day,hour,minute,second - time to convert
-*          (each treated as a signed 16-bit value)
+*          (each treated as a signed 16-bit value, with the
+*          exception of second when using factor_second32)
 *
 *  Outputs:
 *        count - seconds since 13 Nov 1969 (signed 64-bit value)
@@ -244,12 +248,18 @@ factor   private
 ;
 ;  sign-extend time components to 4 bytes
 ;
-         stz  year+2
-         lda  year
+
+         stz  second+2
+         lda  second
          bpl  lb0
+         dec  second+2
+factor_second32 entry
+lb0      stz  year+2
+         lda  year
+         bpl  lb0a
          dec  year+2
-lb0      stz  month+2
-lb0a     stz  day+2
+lb0a     stz  month+2
+         stz  day+2
          lda  day
          bpl  lb0b
          dec  day+2
@@ -259,12 +269,8 @@ lb0b     stz  hour+2
          dec  hour+2
 lb0c     stz  minute+2
          lda  minute
-         bpl  lb0d
-         dec  minute+2
-lb0d     stz  second+2
-         lda  second
          bpl  lb0e
-         dec  second+2
+         dec  minute+2
 ;
 ;  adjust for out-of-range month values
 ;
@@ -347,17 +353,24 @@ lb4      mul4  hour,#3600,t1            add in hours*3600
 ;
 add_t1_to_count anop
          clc
-         lda   count
-         adc   t1
+         lda   t1
+         adc   count
          sta   count
-         lda   count+2
-         adc   t1+2
+         lda   t1+2
+         tax
+         adc   count+2
          sta   count+2
-         bcc   ret
-         inc   count+4
-         bne   ret
-         inc   count+6
-ret      rts
+         lda   #0
+         txy
+         bpl   ad1
+         dec   a
+ad1      tay
+         adc   count+4
+         sta   count+4
+         tya
+         adc   count+6
+         sta   count+6
+         rts
          end
 
 ****************************************************************
@@ -397,14 +410,13 @@ t        equ   6
          phx                            push time_t value to convert
          phy
          
-         pha                            check if time tool is active
-         _tiStatus
-         pla
-         bcs   lb2
-         beq   lb2
-         
-         pha                            make space for TZ preferences record
+         pha                            make space for status return/TZ prefs
          pha
+         _tiStatus                      check if time tool is active
+         bcs   no_tz
+         lda   1,s
+         beq   no_tz
+         
          pea   1                        get one record element only (TZ offset)
 
          tsc                            get time zone preference
@@ -413,15 +425,7 @@ t        equ   6
          pha
          _tiGetTimePrefs
          pla
-         bcs   lb1
-         
-         sec                            adjust for time zone (standard time)
-         lda   5,s
-         sbc   1,s
-         sta   5,s
-         lda   7,s
-         sbc   3,s
-         sta   7,s
+         bcs   no_tz
 
          pha                            determine if it's daylight savings
          ph2   #$5E
@@ -429,20 +433,22 @@ t        equ   6
          pla
          lsr   a
          lsr   a
-         bcs   lb1
+         bcs   doit
          
 ;        clc
-         lda   #-60*60                  adjust for DST (+1 hour) if needed
-         adc   5,s
-         sta   5,s
-         lda   #$ffff
-         adc   7,s
-         sta   7,s
+         lda   #60*60                   adjust for DST (+1 hour) if needed
+         adc   1,s
+         sta   1,s
+         lda   #0
+         adc   3,s
+         sta   3,s
+         bra   doit
 
-lb1      pla                            remove time zone offset from stack
-         pla
+no_tz    lda   #0
+         sta   1,s
+         sta   3,s
          
-lb2      jsl   ~gmlocaltime             use common gmtime/localtime code
+doit     jsl   ~gmlocaltime             use common gmtime/localtime code
          rtl
          end
 
@@ -490,6 +496,8 @@ lb1      plb
          pha                            push tm_isdst value         
          phx                            push time_t value to convert
          phy
+         pea   0                        no time zone offset
+         pea   0
          jsl   ~gmlocaltime             use common gmtime/localtime code
          rtl
          end
@@ -499,6 +507,7 @@ lb1      plb
 *  ~gmlocaltime - common code for gmtime and localtime
 *
 *  Inputs:
+*        tz_offset - offset of local time from desired time zone
 *        t - time_t value (# of seconds since 13 Nov 1969)
 *        isdst - value for tm_isdst flag
 *
@@ -510,7 +519,7 @@ lb1      plb
 ~gmlocaltime private
          using TimeCommon
 
-         csubroutine (4:t,2:isdst),0
+         csubroutine (4:tz_offset,4:t,2:isdst),0
          phb
          phk
          plb
@@ -522,9 +531,12 @@ lb1      plb
          stz   month
          stz   hour
          stz   minute
-         stz   second
+         lda   tz_offset
+         sta   second
+         lda   tz_offset+2
+         sta   second+2
 lb1      inc   year
-         jsr   factor
+         jsr   factor_second32
          lda   count+4
          bne   lb1b
          lda   count+2
@@ -535,7 +547,7 @@ lb1      inc   year
 lb1a     ble   lb1
 lb1b     dec   year
 lb2      inc   month                    find the month
-         jsr   factor
+         jsr   factor_second32
          lda   count+4
          bmi   lb2
          bne   lb2b
@@ -546,7 +558,7 @@ lb2      inc   month                    find the month
          cmp   t
 lb2a     ble   lb2
 lb2b     dec   month
-         jsr   factor                   recompute the factor
+         jsr   factor_second32          recompute the factor
          lda   year                     set the year
          sta   tm_year
          lda   month                    set the month
