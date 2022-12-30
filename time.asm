@@ -32,7 +32,7 @@ TimeCommon privdata
 ;
 ;  For conversion to/from seconds since 13 Nov 1969
 ;
-year     ds    4                        year    0..99
+year     ds    4                        year    (years since 1900)
 month    ds    4                        month   0..11
 day      ds    4                        day     1..31
 hour     ds    4                        hour    0..23
@@ -234,6 +234,8 @@ mk1      inx
 *  Outputs:
 *        count - seconds since 13 Nov 1969 (signed 64-bit value)
 *
+*  Note: Input values outside their normal ranges are allowed.
+*
 ****************************************************************
 *
 factor   private
@@ -247,9 +249,6 @@ factor   private
          bpl  lb0
          dec  year+2
 lb0      stz  month+2
-         lda  month
-         bpl  lb0a
-         dec  month+2
 lb0a     stz  day+2
          lda  day
          bpl  lb0b
@@ -267,9 +266,25 @@ lb0d     stz  second+2
          bpl  lb0e
          dec  second+2
 ;
+;  adjust for out-of-range month values
+;
+lb0e     lda  month
+         bpl  lb0f
+         clc
+         adc  #12
+         sta  month
+         dec4 year
+         bra  lb0e
+lb0f     sec
+         sbc  #12
+         bmi  lb0x
+         sta  month
+         inc4 year
+         bra  lb0e
+;
 ;  compute the # of days since 13 Nov 1969
 ;
-lb0e     mul4  year,#365,count          count := 365*year + day + 31*month
+lb0x     mul4  year,#365,count          count := 365*year + day + 31*month
          add4  count,day
          mul4  month,#31,t1
          add4  count,t1
