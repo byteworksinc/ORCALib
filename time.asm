@@ -510,22 +510,27 @@ lb1      plb
          stz   second
 lb1      inc   year
          jsr   factor
+         lda   count+4
+         bne   lb1b
          lda   count+2
          cmp   t+2
          bne   lb1a
          lda   count
          cmp   t
 lb1a     ble   lb1
-         dec   year
+lb1b     dec   year
 lb2      inc   month                    find the month
          jsr   factor
+         lda   count+4
+         bmi   lb2
+         bne   lb2b
          lda   count+2
          cmp   t+2
          bne   lb2a
          lda   count
          cmp   t
 lb2a     ble   lb2
-         dec   month
+lb2b     dec   month
          jsr   factor                   recompute the factor
          lda   year                     set the year
          sta   tm_year
