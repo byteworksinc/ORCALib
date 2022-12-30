@@ -38,7 +38,7 @@ day      ds    4                        day     1..31
 hour     ds    4                        hour    0..23
 minute   ds    4                        minute  0..59
 second   ds    4                        second  0..59
-count    ds    4                        seconds since 13 Nov 1969
+count    ds    8                        seconds since 13 Nov 1969
 t1       ds    4                        work variable
 t2       ds    4                        work variable
 
@@ -229,59 +229,121 @@ mk1      inx
 *
 *  Inputs:
 *        year,month,day,hour,minute,second - time to convert
+*          (each treated as a signed 16-bit value)
 *
 *  Outputs:
-*        count - seconds since 13 Nov 1969
+*        count - seconds since 13 Nov 1969 (signed 64-bit value)
 *
 ****************************************************************
 *
 factor   private
          using TimeCommon
+         
+;
+;  sign-extend time components to 4 bytes
+;
+         stz  year+2
+         lda  year
+         bpl  lb0
+         dec  year+2
+lb0      stz  month+2
+         lda  month
+         bpl  lb0a
+         dec  month+2
+lb0a     stz  day+2
+         lda  day
+         bpl  lb0b
+         dec  day+2
+lb0b     stz  hour+2
+         lda  hour
+         bpl  lb0c
+         dec  hour+2
+lb0c     stz  minute+2
+         lda  minute
+         bpl  lb0d
+         dec  minute+2
+lb0d     stz  second+2
+         lda  second
+         bpl  lb0e
+         dec  second+2
 ;
 ;  compute the # of days since 13 Nov 1969
 ;
-         mul4  year,#365,count          count := 365*year + day + 31*(month-1)
+lb0e     mul4  year,#365,count          count := 365*year + day + 31*(month-1)
          add4  count,day
          mul4  month,#31,t1
          add4  count,t1
          sub4  count,#31
-         move4 year,t2                  t2 := year
+         add4  year,#32800,t2           t2 := year + 32800 (so it is positive)
          lda   month                    if January or February then
          cmp   #3
          bge   lb1
-         dec   t2                         year := year-1
+         dec4  t2                         year := year-1
          bra   lb2                      else
 lb1      mul4  month,#4,t1                count := count - (month*4+23) div 10
          add4  t1,#23
          div4  t1,#10
          sub4  count,t1
-lb2      lda   t2                       count := count + year div 4
-         lsr   A
-         lsr   A
-         clc
-         adc   count
-         sta   count
-         bcc   lb3
-         inc   count+2
-lb3      add4  t2,#300                  count := count -
-         div4  t2,#100                    ((300+year) div 100+1)*3 div 4
+lb2      div4  t2,#4,t1                 count := count + (year+32800) div 4
+         add4  count,t1
+         add4  t2,#300                  count := count -
+         div4  t2,#100                    ((300+year+32800) div 100+1)*3 div 4
          inc4  t2
          mul4  t2,#3
          div4  t2,#4
          sub4  count,t2
-         sub4  count,#25516             subtract off days between 1 Jan 1900
+         sub4  count,#25518-2+7954      subtract off days between 1 Jan 1900
 !                                        and 13 Nov 1969, minus 2 to adjust for
-!                                        skipped leap days in 1700 and 1800
+!                                        skipped leap days in 1700 and 1800,
+!                                        plus 7954 to adjust for leap days in
+!                                        an additional 32800 years
 ;
 ;  Convert to seconds and add in time of day in seconds
 ;
-         mul4  count,#24*60*60          convert to seconds
-         mul4  hour,#3600,t1            add in hours*3600
-         add4  count,t1
+         lda   count+2                  convert to 64-bit count of seconds
+         pha
+         bpl   lb3                        if count is negative, negate it
+         sub4  #0,count,count
+lb3      tsc                              compute count*24*60*60
+         sec
+         sbc   #8
+         tcs
+         ph4   count
+         ph4   #24*60*60
+         _LongMul
+         pla
+         sta   count
+         pla
+         sta   count+2
+         pla
+         sta   count+4
+         pla
+         sta   count+6
+         pla
+         bpl   lb4                        if count was negative, negate result
+         negate8 count
+lb4      mul4  hour,#3600,t1            add in hours*3600
+         jsr   add_t1_to_count
          mul4  minute,#60,t1            add in minutes*60
-         add4  count,t1
-         add4  count,second             add in seconds
-         rts
+         jsr   add_t1_to_count
+         move4 second,t1                add in seconds
+;
+;  Add t1 (4 bytes) to count (8 bytes).
+;  (This is called as a subroutine and also run at the end of factor.)
+;
+add_t1_to_count anop
+         clc
+         lda   count
+         adc   t1
+         sta   count
+         lda   count+2
+         adc   t1+2
+         sta   count+2
+         bcc   ret
+         inc   count+4
+         bne   ret
+         inc   count+6
+ret      rts
          end
 
 ****************************************************************
@@ -537,13 +599,10 @@ temp2    equ   5                        temp variable
          phk
          plb
 
-         lla   temp,-1                  assume we can't do it
-         ldy   #10                      error if year < 70
+         ldy   #10                      set time parameters
          lda   [tmptr],Y
          sta   year
-         cmp   #70
-         jlt   lb1
-         dey                            set the other time parameters
+         dey
          dey
          lda   [tmptr],Y
          inc   A
@@ -563,7 +622,14 @@ temp2    equ   5                        temp variable
          lda   [tmptr]
          sta   second
          jsr   factor                   compute seconds since 13 Nov 1969
-         move4 count,temp               save the value for later return
+         lda   count+4                  if time is unrepresentable
+         ora   count+6
+         beq   lb0
+         lda   #-1                        return -1
+         sta   temp
+         sta   temp+2
+         brl   lb1
+lb0      move4 count,temp               save the value for later return
          lda   #1                       compute the days since the start of the
          sta   month                     year
          sta   day
@@ -638,7 +704,13 @@ time     start
          pla
          pla
          jsr   factor                   convert the seconds
-         lda   tptr                     if tptr <> nil then
+         lda   count+4                  if time is unrepresentable
+         ora   count+6
+         beq   lb0
+         lda   #-1                        set return value to -1
+         sta   count
+         sta   count+2
+lb0      lda   tptr                     if tptr <> nil then
          ora   tptr+2
          beq   lb1
          ldy   #2                         place the result there
