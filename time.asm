@@ -375,6 +375,16 @@ ad1      tay
 
 ****************************************************************
 *
+*  gmlocaltime_tm - struct tm used by gmtime and localtime
+*
+****************************************************************
+*
+gmlocaltime_tm private
+         ds    9*2
+         end
+
+****************************************************************
+*
 *  struct tm *gmtime(t)
 *        time_t *t;
 *
@@ -406,6 +416,7 @@ t        equ   6
          sta   3,s
          plb
 
+         ph4   #gmlocaltime_tm          push address of struct tm to use
          pea   0                        push tm_isdst value (no DST for UTC)        
          phx                            push time_t value to convert
          phy
@@ -484,7 +495,8 @@ t        equ   6
          sta   3,s
          pla
          sta   3,s
-         
+
+         ph4   #gmlocaltime_tm          push address of struct tm to use
          lda   #-1                      default DST setting = -1 (unknown)
          cpy   lasttime                 determine DST setting, if we can
          bne   lb1
@@ -510,6 +522,7 @@ lb1      plb
 *        tz_offset - offset of local time from desired time zone
 *        t - time_t value (# of seconds since 13 Nov 1969)
 *        isdst - value for tm_isdst flag
+*        tm - pointer to struct tm for result
 *
 *  Outputs:
 *        returns a pointer to a time record
@@ -518,8 +531,18 @@ lb1      plb
 *
 ~gmlocaltime private
          using TimeCommon
+tm_sec   equ   0                        seconds         0..59
+tm_min   equ   tm_sec+2                 minutes         0..59
+tm_hour  equ   tm_min+2                 hours           0..23
+tm_mday  equ   tm_hour+2                day             1..31
+tm_mon   equ   tm_mday+2                month           0..11
+tm_year  equ   tm_mon+2                 year            69..205 (1900=0)
+tm_wday  equ   tm_year+2                day of week     0..6    (Sun = 0)
+tm_yday  equ   tm_wday+2                day of year     0..365
+tm_isdst equ   tm_yday+2                daylight savings? 1 = yes, 0 = no
 
-         csubroutine (4:tz_offset,4:t,2:isdst),0
+
+         csubroutine (4:tz_offset,4:t,2:isdst,4:tm),0
          phb
          phk
          plb
@@ -560,48 +583,44 @@ lb2a     ble   lb2
 lb2b     dec   month
          jsr   factor_second32          recompute the factor
          lda   year                     set the year
-         sta   tm_year
+         ldy   #tm_year
+         sta   [tm],y
          lda   month                    set the month
-         sta   tm_mon
+         ldy   #tm_mon
+         sta   [tm],y
          sub4  t,count                  find the number of seconds
          move4 t,t1
          div4  t,#60
          mul4  t,#60,t2
          sub4  t1,t2
          lda   t1
-         sta   tm_sec
+         ldy   #tm_sec
+         sta   [tm],y
          move4 t,t1                     find the number of minutes
          div4  t,#60
          mul4  t,#60,t2
          sub4  t1,t2
          lda   t1
-         sta   tm_min
+         ldy   #tm_min
+         sta   [tm],y
          move4 t,t1                     find the number of hours
          div4  t,#24
          mul4  t,#24,t2
          sub4  t1,t2
          lda   t1
-         sta   tm_hour
+         ldy   #tm_hour
+         sta   [tm],y
          lda   t                        set the day
          inc   A
-         sta   tm_mday
-         ph4   #tm_sec                  set the day of week/year
+         ldy   #tm_mday
+         sta   [tm],y
+         ph4   tm                       set the day of week/year
          jsl   mktime
-         lla   t,tm_sec
          lda   isdst                    set the DST flag
-         sta   tm_isdst
+         ldy   #tm_isdst
+         sta   [tm],y
          plb
-         creturn 4:t
-
-tm_sec   ds    2                        seconds         0..59
-tm_min   ds    2                        minutes         0..59
-tm_hour  ds    2                        hours           0..23
-tm_mday  ds    2                        day             1..31
-tm_mon   ds    2                        month           0..11
-tm_year  ds    2                        year            70..200 (1900=0)
-tm_wday  ds    2                        day of week     0..6    (Sun = 0)
-tm_yday  ds    2                        day of year     0..365
-tm_isdst ds    2                        daylight savings? 1 = yes, 0 = no
+         creturn 4:tm
          end
 
 ****************************************************************
