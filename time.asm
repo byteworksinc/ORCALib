@@ -588,6 +588,7 @@ lb2b     dec   month
          lda   month                    set the month
          ldy   #tm_mon
          sta   [tm],y
+         ph4   <t                       save original t value
          sub4  t,count                  find the number of seconds
          move4 t,t1
          div4  t,#60
@@ -614,8 +615,31 @@ lb2b     dec   month
          inc   A
          ldy   #tm_mday
          sta   [tm],y
-         ph4   tm                       set the day of week/year
-         jsl   mktime
+         pl4   t                        restore original t value
+         stz   month                    compute the days since the start of the
+         jsr   factor_second32           year (in desired time zone)
+         sub4  t,count,count
+         div4  count,#60*60*24
+         ldy   #tm_yday                 set the day of year
+         lda   count
+         sta   [tm],y
+lb3      cmpl  t,#7*3000*60*60*24       compute the day of week
+         blt   lb3a
+         sub4  t,#7*3000*60*60*24
+         bra   lb3
+lb3a     add4  t,#4*60*60*24
+         sec                            (adjust for time zone)
+         lda   t
+         sbc   tz_offset
+         sta   t
+         lda   t+2
+         sbc   tz_offset+2
+         sta   t+2
+         div4  t,#60*60*24
+         mod4  t,#7 
+         lda   t                        set the day of week
+         ldy   #tm_wday
+         sta   [tm],y
          lda   isdst                    set the DST flag
          ldy   #tm_isdst
          sta   [tm],y
