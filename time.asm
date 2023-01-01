@@ -19,7 +19,18 @@
 *
 ****************************************************************
 *
-Time     start                          dummy segment
+Time     private                        dummy segment
+
+; struct tm fields
+tm_sec   gequ  0                        seconds         0..59
+tm_min   gequ  tm_sec+2                 minutes         0..59
+tm_hour  gequ  tm_min+2                 hours           0..23
+tm_mday  gequ  tm_hour+2                day             1..31
+tm_mon   gequ  tm_mday+2                month           0..11
+tm_year  gequ  tm_mon+2                 year            69..205 (1900=0)
+tm_wday  gequ  tm_year+2                day of week     0..6    (Sun = 0)
+tm_yday  gequ  tm_wday+2                day of year     0..365
+tm_isdst gequ  tm_yday+2                daylight savings? 1 = yes, 0 = no
          end
 
 ****************************************************************
@@ -531,16 +542,6 @@ lb1      plb
 *
 ~gmlocaltime private
          using TimeCommon
-tm_sec   equ   0                        seconds         0..59
-tm_min   equ   tm_sec+2                 minutes         0..59
-tm_hour  equ   tm_min+2                 hours           0..23
-tm_mday  equ   tm_hour+2                day             1..31
-tm_mon   equ   tm_mday+2                month           0..11
-tm_year  equ   tm_mon+2                 year            69..205 (1900=0)
-tm_wday  equ   tm_year+2                day of week     0..6    (Sun = 0)
-tm_yday  equ   tm_wday+2                day of year     0..365
-tm_isdst equ   tm_yday+2                daylight savings? 1 = yes, 0 = no
-
 
          csubroutine (4:tz_offset,4:t,2:isdst,4:tm),0
          phb
@@ -672,7 +673,7 @@ temp2    equ   5                        temp variable
          phk
          plb
 
-         ldy   #10                      set time parameters
+         ldy   #tm_year                 set time parameters
          lda   [tmptr],Y
          sta   year
          dey
@@ -702,22 +703,13 @@ temp2    equ   5                        temp variable
          sta   temp+2
          brl   lb1
 lb0      move4 count,temp               save the value for later return
-         lda   #1                       compute the days since the start of the
-         sta   day                       year
-         stz   month
-         jsr   factor
-         sub4  temp,count,count
-         div4  count,#60*60*24
-         ldy   #14                      set the days
-         lda   count
-         sta   [tmptr],Y
-         div4  temp,#60*60*24,temp2     compute the day of week
-         add4  temp2,#4
-         mod4  temp2,#7
-         lda   temp2                    set the day of week
-         ldy   #12
-         sta   [tmptr],Y
-
+         ph4   <tmptr                   recompute struct tm values
+         ldy   #tm_isdst
+         lda   [tmptr],y
+         pha
+         ph4   <temp
+         ph4   #0
+         jsl   ~gmlocaltime
 lb1      plb
          creturn 4:temp
          end
