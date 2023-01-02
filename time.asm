@@ -383,6 +383,60 @@ ad1      tay
          sta   count+6
          rts
          end
+        
+****************************************************************
+*
+*  ~get_tz_offset - get current time zone offset from UTC
+*
+*  Outputs:
+*        A-X - time zone offset from UTC
+*
+****************************************************************
+*
+~get_tz_offset private
+         pha                            make space for status return/TZ prefs
+         pha
+         _tiStatus                      check if time tool is active
+         bcs   no_tz
+         lda   1,s
+         beq   no_tz
+         
+         pea   1                        get one record element only (TZ offset)
+
+         tsc                            get time zone preference
+         inc   a
+         pea   0
+         pha
+         _tiGetTimePrefs
+         pla
+         bcs   no_tz
+
+         pha                            determine if it's daylight savings
+         ph2   #$5E
+         _ReadBParam
+         pla
+         lsr   a
+         lsr   a
+         bcs   ret
+         
+;        clc
+         lda   #60*60                   adjust for DST (+1 hour) if needed
+         adc   1,s
+         sta   1,s
+         lda   #0
+         adc   3,s
+         sta   3,s
+
+ret      pla                            return offset value
+         plx
+         rts
+
+no_tz    pla
+         pla
+         lda   #0                       assume 0 offset if no TZ info available
+         tax
+         rts
+         end
 
 ****************************************************************
 *
@@ -432,43 +486,9 @@ t        equ   6
          phx                            push time_t value to convert
          phy
          
-         pha                            make space for status return/TZ prefs
+         jsr   ~get_tz_offset           push time zone offset
+         phx
          pha
-         _tiStatus                      check if time tool is active
-         bcs   no_tz
-         lda   1,s
-         beq   no_tz
-         
-         pea   1                        get one record element only (TZ offset)
-
-         tsc                            get time zone preference
-         inc   a
-         pea   0
-         pha
-         _tiGetTimePrefs
-         pla
-         bcs   no_tz
-
-         pha                            determine if it's daylight savings
-         ph2   #$5E
-         _ReadBParam
-         pla
-         lsr   a
-         lsr   a
-         bcs   doit
-         
-;        clc
-         lda   #60*60                   adjust for DST (+1 hour) if needed
-         adc   1,s
-         sta   1,s
-         lda   #0
-         adc   3,s
-         sta   3,s
-         bra   doit
-
-no_tz    lda   #0
-         sta   1,s
-         sta   3,s
          
 doit     jsl   ~gmlocaltime             use common gmtime/localtime code
          rtl
@@ -795,6 +815,70 @@ lb1      lda   count
          sta   lastDST
          plb
          creturn 4:tptr
+         end
+
+****************************************************************
+*
+*  int timespec_get(struct timespec *ts, int base);
+*
+*  Inputs:
+*        ts - pointer to structure for result
+*        base - requested time base
+*
+*  Outputs:
+*        *tptr - the requested time (if successful)
+*        returns base if successful, or 0 otherwise
+*
+****************************************************************
+*
+timespec_get start
+         using TimeCommon
+tz_offset equ  1                        time zone offset from UTC
+current_time equ 5                      current time
+
+TIME_UTC equ   1                        UTC time base
+
+tv_sec   equ   0                        struct timespec members
+tv_nsec  equ   4
+
+         csubroutine (4:ts,2:base),8
+         
+         lda   base
+         cmp   #TIME_UTC
+         bne   err
+
+         ph4   #0                       get current time (in count)
+         jsl   time
+         sta   current_time
+         stx   current_time+2
+         and   current_time+2           if time is not available
+         inc   a
+         beq   err                        report error
+
+         jsr   ~get_tz_offset           get time zone offset
+         sta   tz_offset
+         stx   tz_offset+2
+         
+         sec                            adjust for time zone & store result
+         lda   current_time
+         sbc   tz_offset
+         sta   [ts]
+         lda   current_time+2
+         sbc   tz_offset+2
+         ldy   #tv_sec+2
+         sta   [ts],y
+
+         ldy   #tv_nsec                 ts->tv_nsec = 0
+         lda   #0
+         sta   [ts],y
+         iny
+         iny
+         sta   [ts],y
+         bra   ret
+
+err      stz   base                     unsupported base: return 0
+
+ret      creturn 2:base
          end
 
 ****************************************************************
