@@ -23,7 +23,7 @@ Dummy    start                          (dummy root segment)
 *
 ****************************************************************
 *
-CVars    start
+~CVars   start
 
 errno    entry                          library error number
          ds    2
