@@ -394,13 +394,11 @@ ad1      tay
 ****************************************************************
 *
 ~get_tz_offset private
-         pha                            make space for status return/TZ prefs
+         lda   >__useTimeTool           if not using time tool
+         beq   no_tz                      assume we have no TZ offset
+
+         pha                            make space for TZ prefs
          pha
-         _tiStatus                      check if time tool is active
-         bcs   no_tz
-         lda   1,s
-         beq   no_tz
-         
          pea   1                        get one record element only (TZ offset)
 
          tsc                            get time zone preference
@@ -409,9 +407,14 @@ ad1      tay
          pha
          _tiGetTimePrefs
          pla
-         bcs   no_tz
+         bcc   have_tz
+         pla
+         pla
+         lda   #0                       assume 0 offset if TZ info not available
+no_tz    tax
+         rts
 
-         pha                            determine if it's daylight savings
+have_tz  pha                            determine if it's daylight savings
          ph2   #$5E
          _ReadBParam
          pla
@@ -429,12 +432,6 @@ ad1      tay
 
 ret      pla                            return offset value
          plx
-         rts
-
-no_tz    pla
-         pla
-         lda   #0                       assume 0 offset if no TZ info available
-         tax
          rts
          end
 
@@ -1318,14 +1315,11 @@ Y_skip   inx
 ;%Z - time zone name or abbreviation, if available
 ;we print the numeric offset for both, or nothing if time zone is not available
 fmt_z    anop
-fmt_Z    pha                            check if time tool is active
-         _tiStatus
-         pla
-         bcs   z_ret
-         beq   z_ret
+fmt_Z    lda   >__useTimeTool           if not using Time Tool
+         beq   z_ret                      write nothing
          pea   0                        push pointer to string buffer
          tdc
-;        clc
+         clc
          adc   #numstr
          pha
          pha                            make space for TZ preferences record

@@ -35,6 +35,8 @@ sys_nerr entry                          # of error messages
 _toolErr entry                          last error in a tool call (C)
 ~TOOLERROR entry                        last error in a tool call (Pascal)
          ds    2
+__useTimeTool entry                     use Time Tool in <time.h> functions?
+         ds    2
          end
 
 ****************************************************************

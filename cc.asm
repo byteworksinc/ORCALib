@@ -187,6 +187,7 @@ TAB      equ   9                        TAB key code
          stz   ~QuickExitList
          stz   ~QuickExitList+2
          case  on
+         stz   __useTimeTool            do not use Time Tool
          jsl   ~InitIO                  reset standard I/O
          case  off
 
@@ -363,6 +364,9 @@ start    ds    2                        start of the command line string
          stz   ~ExitList+2
          stz   ~QuickExitList
          stz   ~QuickExitList+2
+         case  on
+         stz   __useTimeTool            do not use Time Tool
+         case  off
          lda   #~RTL                    set up so exit(), etc. call ~RTL
          sta   ~C_Quit+1
 
