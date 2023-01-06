@@ -524,7 +524,6 @@ t        equ   6
          pla
          sta   3,s
 
-         ph4   #gmlocaltime_tm          push address of struct tm to use
          lda   #-1                      default DST setting = -1 (unknown)
          cpy   lasttime                 determine DST setting, if we can
          bne   lb1
@@ -533,6 +532,7 @@ t        equ   6
          lda   lastDST
 lb1      plb
 
+         ph4   #gmlocaltime_tm          push address of struct tm to use
          pha                            push tm_isdst value         
          phx                            push time_t value to convert
          phy
