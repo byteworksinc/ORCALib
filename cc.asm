@@ -435,6 +435,24 @@ ret      tya                            store return value in result space
 
 ****************************************************************
 *
+*  ~CheckPtrC - check a pointer to insure it is not null
+*
+*  Inputs:
+*       1,S - return address
+*       4,S - pointer
+*
+****************************************************************
+*
+~CheckPtrC start
+        lda   4,S
+        ora   5,S
+        bne   lb1
+        error #1                        subrange exceeded
+lb1     rtl
+        end
+
+****************************************************************
+*
 *  ~CUMul2 - unsigned multiply
 *
 *  Inputs:
