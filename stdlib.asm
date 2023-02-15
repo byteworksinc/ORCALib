@@ -830,8 +830,9 @@ r        equ   7                        right entry
 swap     tsc                            set up addressing
          phd
          tcd
-         ldx   lsize+2                  move 64K chunks
+         lda   lsize+2                  move 64K chunks
          beq   sw2
+         sta   banks
          ldy   #0
 sw1      lda   [l],Y
          tax
@@ -844,7 +845,7 @@ sw1      lda   [l],Y
          bne   sw1
          inc   l+2
          inc   r+2
-         dex
+         dec   banks
          bne   sw1
 sw2      lda   lsize                    if there are an odd number of bytes then
          lsr   A
@@ -893,6 +894,7 @@ sw6      pld
 ;
 lsize    entry
          ds    4                        local copy of size
+banks    ds    2                        number of whole banks to swap
          end
 
 ****************************************************************
