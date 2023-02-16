@@ -767,10 +767,10 @@ right    equ   5                        right address
 
          csubroutine (4:first,4:last),8
 
-         phb
+sr0      phb
          phk
          plb
-sr0      lda   last+2                   if last <= first then quit
+         lda   last+2                   if last <= first then quit
          cmp   first+2
          bne   sr1
          lda   last
@@ -825,15 +825,24 @@ sr5      blt   sr2
          ph4   <left                    swap left/last entries
          ph4   <last
          jsr   swap
-         sub4  left,lsize,right         sort left part of array
+         sub4  left,lsize,right         calculate bounds of subarrays
+         add4  left,lsize                 (first..right and left..last)
+         add4  first,last,mid           calculate midpoint of range being sorted
+         lsr   mid+2
+         ror   mid
+         cmpl  right,mid                if right < mid then
+         bge   sr6
          plb
-         ph4   <right
+         ph4   <right                     sort left subarray recursively
          ph4   <first
          jsl   rsort
-         phb
-         phk
-         plb
-         add4  left,lsize,first         sort right part of array
+         move4 left,first                 sort right subarray via tail call
+         brl   sr0
+sr6      plb                            else
+         ph4   <last                      sort right subarray recursively
+         ph4   <left
+         jsl   rsort
+         move4 right,last                 sort left subarray via tail call
          brl   sr0
 ;
 ;  swap - swap two entries
@@ -909,6 +918,7 @@ sw6      pld
 lsize    entry
          ds    4                        local copy of size
 banks    ds    2                        number of whole banks to swap
+mid      ds    4                        midpoint of the elements being sorted
          end
 
 ****************************************************************
