@@ -771,15 +771,16 @@ sr0      phb
          phk
          plb
          lda   last+2                   if last <= first then quit
+         bmi   sr1a
          cmp   first+2
          bne   sr1
          lda   last
          cmp   first
-sr1      bgt   sr1a
-         plb
+sr1      bgt   sr1b
+sr1a     plb
          creturn
 
-sr1a     move4 last,right               right = last
+sr1b     move4 last,right               right = last
          move4 first,left               left = first
          bra   sr3
 sr2      add4  left,lsize               inc left until *left >= *last
