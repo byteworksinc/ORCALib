@@ -333,6 +333,10 @@ addr     equ   13                       address of array element of index test
 
          csubroutine (4:key,4:base,4:count,4:size,4:compar),16
 
+         lda   count                    if count is 0 then
+         ora   count+2
+         jeq   lb5                        just return a null pointer
+
          lda   compar                   patch the call address
          sta   >jsl+1
          lda   compar+1
