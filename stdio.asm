@@ -3210,9 +3210,8 @@ pr       dc    i'2'                     parameter block for OSGet_Prefix
          dc    i'3'
          dc    a4'name'
 
-name     dc    i'16,0'                  GS/OS name buffer
+name     dc    i'17+4,0'                GS/OS name buffer
 cname    ds    26                       part of name; also C buffer
-GS_OSname dc   i'8'                     used for OSGet_File_Info
 syscxxxx dc    c'SYSC0000',i1'0'        for creating unique names
 
 GIParm   dc    i'2'                     used to see if the file exists
