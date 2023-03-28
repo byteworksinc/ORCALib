@@ -522,10 +522,7 @@ ptr      equ   3                        pointer to exit routines
 ;
 ;  Set up our stack frame
 ;
-         phb
-         phk
-         plb
-         ph4   ~ExitList                set up our stack frame
+         ph4   >~ExitList               set up our stack frame
          phd
          tsc
          tcd
@@ -574,7 +571,6 @@ lb3      lda   >stderr+6                while there is a next file
 lb4      pld                            return
          pla
          pla
-         plb
          rts
          end
 
@@ -592,10 +588,7 @@ ptr      equ   3                        pointer to exit routines
 ;
 ;  Set up our stack frame
 ;
-         phb
-         phk
-         plb
-         ph4   ~QuickExitList           set up our stack frame
+         ph4   >~QuickExitList          set up our stack frame
          phd
          tsc
          tcd
@@ -632,7 +625,6 @@ lb2      ldy   #2                         dereference the pointer
 lb3      pld                            return
          pla
          pla
-         plb
          rts
          end
 
