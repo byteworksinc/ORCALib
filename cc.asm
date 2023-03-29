@@ -244,8 +244,6 @@ lb6      long  M
          phy
          sec
          adc   1,S
-         ply
-         pha
          pha
          pea   0
          pha
@@ -265,20 +263,19 @@ lb7      pl4   argv                     get the pointer to the area
          lda   [argv]
          sta   targv
          stx   targv+2
-         clc                            get a pointer to the command line string
-         adc   start
+;        clc                            (already clear)
+         adc   start                    get a pointer to the command line string
          bcc   lb8
          inx
 lb8      sta   argv
          stx   argv+2
          short M                        move the command line string
-         ldy   #0
-lb9      lda   [cLine],Y
+         ldy   #-1
+lb9      iny
+         lda   [cLine],Y
          sta   [argv],Y
-         beq   lb10
-         iny
-         bra   lb9
-lb10     long  M
+         bne   lb9
+         long  M
          move4 argv,cLine               save the pointer
          move4 targv,argv               set up the pointer to argv
 
