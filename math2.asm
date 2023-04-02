@@ -317,11 +317,7 @@ acoshl   entry
 
 ret      FPROCEXIT                      restore env & raise any new exceptions
          plb
-         lda   #t1                      return t1
-         sta   x
-         lda   #^t1
-         sta   x+2
-         creturn 4:x
+         creturn 10:t1                  return t1
 
 y        ds    10                       temporary variable
 one      dc    i'1'                     constants
@@ -442,11 +438,7 @@ setsign  asl   z+8                      sign of z = original sign of x
 
          FPROCEXIT                      restore env & raise any new exceptions
          plb
-         lda   #z                       return z
-         sta   x
-         lda   #^z
-         sta   x+2
-         creturn 4:x
+         creturn 10:z                   return z
 
 y        ds    10                       temporary variables
 z        ds    10
@@ -546,11 +538,7 @@ setsign  asl   t1+8                     sign of t1 = original sign of x
 
          FPROCEXIT                      restore env & raise any new exceptions
          plb
-         lda   #t1                      return t1
-         sta   x
-         lda   #^t1
-         sta   x+2
-         creturn 4:x
+         creturn 10:t1                  return t1
 
 one      dc    i'1'                     constants
 minustwo dc    i'-2'
@@ -646,11 +634,7 @@ do_calc  sta   t1+8
          ror   t1+8
 
          plb
-         lda   #t1                      return t1
-         sta   x
-         lda   #^t1
-         sta   x+2
-         creturn 4:x
+         creturn 10:t1                  return t1
 
 onethird dc    e'0.33333333333333333333'
          end
@@ -1865,12 +1849,8 @@ naninf   anop                           (we skip to here if x or y is nan/inf)
          FSCALBX
 
 done     FPROCEXIT                      restore env
-         lda   #^t1                     return t1
-         sta   x+2
-         lda   #t1
-         sta   x
          plb
-         creturn 4:x
+         creturn 10:t1                  return t1
          end
 
 ****************************************************************
@@ -2474,12 +2454,8 @@ copysign asl   t1+8                     copy sign of x to t1
          asl   x+8
          ror   t1+8
 
-         lda   #^t1                     return t1 (fractional part)
-         sta   iptr+2
-         lda   #t1
-         sta   iptr
          plb
-         creturn 4:iptr
+         creturn 10:t1                  return t1 (fractional part)
          end
 
 ****************************************************************
@@ -2552,12 +2528,8 @@ copysign asl   t1+8                     copy sign of x to t1
          asl   x+8
          ror   t1+8
 
-ret      lda   #^t1                     return t1 (fractional part)
-         sta   iptr+2
-         lda   #t1
-         sta   iptr
-         plb
-         creturn 4:iptr
+ret      plb
+         creturn 10:t1                  return t1 (fractional part)
          end
 
 ****************************************************************
@@ -2615,13 +2587,9 @@ codeok   ora   #$4000                   set high bit of f for quiet NaN
          stz   t1+4                     set rest of fraction field to 0
          stz   t1+2
          stz   t1
-         
-         lda   #^t1                     return a pointer to the result
-         sta   tagp+2
-         lda   #t1
-         sta   tagp
+
          plb
-         creturn 4:tagp
+         creturn 10:t1                  return a pointer to the result
          end
 
 ****************************************************************
@@ -3389,12 +3357,7 @@ roundl   entry
          
 ret      FPROCEXIT                      restore env & raise any new exceptions
          plb
-         
-         lda   #^t1                     return a pointer to the result
-         sta   x+2
-         lda   #t1
-         sta   x
-         creturn 4:x
+         creturn 10:t1                  return a pointer to the result
 
 onehalf  dc    f'0.5'
          end
@@ -3466,12 +3429,8 @@ do_scalb ph4   #t1                      scale the number
          bne   done                       stop: more scaling would not change it
          brl   loop                     else scale by remaining amount
 
-done     lda   #^t1                     return a pointer to the result
-         sta   n+2
-         lda   #t1
-         sta   n
-         plb
-         creturn 4:n
+done     plb
+         creturn 10:t1                  return a pointer to the result
          end
 
 ****************************************************************
@@ -3740,12 +3699,7 @@ lb2      ph4   #z                         z := pi / (fracpart * z)
 
 done     FPROCEXIT                      restore env & raise any new exceptions
          plb
-
-         lda   #^z                      return a pointer to the result
-         sta   x+2
-         lda   #z
-         sta   x
-         creturn 4:x
+         creturn 10:z                   return a pointer to the result
 
 cutoff   dc    f'10.375'                cutoff for Stirling approximation (+1)
 

@@ -47,8 +47,7 @@ feclearexcept start
          sta   1,S
          FSETENV                               clear them
 
-         stz   excepts
-         creturn 2:excepts
+         creturn 2:#0
          end
 
 ****************************************************************
@@ -76,8 +75,7 @@ fegetexceptflag start
          and   #FE_ALL_EXCEPT
          sta   [flagp]                         store them in *flagp
          
-         stz   excepts
-         creturn 2:excepts
+         creturn 2:#0
          end
 
 ****************************************************************
@@ -104,8 +102,7 @@ feraiseexcept start
          pha
          FSETXCP                        raise exceptions
          
-done     stz   excepts
-         creturn 2:excepts
+done     creturn 2:#0
          end
 
 ****************************************************************
@@ -144,8 +141,7 @@ fesetexceptflag start
          sta   1,S
          FSETENV
          
-         stz   excepts
-         creturn 2:excepts
+         creturn 2:#0
          end
 
 ****************************************************************
@@ -250,8 +246,7 @@ fegetenv start
          txa
          sta   [envp]                   store it in *envp
          
-         stz   envp
-         creturn 2:envp
+         creturn 2:#0
          end
 
 ****************************************************************
@@ -280,8 +275,7 @@ feholdexcept start
          pha
          FSETENV                        set the new environment
          
-         stz   envp
-         creturn 2:envp
+         creturn 2:#0
          end
 
 ****************************************************************
@@ -306,8 +300,7 @@ fesetenv start
          pha
          FSETENV
 
-         stz   envp
-         creturn 2:envp
+         creturn 2:#0
          end
 
 ****************************************************************
@@ -332,8 +325,7 @@ feupdateenv start
          pha
          FPROCEXIT
 
-         stz   envp
-         creturn 2:envp
+         creturn 2:#0
          end
 
 ****************************************************************
