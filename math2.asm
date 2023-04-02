@@ -1149,6 +1149,430 @@ ret      plx                            clean up stack
 
 ****************************************************************
 *
+*  double fma(double x, double y, double z);
+*
+*  Compute (x * y) + z, rounded only once at the end.
+*
+****************************************************************
+*
+fma      start
+fmaf     entry
+fmal     entry
+         using MathCommon2
+mant1    equ    1                       mantissa of value 1
+exp1     equ    mant1+16                exponent of value 1
+sign1    equ    exp1+4                  sign of value 1 (high bit)
+mant2    equ    sign1+2                 mantissa of value 2
+exp2     equ    mant2+16                exponent of value 2
+sign2    equ    exp2+4                  sign of value 2 (low bit)
+expdiff  equ    sign2+2                 difference between exponents
+extra    equ    expdiff+4               extra bits (guard, round, sticky)
+xcps     equ    extra+2                 floating-point exceptions
+
+         csubroutine (10:x,10:y,10:z),54
+
+         stz   extra
+         lda   x                        if x or y is NAN, INF, or 0 then
+         ora   x+2
+         ora   x+4
+         ora   x+6
+         beq   nanInf0                    return (x * y) + z computed with SANE
+         lda   x+8
+         asl   a
+         cmp   #32767*2
+         beq   nanInf0
+
+         lda   y
+         ora   y+2
+         ora   y+4
+         ora   y+6
+         beq   nanInf0
+         lda   y+8
+         asl   a
+         cmp   #32767*2
+         beq   nanInf0
+
+         lda   z+8                      else if z is INF or NAN then
+         asl   a
+         cmp   #32767*2
+         beq   x_plus_z                   return x + z computed with SANE
+         inc   extra
+         lda   z                        else if z is 0 then
+         ora   z+2
+         ora   z+4
+         ora   z+6                        return x * y computed with SANE
+         bne   compute                  else compute fma(x,y,z) ourselves
+
+;
+; Compute with SANE if any operands are NAN/INF/0
+;
+nanInf0  tdc                            if in first or third case above then
+         clc
+         adc   #y
+         pea   0
+         pha
+         adc   #x-y
+         pea   0
+         pha
+         FMULX                            x = x * y
+
+x_plus_z ldy   extra                    if in first or second case above then
+         bne   return_x
+
+         tdc                            
+         clc
+         adc   #z
+         phy
+         pha
+         adc   #x-z
+         phy
+         pha
+         FADDX                            x = x + z
+
+return_x lda   x                        copy result to t1
+         sta   t1
+         lda   x+2
+         sta   t1+2
+         lda   x+4
+         sta   t1+4
+         lda   x+6
+         sta   t1+6
+         lda   x+8
+         sta   t1+8
+         brl   ret                      return result
+
+;
+; Compute it ourselves if all operands are finite and non-zero
+;
+compute  stz   xcps                     no exceptions so far
+         lda   x                        copy mantissa of x to mant1
+         sta   mant1
+         lda   x+2
+         sta   mant1+2
+         lda   x+4
+         sta   mant1+4
+         lda   x+6
+         sta   mant1+6
+         stz   mant1+8
+         stz   mant1+10
+         stz   mant1+12
+         stz   mant1+14
+
+         ldy   #64                      multiply mantissas (64 x 64 to 128-bit)
+ml1      lda   mant1
+         lsr   a
+         bcc   ml2
+         clc                              add multiplicand to partial product
+         lda   mant1+8
+         adc   y
+         sta   mant1+8
+         lda   mant1+10
+         adc   y+2
+         sta   mant1+10
+         lda   mant1+12
+         adc   y+4
+         sta   mant1+12
+         lda   mant1+14
+         adc   y+6
+         sta   mant1+14
+ml2      ror   mant1+14                   shift the interim result
+         ror   mant1+12
+         ror   mant1+10
+         ror   mant1+8
+         ror   mant1+6
+         ror   mant1+4
+         ror   mant1+2
+         ror   mant1
+         dey                              loop until done
+         bne   ml1
+
+         lda   x+8                      calculate exponent
+         asl   a
+         sta   exp1
+         lda   y+8
+         asl   a
+         clc
+         adc   exp1
+         ror   a
+         sta   exp1
+         stz   exp1+2
+         add4  exp1,#-16383+1
+         
+         lda   mant1+14                 normalize calculated value
+         bmi   getsign1
+norm1_lp dec4  exp1
+         asl   mant1
+         rol   mant1+2
+         rol   mant1+4
+         rol   mant1+6
+         rol   mant1+8
+         rol   mant1+10
+         rol   mant1+12
+         rol   mant1+14
+         bpl   norm1_lp
+         
+getsign1 lda   x+8                      get sign of x*y
+         eor   y+8
+         sta   sign1
+         
+         lda   z+8                      get sign of z
+         sta   sign2
+
+         and   #$7fff                   copy exponent of z to exp2
+         sta   exp2
+         stz   exp2+2
+
+         stz   mant2                    copy mantissa of z to mant2
+         stz   mant2+2
+         stz   mant2+4
+         stz   mant2+6
+         lda   z
+         sta   mant2+8
+         lda   z+2
+         sta   mant2+10
+         lda   z+4
+         sta   mant2+12
+         lda   z+6
+         sta   mant2+14
+
+         bmi   exp_cmp                  normalize z value
+norm2_lp dec4  exp2
+         asl   mant2+8                    (low mantissa bits stay 0)
+         rol   mant2+10
+         rol   mant2+12
+         rol   mant2+14
+         bpl   norm2_lp
+
+exp_cmp  cmp4  exp1,exp2                if exp1 < exp2
+         bge   do_align
+         jsr   exchange                   exchange value 1 and value 2
+         
+; at this point, exp1 >= exp2
+do_align stz   extra                    initially extra bits are 0
+         sub4  exp1,exp2,expdiff        expdiff = exp1 - exp2
+         cmpl  expdiff,#65+1            if expdiff > 65 then
+         blt   aligntst
+         stz   mant2                      zero out mant2
+         stz   mant2+2
+         stz   mant2+4
+         stz   mant2+6
+         stz   mant2+8
+         stz   mant2+10
+         stz   mant2+12
+         stz   mant2+14
+         inc   extra                      but set the sticky bit for rounding
+         bra   addorsub                 else
+         
+align_lp dec4  expdiff
+         lsr   mant2+14                   shift mant2 until it is aligned
+         ror   mant2+12
+         ror   mant2+10
+         ror   mant2+8
+         ror   mant2+6
+         ror   mant2+4
+         ror   mant2+2
+         ror   mant2
+         ror   extra
+         bcc   aligntst                   maintain sticky bit
+         lda   #$0001
+         tsb   extra
+aligntst lda   expdiff
+         ora   expdiff+2
+         bne   align_lp 
+
+addorsub lda   sign1                    if signs of x*y and z are the same then
+         eor   sign2
+         bmi   subtract
+
+         clc                              mant1 = mant1 + mant2
+         ldx   #-16
+addLoop  lda   mant1+16,x
+         adc   mant2+16,x
+         sta   mant1+16,x
+         inx
+         inx
+         bmi   addLoop
+         bcc   add_done                   if there is carry out
+         ror   mant1+14                     rotate carry back into result
+         ror   mant1+12
+         ror   mant1+10
+         ror   mant1+8
+         ror   mant1+6
+         ror   mant1+4
+         ror   mant1+2
+         ror   mant1
+         ror   extra
+         bcc   inc_exp                      maintain sticky bit
+         lda   #$0001
+         tsb   extra
+inc_exp  inc4  exp1                         increment exponent
+add_done bra   xtrabits                 else
+
+subtract ldx   #14                        if mant1 < mant2 then
+subCmpLp lda   mant1,x                      (note: only occurs if mant2 was
+         cmp   mant2,x                      not shifted, so extra is 0)
+         bne   sub_cmp
+         dex
+         dex
+         bpl   subCmpLp
+sub_cmp  bge   do_sub
+         jsr   exchange                     exchange mant2 and mant1
+
+do_sub   sec                              mant1 = mant1 - mant2 (including extra)
+         lda   #0
+         sbc   extra
+         sta   extra
+         ldx   #-16
+subLoop  lda   mant1+16,x
+         sbc   mant2+16,x
+         sta   mant1+16,x
+         inx
+         inx
+         bmi   subLoop
+         ora   mant1                      if result (including extra bits) is 0 then
+         ora   mant1+2
+         ora   mant1+4
+         ora   mant1+6
+         ora   mant1+8
+         ora   mant1+10
+         ora   mant1+12
+         ora   extra
+         bne   subalign
+         stz   exp1                         set exponent to 0
+         stz   sign1                        set sign to +
+         FGETENV                            if rounding direction is downward then
+         txa
+         bpl   savezero
+         asl   a
+         bmi   savezero
+         dec   sign1                          set sign to -
+savezero brl   do_save                      skip to return
+subalign lda   mant1+14
+         bmi   xtrabits                   normalize after subtraction, if needed
+subAl_lp dec4  exp1
+         asl   extra
+         rol   mant1
+         rol   mant1+2
+         rol   mant1+4
+         rol   mant1+6
+         rol   mant1+8
+         rol   mant1+10
+         rol   mant1+12
+         rol   mant1+14
+subAlNeg bpl   subAl_lp
+
+xtrabits lda   mant1                    consolidate extra bits (into mant1+6)
+         ora   mant1+2
+         ora   mant1+4
+         ora   extra
+         beq   denorm
+         lda   #$0001
+         tsb   mant1+6
+
+denorm   lda   #INEXACT                 assume INEXACT is just INEXACT
+         bra   denormCk                 while exponent is too small
+denormLp inc4  exp1                       increment exponent
+         lsr   mant1+14                   shift mantissa right
+         ror   mant1+12
+         ror   mant1+10
+         ror   mant1+8
+         ror   mant1+6
+         bcc   denorm2                    maintain sticky bit
+         lda   #$0001
+         tsb   mant1+6
+denorm2  lda   #UNDERFLOW+INEXACT         flag that INEXACT also implies UNDERFLOW
+denormCk ldy   exp1+2                     
+         bmi   denormLp
+
+         ldy   mant1+6                  if there are extra bits then
+         beq   saveval       
+         tsb   xcps                       set inexact (+ maybe underflow) exception
+         FGETENV                          get rounding direction
+         txa
+         asl   a
+         bcs   roundDn0
+         bmi   roundUp                    if rounding to nearest then
+         lda   mant1+6                      if first extra bit is 0
+         bpl   saveval                        do not round
+         asl   a                            else if remaining extra bits are non-zero
+         bne   do_round
+         lda   mant1+8                        or low-order bit of result is 1 then
+         lsr   a
+         bcc   saveval
+         bra   do_round                       apply rounding
+
+roundUp  lda   sign1                      if rounding upward then
+         bmi   saveval                      if positive then
+         bra   do_round                       apply rounding
+
+roundDn0 bmi   saveval                    if rounding downward then
+         lda   sign1                        if negative then
+         bpl   saveval                        apply rounding
+
+do_round inc   mant1+8                    (perform the rounding, if needed)
+         bne   saveval
+         inc   mant1+10
+         bne   saveval
+         inc   mant1+12
+         bne   saveval
+         inc   mant1+14
+         bne   saveval
+         sec
+         ror   mant1+14
+         ror   mant1+12
+         ror   mant1+10
+         ror   mant1+8
+         inc4  exp1
+
+saveval  lda   exp1+2                   if value is too large to represent then
+         bne   save_inf
+         lda   exp1
+         cmp   #32766+1
+         blt   do_save
+save_inf lda   #32767                     set it to infinity
+         sta   exp1
+         stz   mant1+8
+         stz   mant1+10
+         stz   mant1+12
+         stz   mant1+14
+         lda   #OVERFLOW+INEXACT          set overflow and inexact exceptions
+         tsb   xcps
+do_save  lda   mant1+8                  generate result
+         sta   t1
+         lda   mant1+10
+         sta   t1+2
+         lda   mant1+12
+         sta   t1+4
+         lda   mant1+14
+         sta   t1+6
+         lda   exp1
+         asl   a
+         asl   sign1
+         ror   a
+         sta   t1+8
+         
+         lda   xcps                     if there were exceptions then
+         beq   ret
+         pha                              set them in SANE environment
+         FSETXCP
+
+ret      creturn 10:t1                  return t1
+
+; local subroutine - exchange value 1 and value 2
+; Note: requires mant1/exp1/sign1 and mant2/exp2/sign2 to be in order
+exchange ldx   #16+4+2-2
+xchgLp   lda   mant1,x
+         ldy   mant2,x
+         sta   mant2,x
+         sty   mant1,x
+         dex
+         dex
+         bpl   xchgLp
+         rts
+         end
+
+****************************************************************
+*
 *  double fmax(double x, double y);
 *
 *  Returns the maximum numeric value of x or y.
