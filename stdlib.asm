@@ -999,9 +999,10 @@ rtl      equ   7                        return address
 val      equ   3                        value
 negative equ   1                        is the number negative?
 
-         pea   0                        make room for & initialize val
-         pea   0
-         pea   0                        make room for & initialize negative
+         lda   #0
+         pha                            make room for & initialize val
+         pha
+         pha                            make room for & initialize negative
          tsc                            set up direct page addressing
          phd
          tcd
@@ -1126,10 +1127,11 @@ foundOne equ   1                        have we found a number?
          ldx   #1
 
 init     pea   1                        make room for & initialize rangeOK
-         pea   0                        make room for & initialize negative
-         pea   0                        make room for & initialize val
-         pea   0
-         pea   0                        make room for & initialize foundOne
+         lda   #0
+         pha                            make room for & initialize negative
+         pha                            make room for & initialize val
+         pha
+         pha                            make room for & initialize foundOne
          tsc                            set up direct page addressing
          phd
          tcd
@@ -1317,13 +1319,14 @@ retptr   equ   11                       pointer to location for return value
 val      equ   3                        value
 negative equ   1                        is the number negative?
 
-         pea   0                        make room for & initialize retptr
+         lda   #0
+         pha                            make room for & initialize retptr
          phx
-         pea   0                        make room for & initialize val
-         pea   0
-         pea   0
-         pea   0
-         pea   0                        make room for & initialize negative
+         pha                            make room for & initialize val
+         pha
+         pha
+         pha
+         pha                            make room for & initialize negative
          tsc                            set up direct page addressing
          phd
          tcd
@@ -1466,15 +1469,16 @@ foundOne equ   1                        have we found a number?
 ~strtoull entry                         alt entry point called from strtoll
          ldy   #1
 
-init     pea   0                        make room for & initialize retptr
+init     lda   #0
+         pha                            make room for & initialize retptr
          phx
          pea   1                        make room for & initialize rangeOK
-         pea   0                        make room for & initialize negative
-         pea   0                        make room for & initialize val
-         pea   0
-         pea   0
-         pea   0
-         pea   0                        make room for & initialize foundOne
+         pha                            make room for & initialize negative
+         pha                            make room for & initialize val
+         pha
+         pha
+         pha
+         pha                            make room for & initialize foundOne
          tsc                            set up direct page addressing
          phd
          tcd
