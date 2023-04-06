@@ -1214,15 +1214,15 @@ x_plus_z ldy   extra                    if in first or second case above then
          FADDX                            x = x + z
 
 return_x lda   x                        copy result to t1
-         sta   t1
+         sta   >t1
          lda   x+2
-         sta   t1+2
+         sta   >t1+2
          lda   x+4
-         sta   t1+4
+         sta   >t1+4
          lda   x+6
-         sta   t1+6
+         sta   >t1+6
          lda   x+8
-         sta   t1+8
+         sta   >t1+8
          brl   ret                      return result
 
 ;
@@ -1522,18 +1522,18 @@ save_inf lda   #32767                     set it to infinity
          lda   #OVERFLOW+INEXACT          set overflow and inexact exceptions
          tsb   xcps
 do_save  lda   mant1+8                  generate result
-         sta   t1
+         sta   >t1
          lda   mant1+10
-         sta   t1+2
+         sta   >t1+2
          lda   mant1+12
-         sta   t1+4
+         sta   >t1+4
          lda   mant1+14
-         sta   t1+6
+         sta   >t1+6
          lda   exp1
          asl   a
          asl   sign1
          ror   a
-         sta   t1+8
+         sta   >t1+8
          
          lda   xcps                     if there were exceptions then
          beq   ret
