@@ -691,16 +691,17 @@ convert  lda   4+8,s
          pla                              if original value was negative
          bpl   done
          sec
-         lda   #0                           negate result
+         ldx   #0                           negate result
+         txa
          sbc   6,s
          sta   6,s
-         lda   #0
+         txa
          sbc   6+2,s
          sta   6+2,s
-         lda   #0
+         txa
          sbc   6+4,s
          sta   6+4,s
-         lda   #0
+         txa
          sbc   6+6,s
          sta   6+6,s
 

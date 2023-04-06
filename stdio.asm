@@ -688,24 +688,26 @@ disp     equ   1                        disp in s
 
          ph4   <stream                  verify that stream exists
          jsl   ~VerifyStream
-         bcs   err1
-         ph4   <stream                  quit with NULL if at EOF
-         jsl   feof
-         tax
-         beq   lb0
-err1     stz   s
-         stz   s+2
-         bra   rts
-lb0      stz   disp                     no characters processed so far
-         lda   #0
-         sta   [s]
+         bcs   err
+         stz   disp                     no characters processed so far
          dec   n                        leave room for the null terminator
          bmi   err
-         beq   err
+         bne   lb1
+         short M                        n = 1: store null terminator only
+         lda   #0
+         sta   [s]
+         long  M
+         bra   rts
 lb1      ph4   <stream                  get a character
          jsl   fgetc
-         tax                            quit with error if it is an EOF
+         tax                            if error or EOF encountered
          bpl   lb2
+         lda   disp                       if no characters read, return NULL
+         beq   err
+         ldy   #FILE_flag                 if error encountered, return NULL
+         lda   [stream],Y
+         and   #_IOERR
+         beq   rts                        else return s
 err      stz   s
          stz   s+2
          bra   rts
@@ -2249,9 +2251,15 @@ disp     equ   1                        disp in s
 
          stz   disp                     no characters processed so far
 lb1      jsl   getchar                  get a character
-         tax                            quit with error if it is an EOF
+         tax                            if error or EOF encountered
          bpl   lb2
-         stz   s
+         lda   disp                       if no characters read, return NULL
+         beq   err
+         ph4   >stdin                     if error encountered, return NULL
+         jsl   ferror
+         tax
+         beq   rts                        else return s
+err      stz   s
          stz   s+2
          bra   rts
 lb2      cmp   #LF                      quit if it was a \n
@@ -3202,9 +3210,8 @@ pr       dc    i'2'                     parameter block for OSGet_Prefix
          dc    i'3'
          dc    a4'name'
 
-name     dc    i'16,0'                  GS/OS name buffer
+name     dc    i'17+4,0'                GS/OS name buffer
 cname    ds    26                       part of name; also C buffer
-GS_OSname dc   i'8'                     used for OSGet_File_Info
 syscxxxx dc    c'SYSC0000',i1'0'        for creating unique names
 
 GIParm   dc    i'2'                     used to see if the file exists
@@ -4909,20 +4916,20 @@ fm4      cmp   #'L'                     else if *format in ['L','h'] then
          inc   ~isByte
 fm5      inc4  format                     ++format
          lda   [format]                 find the proper format character
-         and   #$00FF
 fm6      inc4  format
-         ldx   #fListEnd-fList-4
+         short M,I
+         ldx   #fListEnd-fList-3
 fm7      cmp   fList,X
          beq   fm8
          dex
          dex
          dex
-         dex
          bpl   fm7
+         long  M,I
          brl   ps1                      none found - continue
-fm8      pea   ps1-1                    push the return address
+fm8      long  M,I
+         pea   ps1-1                    push the return address
          inx                            call the subroutine
-         inx
          jmp   (fList,X)
 ;
 ;  Flag - Read and process a flag character
@@ -5013,27 +5020,27 @@ val      ds    2                        value
 ;
 ;  List of format specifiers and the equivalent subroutines
 ;
-fList    dc    c'%',i1'0',a'~Format_Percent'    %
-         dc    c'a',i1'0',a'~Format_e'          a (not formatted correctly)
-         dc    c'A',i1'0',a'~Format_E'          A (not formatted correctly)
-         dc    c'f',i1'0',a'~Format_f'          f
-         dc    c'F',i1'0',a'~Format_f'          F
-         dc    c'e',i1'0',a'~Format_e'          e
-         dc    c'E',i1'0',a'~Format_E'          E
-         dc    c'g',i1'0',a'~Format_g'          g
-         dc    c'G',i1'0',a'~Format_G'          G
-         dc    c'n',i1'0',a'~Format_n'          n
-         dc    c's',i1'0',a'~Format_s'          s
-         dc    c'b',i1'0',a'~Format_b'          b
-         dc    c'P',i1'0',a'~Format_P'          P
-         dc    c'p',i1'0',a'~Format_p'          p
-         dc    c'c',i1'0',a'~Format_c'          c
-         dc    c'X',i1'0',a'~Format_X'          X
-         dc    c'x',i1'0',a'~Format_x'          x
-         dc    c'o',i1'0',a'~Format_o'          o
-         dc    c'u',i1'0',a'~Format_u'          u
-         dc    c'd',i1'0',a'~Format_d'          d
-         dc    c'i',i1'0',a'~Format_d'          i
+fList    dc    c'%',a'~Format_Percent'  %
+         dc    c'a',a'~Format_e'        a (not formatted correctly)
+         dc    c'A',a'~Format_E'        A (not formatted correctly)
+         dc    c'f',a'~Format_f'        f
+         dc    c'F',a'~Format_f'        F
+         dc    c'e',a'~Format_e'        e
+         dc    c'E',a'~Format_E'        E
+         dc    c'g',a'~Format_g'        g
+         dc    c'G',a'~Format_G'        G
+         dc    c'n',a'~Format_n'        n
+         dc    c's',a'~Format_s'        s
+         dc    c'b',a'~Format_b'        b
+         dc    c'P',a'~Format_P'        P
+         dc    c'p',a'~Format_p'        p
+         dc    c'c',a'~Format_c'        c
+         dc    c'X',a'~Format_X'        X
+         dc    c'x',a'~Format_x'        x
+         dc    c'o',a'~Format_o'        o
+         dc    c'u',a'~Format_u'        u
+         dc    c'd',a'~Format_d'        d
+         dc    c'i',a'~Format_d'        i
 fListEnd anop
          end
 
@@ -6117,7 +6124,7 @@ fm2b     inc   ~size
 fm2c     inc   ~size
          bra   fm4
 fm3      cmp   #'h'                     'h' specifies short int
-         bne   fm5
+         bne   fm6
          inc4  format                     unless it is 'hh' for char types
          lda   [format]
          and   #$00FF
@@ -6126,21 +6133,21 @@ fm3      cmp   #'h'                     'h' specifies short int
          dec   ~size
 fm4      inc4  format                     ignore the character
 
-fm5      lda   [format]                 find the proper format character
-         and   #$00FF
+         lda   [format]                 find the proper format character
 fm6      inc4  format
-         ldx   #fListEnd-fList-4
+         short M,I
+         ldx   #fListEnd-fList-3
 fm7      cmp   fList,X
          beq   fm8
          dex
          dex
          dex
-         dex
          bpl   fm7
+         long  M,I
          brl   ps1                      none found - continue
-fm8      pea   ps1-1                    push the return address
+fm8      long  M,I
+         pea   ps1-1                    push the return address
          inx                            call the subroutine
-         inx
          jmp   (fList,X)
 ;
 ;  GetSize - get a numeric value
@@ -6182,28 +6189,28 @@ val      ds    2                        value
 ;
 ;  List of format specifiers and the equivalent subroutines
 ;
-fList    dc    c'd',i1'0',a'~Scan_d'            d
-         dc    c'i',i1'0',a'~Scan_i'            i
-         dc    c'u',i1'0',a'~Scan_u'            u
-         dc    c'o',i1'0',a'~Scan_o'            o
-         dc    c'x',i1'0',a'~Scan_x'            x
-         dc    c'X',i1'0',a'~Scan_x'            X
-         dc    c'p',i1'0',a'~Scan_p'            p
-         dc    c'c',i1'0',a'~Scan_c'            c
-         dc    c's',i1'0',a'~Scan_s'            s
-         dc    c'b',i1'0',a'~Scan_b'            b
-         dc    c'P',i1'0',a'~Scan_P'            P
-         dc    c'n',i1'0',a'~Scan_n'            n
-         dc    c'a',i1'0',a'~Scan_f'            a
-         dc    c'A',i1'0',a'~Scan_f'            A
-         dc    c'f',i1'0',a'~Scan_f'            f
-         dc    c'F',i1'0',a'~Scan_f'            F
-         dc    c'e',i1'0',a'~Scan_f'            e
-         dc    c'E',i1'0',a'~Scan_f'            E
-         dc    c'g',i1'0',a'~Scan_f'            g
-         dc    c'G',i1'0',a'~Scan_f'            G
-         dc    c'%',i1'0',a'~Scan_percent'      %
-         dc    c'[',i1'0',a'~Scan_lbrack'       [
+fList    dc    c'd',a'~Scan_d'          d
+         dc    c'i',a'~Scan_i'          i
+         dc    c'u',a'~Scan_u'          u
+         dc    c'o',a'~Scan_o'          o
+         dc    c'x',a'~Scan_x'          x
+         dc    c'X',a'~Scan_x'          X
+         dc    c'p',a'~Scan_p'          p
+         dc    c'c',a'~Scan_c'          c
+         dc    c's',a'~Scan_s'          s
+         dc    c'b',a'~Scan_b'          b
+         dc    c'P',a'~Scan_P'          P
+         dc    c'n',a'~Scan_n'          n
+         dc    c'a',a'~Scan_f'          a
+         dc    c'A',a'~Scan_f'          A
+         dc    c'f',a'~Scan_f'          f
+         dc    c'F',a'~Scan_f'          F
+         dc    c'e',a'~Scan_f'          e
+         dc    c'E',a'~Scan_f'          E
+         dc    c'g',a'~Scan_f'          g
+         dc    c'G',a'~Scan_f'          G
+         dc    c'%',a'~Scan_percent'    %
+         dc    c'[',a'~Scan_lbrack'     [
 fListEnd anop
 ;
 ;  Other local data

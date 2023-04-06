@@ -186,6 +186,9 @@ TAB      equ   9                        TAB key code
          stz   ~ExitList+2
          stz   ~QuickExitList
          stz   ~QuickExitList+2
+         case  on
+         stz   __useTimeTool            do not use Time Tool
+         case  off
 
          lda   cLine                    if cLine == 0 then
          ora   cLine+2
@@ -240,8 +243,6 @@ lb6      long  M
          phy
          sec
          adc   1,S
-         ply
-         pha
          pha
          pea   0
          pha
@@ -261,20 +262,19 @@ lb7      pl4   argv                     get the pointer to the area
          lda   [argv]
          sta   targv
          stx   targv+2
-         clc                            get a pointer to the command line string
-         adc   start
+;        clc                            (already clear)
+         adc   start                    get a pointer to the command line string
          bcc   lb8
          inx
 lb8      sta   argv
          stx   argv+2
          short M                        move the command line string
-         ldy   #0
-lb9      lda   [cLine],Y
+         ldy   #-1
+lb9      iny
+         lda   [cLine],Y
          sta   [argv],Y
-         beq   lb10
-         iny
-         bra   lb9
-lb10     long  M
+         bne   lb9
+         long  M
          move4 argv,cLine               save the pointer
          move4 targv,argv               set up the pointer to argv
 
@@ -360,6 +360,9 @@ start    ds    2                        start of the command line string
          stz   ~ExitList+2
          stz   ~QuickExitList
          stz   ~QuickExitList+2
+         case  on
+         stz   __useTimeTool            do not use Time Tool
+         case  off
          lda   #~RTL                    set up so exit(), etc. call ~RTL
          sta   ~C_Quit+1
 
@@ -371,6 +374,78 @@ start    ds    2                        start of the command line string
 
 targv    ds    4
          end
+
+****************************************************************
+*
+*  ~CDevCleanup - cleanup code run after a CDev call
+*
+*  Inputs:
+*        A+X - CDev result value
+*        1,S - Original data bank to restore
+*        2,S - Return address
+*        5,S - Message code passed to CDev
+*        7,S - Old user ID from before the call (0 if none)
+*
+*  Notes:
+*        This routine handles cases where the CDev is going
+*        away and so the user ID allocated for it needs to be
+*        disposed of to avoid being leaked.
+*
+****************************************************************
+*
+~CDevCleanup start
+MachineCDEV equ 1
+BootCDEV equ 2
+CloseCDEV equ 5
+AboutCDEV equ 8
+
+         tay                            stash low word of result
+
+         lda    5,s                     if message == CloseCDEV
+         cmp    #CloseCDEV
+         beq    cleanup
+         cmp    #BootCDEV               or message == BootCDEV
+         beq    cleanup
+         cmp    #AboutCDEV              or message == AboutCDEV
+         bne    lb1
+         lda    7,s                       and original user ID was 0
+         beq    cleanup                   (i.e. CDev window was not open)
+         bra    ret
+lb1      cmp    #MachineCDEV            or message == MachineCDEV
+         bne    ret
+         tya                              and return value is 0
+         bne    ret
+         txa
+         bne    ret
+
+cleanup  pea    0                       ...then dispose of user ID
+         jsl    >~DAID
+
+ret      tya                            store return value in result space
+         sta    5,s
+         txa
+         sta    7,s
+         plb                            restore data bank
+         rtl                            return to original caller
+         end
+
+****************************************************************
+*
+*  ~CheckPtrC - check a pointer to insure it is not null
+*
+*  Inputs:
+*       1,S - return address
+*       4,S - pointer
+*
+****************************************************************
+*
+~CheckPtrC start
+        lda   4,S
+        ora   5,S
+        bne   lb1
+        error #1                        subrange exceeded
+lb1     rtl
+        end
 
 ****************************************************************
 *
@@ -443,10 +518,7 @@ ptr      equ   3                        pointer to exit routines
 ;
 ;  Set up our stack frame
 ;
-         phb
-         phk
-         plb
-         ph4   ~ExitList                set up our stack frame
+         ph4   >~ExitList               set up our stack frame
          phd
          tsc
          tcd
@@ -501,7 +573,6 @@ lb3      lda   >__cleanup+2
 lb4      pld                            return
          pla
          pla
-         plb
          rts
          end
 
@@ -519,10 +590,7 @@ ptr      equ   3                        pointer to exit routines
 ;
 ;  Set up our stack frame
 ;
-         phb
-         phk
-         plb
-         ph4   ~QuickExitList           set up our stack frame
+         ph4   >~QuickExitList          set up our stack frame
          phd
          tsc
          tcd
@@ -559,7 +627,6 @@ lb2      ldy   #2                         dereference the pointer
 lb3      pld                            return
          pla
          pla
-         plb
          rts
          end
 

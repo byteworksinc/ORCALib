@@ -333,6 +333,10 @@ addr     equ   13                       address of array element of index test
 
          csubroutine (4:key,4:base,4:count,4:size,4:compar),16
 
+         lda   count                    if count is 0 then
+         ora   count+2
+         jeq   lb5                        just return a null pointer
+
          lda   compar                   patch the call address
          sta   >jsl+1
          lda   compar+1
@@ -700,13 +704,14 @@ ret      stx   n
 qsort    start
 
          csubroutine (4:base,4:count,4:size,4:compar),0
-         phb
-         phk
-         plb
 
          lda   count                    nothing to do if count is 0
          ora   count+2
          beq   done
+
+         phb
+         phk
+         plb
          dec4  count                    set count to the addr of the last entry
          mul4  count,size
          add4  count,base
@@ -717,12 +722,13 @@ qsort    start
          lda   compar+1
          sta   jsl1+2
          sta   jsl2+2
+         plb
+
          ph4   <count                   do the sort
          ph4   <base
          jsl   rsort
 
-done     plb
-         creturn
+done     creturn
          end
 
 ****************************************************************
@@ -765,26 +771,31 @@ right    equ   5                        right address
 
          csubroutine (4:first,4:last),8
 
-         phb
+sr0      phb
          phk
          plb
-sr0      lda   last+2                   if last <= first then quit
+         lda   last+2                   if last <= first then quit
+         bmi   sr1a
          cmp   first+2
          bne   sr1
          lda   last
          cmp   first
-sr1      bgt   sr1a
-         plb
+sr1      bgt   sr1b
+sr1a     plb
          creturn
 
-sr1a     move4 last,right               right = last
+sr1b     move4 last,right               right = last
          move4 first,left               left = first
          bra   sr3
 sr2      add4  left,lsize               inc left until *left >= *last
-sr3      ph4   <last
+sr3      plb
+         ph4   <last
          ph4   <left
 jsl1     entry
          jsl   jsl1
+         phb
+         phk
+         plb
          tax
          bmi   sr2
 sr4      lda   right                    quit if right = first
@@ -794,10 +805,14 @@ sr4      lda   right                    quit if right = first
          cmp   first+2
          beq   sr4b
 sr4a     sub4  right,lsize              dec right until *right <= *last
+         plb
          ph4   <last
          ph4   <right
 jsl2     entry
          jsl   jsl2
+         phb
+         phk
+         plb
          dec   A
          bpl   sr4
 sr4b     ph4   <left                    swap left/right entries
@@ -815,11 +830,24 @@ sr5      blt   sr2
          ph4   <left                    swap left/last entries
          ph4   <last
          jsr   swap
-         sub4  left,lsize,right         sort left part of array
-         ph4   <right
+         sub4  left,lsize,right         calculate bounds of subarrays
+         add4  left,lsize                 (first..right and left..last)
+         add4  first,last,mid           calculate midpoint of range being sorted
+         lsr   mid+2
+         ror   mid
+         cmpl  right,mid                if right < mid then
+         bge   sr6
+         plb
+         ph4   <right                     sort left subarray recursively
          ph4   <first
          jsl   rsort
-         add4  left,lsize,first         sort right part of array
+         move4 left,first                 sort right subarray via tail call
+         brl   sr0
+sr6      plb                            else
+         ph4   <last                      sort right subarray recursively
+         ph4   <left
+         jsl   rsort
+         move4 right,last                 sort left subarray via tail call
          brl   sr0
 ;
 ;  swap - swap two entries
@@ -830,8 +858,9 @@ r        equ   7                        right entry
 swap     tsc                            set up addressing
          phd
          tcd
-         ldx   lsize+2                  move 64K chunks
+         lda   lsize+2                  move 64K chunks
          beq   sw2
+         sta   banks
          ldy   #0
 sw1      lda   [l],Y
          tax
@@ -844,7 +873,7 @@ sw1      lda   [l],Y
          bne   sw1
          inc   l+2
          inc   r+2
-         dex
+         dec   banks
          bne   sw1
 sw2      lda   lsize                    if there are an odd number of bytes then
          lsr   A
@@ -893,6 +922,8 @@ sw6      pld
 ;
 lsize    entry
          ds    4                        local copy of size
+banks    ds    2                        number of whole banks to swap
+mid      ds    4                        midpoint of the elements being sorted
          end
 
 ****************************************************************
@@ -968,9 +999,10 @@ rtl      equ   7                        return address
 val      equ   3                        value
 negative equ   1                        is the number negative?
 
-         pea   0                        make room for & initialize val
-         pea   0
-         pea   0                        make room for & initialize negative
+         lda   #0
+         pha                            make room for & initialize val
+         pha
+         pha                            make room for & initialize negative
          tsc                            set up direct page addressing
          phd
          tcd
@@ -1095,10 +1127,11 @@ foundOne equ   1                        have we found a number?
          ldx   #1
 
 init     pea   1                        make room for & initialize rangeOK
-         pea   0                        make room for & initialize negative
-         pea   0                        make room for & initialize val
-         pea   0
-         pea   0                        make room for & initialize foundOne
+         lda   #0
+         pha                            make room for & initialize negative
+         pha                            make room for & initialize val
+         pha
+         pha                            make room for & initialize foundOne
          tsc                            set up direct page addressing
          phd
          tcd
@@ -1286,13 +1319,14 @@ retptr   equ   11                       pointer to location for return value
 val      equ   3                        value
 negative equ   1                        is the number negative?
 
-         pea   0                        make room for & initialize retptr
+         lda   #0
+         pha                            make room for & initialize retptr
          phx
-         pea   0                        make room for & initialize val
-         pea   0
-         pea   0
-         pea   0
-         pea   0                        make room for & initialize negative
+         pha                            make room for & initialize val
+         pha
+         pha
+         pha
+         pha                            make room for & initialize negative
          tsc                            set up direct page addressing
          phd
          tcd
@@ -1435,15 +1469,16 @@ foundOne equ   1                        have we found a number?
 ~strtoull entry                         alt entry point called from strtoll
          ldy   #1
 
-init     pea   0                        make room for & initialize retptr
+init     lda   #0
+         pha                            make room for & initialize retptr
          phx
          pea   1                        make room for & initialize rangeOK
-         pea   0                        make room for & initialize negative
-         pea   0                        make room for & initialize val
-         pea   0
-         pea   0
-         pea   0
-         pea   0                        make room for & initialize foundOne
+         pha                            make room for & initialize negative
+         pha                            make room for & initialize val
+         pha
+         pha
+         pha
+         pha                            make room for & initialize foundOne
          tsc                            set up direct page addressing
          phd
          tcd

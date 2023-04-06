@@ -477,11 +477,6 @@
 ~&SYSCNT ~RESTM
  MEND
  MACRO
-&LAB JLT &BP
-&LAB BGE *+5
- BRL &BP
- MEND
- MACRO
 &LAB LLA &AD1,&AD2
 &LAB ANOP
  LCLA &L
@@ -621,3 +616,54 @@
 &LAB LDX #$260B
  JSL $E10000
  MEND
+ MACRO
+&lab _tiStatus
+&lab ldx #$0638
+ jsl $E10000
+ MEND
+ MACRO
+&lab _tiGetTimePrefs
+&lab ldx #$0938
+ jsl $E10000
+ MEND
+ MACRO
+&lab _tiOffset2TimeZoneString
+&lab ldx #$1138
+ jsl $E10000
+ MEND
+ MACRO
+&lab _LongMul
+&lab ldx #$0C0B
+ jsl $E10000
+ MEND
+ macro
+&l negate8 &n1
+&l ~setm
+ sec
+ ldy #0
+ tya
+ sbc &n1
+ sta &n1
+ tya
+ sbc &n1+2
+ sta &n1+2
+ tya
+ sbc &n1+4
+ sta &n1+4
+ tya
+ sbc &n1+6
+ sta &n1+6
+ ~restm
+ mend
+ macro
+&l cmpl &n1,&n2
+ lclb &yistwo
+&l ~setm
+ ~lda.h &n1
+ ~op.h cmp,&n2
+ bne ~a&SYSCNT
+ ~lda &n1
+ ~op cmp,&n2
+~a&SYSCNT anop
+ ~restm
+ mend

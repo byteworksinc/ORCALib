@@ -23,7 +23,7 @@ Dummy    start                          (dummy root segment)
 *
 ****************************************************************
 *
-CVars    start
+~CVars   start
 
 errno    entry                          library error number
          ds    2
@@ -34,5 +34,7 @@ __cleanup entry                         function to clean up files at exit
          dc    i4'0'
 _toolErr entry                          last error in a tool call (C)
 ~TOOLERROR entry                        last error in a tool call (Pascal)
+         ds    2
+__useTimeTool entry                     use Time Tool in <time.h> functions?
          ds    2
          end

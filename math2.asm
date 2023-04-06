@@ -317,11 +317,7 @@ acoshl   entry
 
 ret      FPROCEXIT                      restore env & raise any new exceptions
          plb
-         lda   #t1                      return t1
-         sta   x
-         lda   #^t1
-         sta   x+2
-         creturn 4:x
+         creturn 10:t1                  return t1
 
 y        ds    10                       temporary variable
 one      dc    i'1'                     constants
@@ -442,11 +438,7 @@ setsign  asl   z+8                      sign of z = original sign of x
 
          FPROCEXIT                      restore env & raise any new exceptions
          plb
-         lda   #z                       return z
-         sta   x
-         lda   #^z
-         sta   x+2
-         creturn 4:x
+         creturn 10:z                   return z
 
 y        ds    10                       temporary variables
 z        ds    10
@@ -546,11 +538,7 @@ setsign  asl   t1+8                     sign of t1 = original sign of x
 
          FPROCEXIT                      restore env & raise any new exceptions
          plb
-         lda   #t1                      return t1
-         sta   x
-         lda   #^t1
-         sta   x+2
-         creturn 4:x
+         creturn 10:t1                  return t1
 
 one      dc    i'1'                     constants
 minustwo dc    i'-2'
@@ -646,11 +634,7 @@ do_calc  sta   t1+8
          ror   t1+8
 
          plb
-         lda   #t1                      return t1
-         sta   x
-         lda   #^t1
-         sta   x+2
-         creturn 4:x
+         creturn 10:t1                  return t1
 
 onethird dc    e'0.33333333333333333333'
          end
@@ -700,6 +684,300 @@ copysignl entry
          ldx   #^t1                     return a pointer to the result
          lda   #t1
          rtl
+         end
+
+****************************************************************
+*
+*  double erf(double x);
+*
+*  Returns the error function of x.
+*
+*  double erfc(double x);
+*
+*  Returns the complementary error function of x, 1 - erf(x).
+*
+*  This implementation is based on W. J. Cody's article 
+*  "Rational Chebyshev Approximations for the Error Function."
+*
+****************************************************************
+*
+erf      start
+erff     entry
+erfl     entry
+         using MathCommon2
+x_offset equ   9                        stack offset of x (in most of the code)
+
+         clc
+         bra   lb1
+
+erfc     entry
+erfcf    entry
+erfcl    entry
+
+         sec
+
+lb1      phb                            save & set data bank
+         phk
+         plb
+
+         pha                            make space for saved SANE environment
+         
+         lda   x_offset-2+8,s
+         ror   a                        save erf/erfc flag (high bit)
+         pha                              and original sign (next bit)
+
+         rol   a                        t1 := |x|
+         rol   a
+         lsr   a
+         sta   t1+8
+         lda   x_offset+6,s
+         sta   t1+6
+         lda   x_offset+4,s
+         sta   t1+4
+         lda   x_offset+2,s
+         sta   t1+2
+         lda   x_offset,s
+         sta   t1
+
+         tsc                            save env & set to default
+         clc
+         adc   #3
+         pea   0
+         pha
+         FPROCENTRY
+;
+; Computation using approximation of erf, for small enough x values
+;
+         ph4   #threshold               if |x| <= 0.5 then
+         ph4   #t1
+         FCMPS
+         jmi   use_erfc
+         
+         ph4   #t1                        t1 := x^2
+         ph4   #t1
+         FMULX
+
+         ph4   #y                         y := P1(t1)
+         pea   4
+         ph4   #P1
+         jsl   poly
+
+         ph4   #z                         z := Q1(t1)
+         pea   4
+         ph4   #Q1
+         jsl   poly
+
+         ph4   #z                         y := y/z
+         ph4   #y
+         FDIVX
+
+         tsc                              y := x * y
+         clc
+         adc   #x_offset
+         pea   0
+         pha
+         ph4   #y
+         FMULX
+
+         pla
+         jpl   clearxcp                   if computing erfc then
+         
+         ph4   #one                         y := y - 1
+         ph4   #y
+         FSUBX
+         brl   flipsign                     y := -y
+;
+; Computation using approximations of erfc, for larger x values
+;
+use_erfc ph4   #four                    else
+         ph4   #t1
+         FCMPI
+         jmi   big_erfc                   if |x| <= 4 then
+
+         ph4   #y                           y := P2(t1)
+         pea   8
+         ph4   #P2
+         jsl   poly
+
+         ph4   #z                           z := Q2(t1)
+         pea   8
+         ph4   #Q2
+         jsl   poly
+
+         ph4   #z                           y := y/z
+         ph4   #y
+         FDIVX
+
+         ph4   #t1                          t1 := e^(-x^2)
+         ph4   #t1
+         FMULX
+         lda   t1+8
+         eor   #$8000
+         sta   t1+8
+         ph4   #t1
+         FEXPX
+         
+         ph4   #t1                          y := t1 * y
+         ph4   #y
+         FMULX
+         
+         brl   end_erfc                   else (if |x| > 4 or NAN)
+
+big_erfc pea   -2                           t1 := 1 / x^2
+         ph4   #t1
+         FXPWRI
+
+         ph4   #y                           y := P3(t1)
+         pea   5
+         ph4   #P3
+         jsl   poly
+
+         ph4   #z                           z := Q3(t1)
+         pea   5
+         ph4   #Q3
+         jsl   poly
+
+         ph4   #z                           y := y/z
+         ph4   #y
+         FDIVX
+         
+         ph4   #t1                          y := t1 * y
+         ph4   #y
+         FMULX
+         
+         ph4   #one_over_sqrt_pi            y := 1/sqrt(pi) + y
+         ph4   #y
+         FADDX
+         
+         lda   x_offset+8,s                 y := y / |x|
+         and   #$7fff
+         sta   x_offset+8,s
+         tsc
+         clc
+         adc   #x_offset
+         ldx   #0
+         phx                                (push operands of below calls)
+         pha
+         phx
+         pha
+         phx
+         pha
+         phx
+         pha
+         phx
+         pha
+         ph4   #y
+         FDIVX
+
+         FMULX                              y := e^(-x^2) * y
+         lda   x_offset+8+8,s
+         eor   #$8000
+         sta   x_offset+8+8,s
+         FEXPX       
+         ph4   #y
+         FMULX
+
+end_erfc pla
+         bpl   erf_from_erfc              if computing erfc then
+
+         ldx   #$1300                       (set allowed exception mask)
+         asl   a
+         bpl   rstr_env                     if x < 0
+         
+         ph4   #two                           y := y - 2
+         ph4   #y
+         FSUBI
+         bra  flipsign                        y :=  -y
+         
+erf_from_erfc anop
+         pha
+         ph4   #one                       if computing erf then
+         ph4   #y
+         FSUBX                              y := y - 1
+         
+         pla
+         asl   a
+         bmi   clearxcp                     if x > 0 then
+
+flipsign lda   y+8                            y := -y
+         eor   #$8000
+         sta   y+8
+
+clearxcp ldx   #$1100                   ignore overflow, div-by-zero
+rstr_env stx   z                        (& underflow unless doing erfc for x>.5)
+         FGETENV
+         txa
+         and   z
+         ora   1,s
+         sta   1,s
+         FSETENV                        unless computing erfc for x > 4
+
+         pla                            clean up stack
+         sta   9,s
+         pla
+         sta   9,s
+         tsc
+         clc
+         adc   #6
+         tcs
+         plb
+         ldx   #^y                      return a pointer to the result
+         lda   #y
+         rtl
+
+threshold dc   f'0.5'                   threshold for computing erf or erfc
+
+; constants
+two      dc    i2'2'
+four     dc    i2'4'
+one_over_sqrt_pi dc e'0.564189583547756286924'
+; coefficients for erf calculation, |x| <= .5
+P1       dc    e'1.857777061846031526730e-1'
+         dc    e'3.161123743870565596947e+0'
+         dc    e'1.138641541510501556495e+2'
+         dc    e'3.774852376853020208137e+2'
+         dc    e'3.209377589138469472562e+3'
+one      anop
+Q1       dc    e'1.0'
+         dc    e'2.360129095234412093499e+1'
+         dc    e'2.440246379344441733056e+2'
+         dc    e'1.282616526077372275645e+3'
+         dc    e'2.844236833439170622273e+3'
+; coefficients for erfc calculation, .46875 <= x <= 4
+P2       dc    e'2.15311535474403846343e-8'
+         dc    e'5.64188496988670089180e-1'
+         dc    e'8.88314979438837594118e+0'
+         dc    e'6.61191906371416294775e+1'
+         dc    e'2.98635138197400131132e+2'
+         dc    e'8.81952221241769090411e+2'
+         dc    e'1.71204761263407058314e+3'
+         dc    e'2.05107837782607146532e+3'
+         dc    e'1.23033935479799725272e+3'
+Q2       dc    e'1.0'
+         dc    e'1.57449261107098347253e+1'
+         dc    e'1.17693950891312499305e+2'
+         dc    e'5.37181101862009857509e+2'
+         dc    e'1.62138957456669018874e+3'
+         dc    e'3.29079923573345962678e+3'
+         dc    e'4.36261909014324715820e+3'
+         dc    e'3.43936767414372163696e+3'
+         dc    e'1.23033935480374942043e+3'
+; coefficients for erfc calculation, x >= 4
+P3       dc    e'-1.63153871373020978498e-2'
+         dc    e'-3.05326634961232344035e-1'
+         dc    e'-3.60344899949804439429e-1'
+         dc    e'-1.25781726111229246204e-1'
+         dc    e'-1.60837851487422766278e-2'
+         dc    e'-6.58749161529837803157e-4'
+Q3       dc    e'1.0'
+         dc    e'2.56852019228982242072e+0'
+         dc    e'1.87295284992346047209e+0'
+         dc    e'5.27905102951428412248e-1'
+         dc    e'6.05183413124413191178e-2'
+         dc    e'2.33520497626869185443e-3'
+;                                        temporaries / return values
+y        ds    10
+z        ds    10
          end
 
 ****************************************************************
@@ -851,6 +1129,430 @@ ret      plx                            clean up stack
          ldx   #^t1                     return a pointer to the result
          lda   #t1
          rtl
+         end
+
+****************************************************************
+*
+*  double fma(double x, double y, double z);
+*
+*  Compute (x * y) + z, rounded only once at the end.
+*
+****************************************************************
+*
+fma      start
+fmaf     entry
+fmal     entry
+         using MathCommon2
+mant1    equ    1                       mantissa of value 1
+exp1     equ    mant1+16                exponent of value 1
+sign1    equ    exp1+4                  sign of value 1 (high bit)
+mant2    equ    sign1+2                 mantissa of value 2
+exp2     equ    mant2+16                exponent of value 2
+sign2    equ    exp2+4                  sign of value 2 (low bit)
+expdiff  equ    sign2+2                 difference between exponents
+extra    equ    expdiff+4               extra bits (guard, round, sticky)
+xcps     equ    extra+2                 floating-point exceptions
+
+         csubroutine (10:x,10:y,10:z),54
+
+         stz   extra
+         lda   x                        if x or y is NAN, INF, or 0 then
+         ora   x+2
+         ora   x+4
+         ora   x+6
+         beq   nanInf0                    return (x * y) + z computed with SANE
+         lda   x+8
+         asl   a
+         cmp   #32767*2
+         beq   nanInf0
+
+         lda   y
+         ora   y+2
+         ora   y+4
+         ora   y+6
+         beq   nanInf0
+         lda   y+8
+         asl   a
+         cmp   #32767*2
+         beq   nanInf0
+
+         lda   z+8                      else if z is INF or NAN then
+         asl   a
+         cmp   #32767*2
+         beq   x_plus_z                   return x + z computed with SANE
+         inc   extra
+         lda   z                        else if z is 0 then
+         ora   z+2
+         ora   z+4
+         ora   z+6                        return x * y computed with SANE
+         bne   compute                  else compute fma(x,y,z) ourselves
+
+;
+; Compute with SANE if any operands are NAN/INF/0
+;
+nanInf0  tdc                            if in first or third case above then
+         clc
+         adc   #y
+         pea   0
+         pha
+         adc   #x-y
+         pea   0
+         pha
+         FMULX                            x = x * y
+
+x_plus_z ldy   extra                    if in first or second case above then
+         bne   return_x
+
+         tdc                            
+         clc
+         adc   #z
+         phy
+         pha
+         adc   #x-z
+         phy
+         pha
+         FADDX                            x = x + z
+
+return_x lda   x                        copy result to t1
+         sta   >t1
+         lda   x+2
+         sta   >t1+2
+         lda   x+4
+         sta   >t1+4
+         lda   x+6
+         sta   >t1+6
+         lda   x+8
+         sta   >t1+8
+         brl   ret                      return result
+
+;
+; Compute it ourselves if all operands are finite and non-zero
+;
+compute  stz   xcps                     no exceptions so far
+         lda   x                        copy mantissa of x to mant1
+         sta   mant1
+         lda   x+2
+         sta   mant1+2
+         lda   x+4
+         sta   mant1+4
+         lda   x+6
+         sta   mant1+6
+         stz   mant1+8
+         stz   mant1+10
+         stz   mant1+12
+         stz   mant1+14
+
+         ldy   #64                      multiply mantissas (64 x 64 to 128-bit)
+ml1      lda   mant1
+         lsr   a
+         bcc   ml2
+         clc                              add multiplicand to partial product
+         lda   mant1+8
+         adc   y
+         sta   mant1+8
+         lda   mant1+10
+         adc   y+2
+         sta   mant1+10
+         lda   mant1+12
+         adc   y+4
+         sta   mant1+12
+         lda   mant1+14
+         adc   y+6
+         sta   mant1+14
+ml2      ror   mant1+14                   shift the interim result
+         ror   mant1+12
+         ror   mant1+10
+         ror   mant1+8
+         ror   mant1+6
+         ror   mant1+4
+         ror   mant1+2
+         ror   mant1
+         dey                              loop until done
+         bne   ml1
+
+         lda   x+8                      calculate exponent
+         asl   a
+         sta   exp1
+         lda   y+8
+         asl   a
+         clc
+         adc   exp1
+         ror   a
+         sta   exp1
+         stz   exp1+2
+         add4  exp1,#-16383+1
+         
+         lda   mant1+14                 normalize calculated value
+         bmi   getsign1
+norm1_lp dec4  exp1
+         asl   mant1
+         rol   mant1+2
+         rol   mant1+4
+         rol   mant1+6
+         rol   mant1+8
+         rol   mant1+10
+         rol   mant1+12
+         rol   mant1+14
+         bpl   norm1_lp
+         
+getsign1 lda   x+8                      get sign of x*y
+         eor   y+8
+         sta   sign1
+         
+         lda   z+8                      get sign of z
+         sta   sign2
+
+         and   #$7fff                   copy exponent of z to exp2
+         sta   exp2
+         stz   exp2+2
+
+         stz   mant2                    copy mantissa of z to mant2
+         stz   mant2+2
+         stz   mant2+4
+         stz   mant2+6
+         lda   z
+         sta   mant2+8
+         lda   z+2
+         sta   mant2+10
+         lda   z+4
+         sta   mant2+12
+         lda   z+6
+         sta   mant2+14
+
+         bmi   exp_cmp                  normalize z value
+norm2_lp dec4  exp2
+         asl   mant2+8                    (low mantissa bits stay 0)
+         rol   mant2+10
+         rol   mant2+12
+         rol   mant2+14
+         bpl   norm2_lp
+
+exp_cmp  cmp4  exp1,exp2                if exp1 < exp2
+         bge   do_align
+         jsr   exchange                   exchange value 1 and value 2
+         
+; at this point, exp1 >= exp2
+do_align stz   extra                    initially extra bits are 0
+         sub4  exp1,exp2,expdiff        expdiff = exp1 - exp2
+         cmpl  expdiff,#65+1            if expdiff > 65 then
+         blt   aligntst
+         stz   mant2                      zero out mant2
+         stz   mant2+2
+         stz   mant2+4
+         stz   mant2+6
+         stz   mant2+8
+         stz   mant2+10
+         stz   mant2+12
+         stz   mant2+14
+         inc   extra                      but set the sticky bit for rounding
+         bra   addorsub                 else
+         
+align_lp dec4  expdiff
+         lsr   mant2+14                   shift mant2 until it is aligned
+         ror   mant2+12
+         ror   mant2+10
+         ror   mant2+8
+         ror   mant2+6
+         ror   mant2+4
+         ror   mant2+2
+         ror   mant2
+         ror   extra
+         bcc   aligntst                   maintain sticky bit
+         lda   #$0001
+         tsb   extra
+aligntst lda   expdiff
+         ora   expdiff+2
+         bne   align_lp 
+
+addorsub lda   sign1                    if signs of x*y and z are the same then
+         eor   sign2
+         bmi   subtract
+
+         clc                              mant1 = mant1 + mant2
+         ldx   #-16
+addLoop  lda   mant1+16,x
+         adc   mant2+16,x
+         sta   mant1+16,x
+         inx
+         inx
+         bmi   addLoop
+         bcc   add_done                   if there is carry out
+         ror   mant1+14                     rotate carry back into result
+         ror   mant1+12
+         ror   mant1+10
+         ror   mant1+8
+         ror   mant1+6
+         ror   mant1+4
+         ror   mant1+2
+         ror   mant1
+         ror   extra
+         bcc   inc_exp                      maintain sticky bit
+         lda   #$0001
+         tsb   extra
+inc_exp  inc4  exp1                         increment exponent
+add_done bra   xtrabits                 else
+
+subtract ldx   #14                        if mant1 < mant2 then
+subCmpLp lda   mant1,x                      (note: only occurs if mant2 was
+         cmp   mant2,x                      not shifted, so extra is 0)
+         bne   sub_cmp
+         dex
+         dex
+         bpl   subCmpLp
+sub_cmp  bge   do_sub
+         jsr   exchange                     exchange mant2 and mant1
+
+do_sub   sec                              mant1 = mant1 - mant2 (including extra)
+         lda   #0
+         sbc   extra
+         sta   extra
+         ldx   #-16
+subLoop  lda   mant1+16,x
+         sbc   mant2+16,x
+         sta   mant1+16,x
+         inx
+         inx
+         bmi   subLoop
+         ora   mant1                      if result (including extra bits) is 0 then
+         ora   mant1+2
+         ora   mant1+4
+         ora   mant1+6
+         ora   mant1+8
+         ora   mant1+10
+         ora   mant1+12
+         ora   extra
+         bne   subalign
+         stz   exp1                         set exponent to 0
+         stz   sign1                        set sign to +
+         FGETENV                            if rounding direction is downward then
+         txa
+         bpl   savezero
+         asl   a
+         bmi   savezero
+         dec   sign1                          set sign to -
+savezero brl   do_save                      skip to return
+subalign lda   mant1+14
+         bmi   xtrabits                   normalize after subtraction, if needed
+subAl_lp dec4  exp1
+         asl   extra
+         rol   mant1
+         rol   mant1+2
+         rol   mant1+4
+         rol   mant1+6
+         rol   mant1+8
+         rol   mant1+10
+         rol   mant1+12
+         rol   mant1+14
+subAlNeg bpl   subAl_lp
+
+xtrabits lda   mant1                    consolidate extra bits (into mant1+6)
+         ora   mant1+2
+         ora   mant1+4
+         ora   extra
+         beq   denorm
+         lda   #$0001
+         tsb   mant1+6
+
+denorm   lda   #INEXACT                 assume INEXACT is just INEXACT
+         bra   denormCk                 while exponent is too small
+denormLp inc4  exp1                       increment exponent
+         lsr   mant1+14                   shift mantissa right
+         ror   mant1+12
+         ror   mant1+10
+         ror   mant1+8
+         ror   mant1+6
+         bcc   denorm2                    maintain sticky bit
+         lda   #$0001
+         tsb   mant1+6
+denorm2  lda   #UNDERFLOW+INEXACT         flag that INEXACT also implies UNDERFLOW
+denormCk ldy   exp1+2                     
+         bmi   denormLp
+
+         ldy   mant1+6                  if there are extra bits then
+         beq   saveval       
+         tsb   xcps                       set inexact (+ maybe underflow) exception
+         FGETENV                          get rounding direction
+         txa
+         asl   a
+         bcs   roundDn0
+         bmi   roundUp                    if rounding to nearest then
+         lda   mant1+6                      if first extra bit is 0
+         bpl   saveval                        do not round
+         asl   a                            else if remaining extra bits are non-zero
+         bne   do_round
+         lda   mant1+8                        or low-order bit of result is 1 then
+         lsr   a
+         bcc   saveval
+         bra   do_round                       apply rounding
+
+roundUp  lda   sign1                      if rounding upward then
+         bmi   saveval                      if positive then
+         bra   do_round                       apply rounding
+
+roundDn0 bmi   saveval                    if rounding downward then
+         lda   sign1                        if negative then
+         bpl   saveval                        apply rounding
+
+do_round inc   mant1+8                    (perform the rounding, if needed)
+         bne   saveval
+         inc   mant1+10
+         bne   saveval
+         inc   mant1+12
+         bne   saveval
+         inc   mant1+14
+         bne   saveval
+         sec
+         ror   mant1+14
+         ror   mant1+12
+         ror   mant1+10
+         ror   mant1+8
+         inc4  exp1
+
+saveval  lda   exp1+2                   if value is too large to represent then
+         bne   save_inf
+         lda   exp1
+         cmp   #32766+1
+         blt   do_save
+save_inf lda   #32767                     set it to infinity
+         sta   exp1
+         stz   mant1+8
+         stz   mant1+10
+         stz   mant1+12
+         stz   mant1+14
+         lda   #OVERFLOW+INEXACT          set overflow and inexact exceptions
+         tsb   xcps
+do_save  lda   mant1+8                  generate result
+         sta   >t1
+         lda   mant1+10
+         sta   >t1+2
+         lda   mant1+12
+         sta   >t1+4
+         lda   mant1+14
+         sta   >t1+6
+         lda   exp1
+         asl   a
+         asl   sign1
+         ror   a
+         sta   >t1+8
+         
+         lda   xcps                     if there were exceptions then
+         beq   ret
+         pha                              set them in SANE environment
+         FSETXCP
+
+ret      creturn 10:t1                  return t1
+
+; local subroutine - exchange value 1 and value 2
+; Note: requires mant1/exp1/sign1 and mant2/exp2/sign2 to be in order
+exchange ldx   #16+4+2-2
+xchgLp   lda   mant1,x
+         ldy   mant2,x
+         sta   mant2,x
+         sty   mant1,x
+         dex
+         dex
+         bpl   xchgLp
+         rts
          end
 
 ****************************************************************
@@ -1147,12 +1849,8 @@ naninf   anop                           (we skip to here if x or y is nan/inf)
          FSCALBX
 
 done     FPROCEXIT                      restore env
-         lda   #^t1                     return t1
-         sta   x+2
-         lda   #t1
-         sta   x
          plb
-         creturn 4:x
+         creturn 10:t1                  return t1
          end
 
 ****************************************************************
@@ -1756,12 +2454,8 @@ copysign asl   t1+8                     copy sign of x to t1
          asl   x+8
          ror   t1+8
 
-         lda   #^t1                     return t1 (fractional part)
-         sta   iptr+2
-         lda   #t1
-         sta   iptr
          plb
-         creturn 4:iptr
+         creturn 10:t1                  return t1 (fractional part)
          end
 
 ****************************************************************
@@ -1834,12 +2528,8 @@ copysign asl   t1+8                     copy sign of x to t1
          asl   x+8
          ror   t1+8
 
-ret      lda   #^t1                     return t1 (fractional part)
-         sta   iptr+2
-         lda   #t1
-         sta   iptr
-         plb
-         creturn 4:iptr
+ret      plb
+         creturn 10:t1                  return t1 (fractional part)
          end
 
 ****************************************************************
@@ -1897,13 +2587,9 @@ codeok   ora   #$4000                   set high bit of f for quiet NaN
          stz   t1+4                     set rest of fraction field to 0
          stz   t1+2
          stz   t1
-         
-         lda   #^t1                     return a pointer to the result
-         sta   tagp+2
-         lda   #t1
-         sta   tagp
+
          plb
-         creturn 4:tagp
+         creturn 10:t1                  return a pointer to the result
          end
 
 ****************************************************************
@@ -2385,6 +3071,53 @@ minusinf dc    f'-inf'
 
 ****************************************************************
 *
+*  poly: evaluate a polynomial
+*
+*  Evaluates sum from i=0 to n of K_i * x^i
+*  
+*  Inputs:
+*        coeffs: array of coefficients, K_n down to K_0
+*        n: degree of polynomial
+*        result: pointer to location for result
+*        t1: x value
+*
+*  Note: The coeffs array is assumed not to cross banks.
+*
+****************************************************************
+*
+poly     private
+         using MathCommon2
+
+         csubroutine (4:coeffs,2:n,4:result),0
+         
+         ldy   #8                       val := K_n
+loop1    lda   [coeffs],y
+         sta   [result],y
+         dey
+         dey
+         bpl   loop1
+
+loop2    lda   coeffs                   for i := n-1 downto 0
+         clc
+         adc   #10
+         sta   coeffs
+
+         ph4   #t1                        val := val * x
+         ph4   <result
+         FMULX
+         
+         ph4   <coeffs                    val := val + K_i
+         ph4   <result
+         FADDX
+         
+         dec   n
+         bne   loop2
+         
+         creturn
+         end
+
+****************************************************************
+*
 *  double remainder(double x, double y);
 *
 *  Returns x REM y as specified by IEEE 754: r = x - ny,
@@ -2624,12 +3357,7 @@ roundl   entry
          
 ret      FPROCEXIT                      restore env & raise any new exceptions
          plb
-         
-         lda   #^t1                     return a pointer to the result
-         sta   x+2
-         lda   #t1
-         sta   x
-         creturn 4:x
+         creturn 10:t1                  return a pointer to the result
 
 onehalf  dc    f'0.5'
          end
@@ -2701,12 +3429,8 @@ do_scalb ph4   #t1                      scale the number
          bne   done                       stop: more scaling would not change it
          brl   loop                     else scale by remaining amount
 
-done     lda   #^t1                     return a pointer to the result
-         sta   n+2
-         lda   #t1
-         sta   n
-         plb
-         creturn 4:n
+done     plb
+         creturn 10:t1                  return a pointer to the result
          end
 
 ****************************************************************
@@ -2751,6 +3475,267 @@ scalbnl  entry
          ldx   #^t1                     return a pointer to the result
          lda   #t1
          rtl
+         end
+
+****************************************************************
+*
+*  double tgamma(double x);
+*
+*  Computes the gamma function of x.
+*
+****************************************************************
+*
+tgamma   start
+tgammaf  entry
+tgammal  entry
+         using MathCommon2
+
+         csubroutine (10:x),0
+
+         phb
+         phk
+         plb
+
+         pha                            save env & set to default
+         tsc
+         inc   a
+         pea   0
+         pha
+         FPROCENTRY
+
+* For x < 0.5, use Gamma(x) = pi / (sin(x * pi) * Gamma(1 - x))
+         stz   reflect
+         ph4   #one_half                if x < 0.5 then
+         tdc
+         clc
+         adc   #x
+         pea   0
+         pha
+         FCMPS
+         bvc   lb1
+         inc   reflect
+
+         ldx   #8                         orig_x := x
+lp0      lda   x,x
+         sta   fracpart,x
+         sta   orig_x,x
+         dex
+         dex
+         bpl   lp0
+         
+         ph4   #two                       fracpart := x REM 2
+         ph4   #fracpart
+         FREMI
+
+         ph4   #one                       x := x-1
+         tdc
+         clc
+         adc   #x
+         pea   0
+         pha
+         FSUBX
+         
+         lda   x+8
+         eor   #$8000
+         sta   x+8
+
+* For 0 <= x <= 9.375, use the identity Gamma(x) = Gamma(x+1)/x
+lb1      ldy   #8                       denom := 1
+lp1      lda   one,y
+         sta   denom,y
+         dey
+         dey
+         bpl   lp1
+
+         ph4   #cutoff
+         ph4   #z
+         FS2X
+
+         tdc                            z := 10.375 - x
+         clc
+         adc   #x
+         pea   0
+         pha
+         ph4   #z
+         FSUBX
+         
+         lda   z+8                      if z < 0 (or NAN)
+         jmi   stirling                   just use Stirling series approx.
+         cmp   #$7fff
+         jeq   stirling
+         
+         ph4   #z                       truncate z to integer
+         FTINTX
+         
+         ph4   #z                       x := x + z
+         tdc
+         clc
+         adc   #x
+         pea   0
+         pha
+         FADDX
+         
+         tdc                            y := x
+         clc
+         adc   #x
+         pea   0
+         pha
+         ph4   #y
+         FX2X
+         
+         ph4   #z                       repeat z times :
+         ph4   #z
+         FX2I
+         
+lp2      dec   z
+         bmi   stirling
+
+         ph4   #one                       y := y - 1
+         ph4   #y
+         FSUBX
+         
+         ph4   #y                         denom := denom * y
+         ph4   #denom
+         FMULX
+         
+         bra   lp2
+         
+* For x >= 9.375, calculate Gamma(x) using a Stirling series approximation
+stirling lda   x                        t1 := x
+         sta   y                        y := x
+         sta   z                        z := x
+         sta   t1
+         lda   x+2
+         sta   y+2
+         sta   z+2
+         sta   t1+2
+         lda   x+4
+         sta   y+4
+         sta   z+4
+         sta   t1+4
+         lda   x+6
+         sta   y+6
+         sta   z+6
+         sta   t1+6
+         lda   x+8
+         sta   y+8
+         sta   z+8
+         sta   t1+8
+
+         ph4   #e                       z := x/e
+         ph4   #z
+         FDIVX
+         ph4   #one_half                y := x - 1/2
+         ph4   #y
+         FSUBS
+         ph4   #y                       z := (x/e)^(x-1/2)
+         ph4   #z
+         FXPWRY
+
+         pea   -1                       t1 := 1/x
+         ph4   #t1
+         FXPWRI
+         ph4   #y                       y := P(t1)
+         pea   17
+         ph4   #P
+         jsl   poly
+         
+         ph4   #y                       z := z * y * sqrt(2*pi/e)
+         ph4   #z
+         FMULX
+         ph4   #sqrt_2pi_over_e
+         ph4   #z
+         FMULX
+
+* Adjust result as necessary for small or negative x values
+         ph4   #denom                   z := z / denom
+         ph4   #z                         (for cases where initial x was small)
+         FDIVX
+
+         lda   reflect                  if doing reflection
+         jeq   done
+
+         ph4   #pi                        fracpart := sin(x*pi)
+         ph4   #fracpart
+         FMULX
+         ph4   #fracpart
+         FSINX
+
+         ph4   #fracpart                  if sin(x*pi)=0 (i.e. x was an integer)
+         FCLASSX
+         txa
+         inc   a
+         and   #$00ff
+         bne   lb2
+         
+         asl   fracpart+8                   take sign from original x (for +-0)
+         asl   orig_x+8
+         ror   fracpart+8
+         
+         lda   orig_x                       if original x was not 0
+         ora   orig_x+2
+         ora   orig_x+4
+         ora   orig_x+6
+         beq   lb2
+         
+         lda   #32767                         force NAN result
+         sta   z+8
+         sta   z+6
+         
+         pea   $0100                          raise "invalid" exception (only)
+         FSETENV
+
+lb2      ph4   #z                         z := pi / (fracpart * z)
+         ph4   #fracpart
+         FMULX
+         
+         ph4   #pi
+         ph4   #z
+         FX2X
+         
+         ph4   #fracpart
+         ph4   #z
+         FDIVX
+
+done     FPROCEXIT                      restore env & raise any new exceptions
+         plb
+         creturn 10:z                   return a pointer to the result
+
+cutoff   dc    f'10.375'                cutoff for Stirling approximation (+1)
+
+one_half dc    f'0.5'
+two      dc    i2'2'
+e        dc    e'2.7182818284590452353602874713526624977572'
+pi       dc    e'3.1415926535897932384626433'
+sqrt_2pi_over_e dc e'1.520346901066280805611940146754975627'
+
+P        anop                           Stirling series constants
+         dc    e'+1.79540117061234856108e-01'
+         dc    e'-2.48174360026499773092e-03'
+         dc    e'-2.95278809456991205054e-02'
+         dc    e'+5.40164767892604515180e-04'
+         dc    e'+6.40336283380806979482e-03'
+         dc    e'-1.62516262783915816899e-04'
+         dc    e'-1.91443849856547752650e-03'
+         dc    e'+7.20489541602001055909e-05'
+         dc    e'+8.39498720672087279993e-04'
+         dc    e'-5.17179090826059219337e-05'
+         dc    e'-5.92166437353693882865e-04'
+         dc    e'+6.97281375836585777429e-05'
+         dc    e'+7.84039221720066627474e-04'
+         dc    e'-2.29472093621399176955e-04'
+         dc    e'-2.68132716049382716049e-03'
+         dc    e'+3.47222222222222222222e-03'
+         dc    e'+8.33333333333333333333e-02'
+one      dc    e'+1.00000000000000000000e+00'
+
+y        ds    10
+z        ds    10
+denom    ds    10
+fracpart ds    10
+
+reflect  ds    2                        flag: do reflection?
+orig_x   ds    10                        original x value
          end
 
 ****************************************************************
