@@ -4942,11 +4942,15 @@ Flag     lda   [format]                 get the character
          bne   fl1
          lda   #1                         left justify the output
          sta   ~leftJustify
+         lda   #' '                       pad with spaces (ignore any '0' flag)
+         sta   ~paddChar
          bra   fl5
 
 fl1      cmp   #'0'                     if it is a '0' then
          bne   fl2
-         sta   ~paddChar                  padd with '0' characters
+         ldx   ~leftJustify               if not left justifying then
+         bne   fl5
+         sta   ~paddChar                    padd with '0' characters
          bra   fl5
 
 fl2      cmp   #'+'                     if it is a '+' or ' ' then
@@ -4988,6 +4992,8 @@ GetSize  stz   val                      assume a value of 0
          inc   a                              positive with - flag
          ldx   #1
          stx   ~leftJustify
+         ldx   #' '
+         stx   ~paddChar
          bra   fv1
 fv0      lda   #0                           negative precision is ignored
          stz   ~precisionSpecified
