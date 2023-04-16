@@ -4793,7 +4793,7 @@ lb3      creturn 4:ptr
 *  -----------------------
 *
 *  An 'l' indicates that the 'd', 'o', 'u', 'x' or 'X' argument is
-*  long.  'L' and 'u' are also accepted for compliance with ANSI C,
+*  long.  'L' and 'h' are also accepted for compliance with ANSI C,
 *  but have no effect in this implementation.
 *
 *  Conversion Specifier
@@ -4806,10 +4806,11 @@ lb3      creturn 4:ptr
 *        while 'X' generates uppercase hex digits.
 *  c     Character.
 *  s     String.
-*  p     Pascal string.
+*  P,b   Pascal string.
+*  p     Pointer.
 *  n     The argument is (int *); the number of characters written so
 *        far is written to the location.
-*  f     Signed decimal floating point.
+*  f,F   Signed decimal floating point.
 *  e,E   Exponential format floating point.
 *  g,G   Use f,e or E, as appropriate.
 *  %     Write a '%' character.
