@@ -3832,6 +3832,304 @@ string   ds    4
 
 ****************************************************************
 *
+*  ~Format_a - format a floating-point number in hex format
+*              (lowercase output)
+*  ~Format_A - format a floating-point number in hex format
+*              (uppercase output)
+*
+*  Inputs:
+*        ~altForm - always include decimal point?
+*        ~fieldWidth - output field width
+*        ~paddChar - padd character
+*        ~leftJustify - left justify the output?
+*        ~precision - precision of output
+*        ~precisionSpecified - was the precision specified?
+*
+****************************************************************
+*
+~Format_a private
+         using ~printfCommon
+argp     equ   7                        argument pointer
+;
+;  Set the "or" value; this is used to set the case of character results
+;
+         lda   #$20
+         sta   orVal
+         bra   in1
+
+~Format_A entry
+         stz   orVal
+;
+;  Check for infinities or nans
+;
+in1      ldy   #8                       load exponent/sign word
+         lda   [argp],Y
+         asl   a
+         tax
+         eor   #32767*2
+         bne   sn1                      if number is an infinity or NaN
+         lda   #' '                       do not use '0' padding
+         sta   ~paddChar
+; Always format like %e for now, because %E code messes up padding for INF/NAN.
+;        lda   orVal                      if doing %A format
+;        bne   in2
+;        brl   ~Format_E                    format like %E
+in2      brl   ~Format_e                  else format like %e
+;
+;  Determine sign
+;
+sn1      stz   ~sgn                     assume sign is positive
+         bcc   ex1                      if sign of number is negative
+         lda   #'-'                       set sign character to '-'
+         sta   ~sign
+         dec   ~sgn                       flag that sign is negative
+;
+;  Get exponent
+;
+ex1      txa                            get exponent field
+         lsr   a                        (clears carry)
+         sbc   #16383-1                 compute unbiased exponent
+         sta   ~exp                     save it
+;
+;  Get significand
+;
+sg1      ldy   #6                       store the significand in ~sig
+sg2      lda   [argp],Y
+         sta   ~sig,Y
+         dey
+         dey
+         bpl   sg2
+         ora   ~sig+2                   if significand is zero then
+         ora   ~sig+4
+         ora   ~sig+6
+         bne   pc1
+         lda   #3                         set exponent so it will print as 0
+         sta   ~exp
+;
+;  Determine precision
+;
+pc1      lda   ~precisionSpecified      if the precision was not specified then
+         bne   rd0
+         lda   #15                        use a precision of 15
+         sta   ~precision
+;
+;  Do rounding
+;
+rd0      lda   ~precision               if precision < 15
+         cmp   #15
+         jge   pd1
+
+         stz   ~sig+8                     make sure bit above significand is zero
+         inc   a                          shift significand (precision+1)*4 bits left
+         asl   a
+         asl   a
+         pha
+         tay
+rd1      ldx   #0
+         clc
+rd1a     rol   ~sig,X
+         inx
+         inx
+         txa
+         eor   #16
+         bne   rd1a
+         dey
+         bne   rd1
+
+         lda   ~sig                       consolidate extra bits
+         ora   ~sig+2
+         ora   ~sig+4
+         beq   rd2
+         lda   #1
+         tsb   ~sig+6
+
+rd2      lda   ~sig+6                     if there are extra non-zero bits then
+         beq   rdW
+         FGETENV                            get rounding direction
+         txa
+         asl   a
+         bcs   roundDn0
+         bmi   roundUp                      if rounding to nearest then
+roundNr  lda   ~sig+6                         if first extra bit is 0
+         bpl   rdW                              do not round
+         asl   a                              else if remaining extra bits are non-zero
+         bne   do_round
+         lda   ~sig+8                           or low-order bit of result is 1 then
+         lsr   a
+         bcc   rdW
+         bra   do_round                         apply rounding
+
+roundUp  lda   ~sgn                         if rounding upward then
+         bmi   rdW                            if positive then
+         bra   do_round                         apply rounding
+
+roundDn0 bmi   rdW                          if rounding downward then
+roundDn  lda   ~sgn                           if negative then
+         bpl   rdW                              apply rounding
+
+do_round ldx   #8                           (perform the rounding, if needed)
+rdV      inc   ~sig,X
+         bne   rdW
+         inx
+         inx
+         cpx   #14+1
+         blt   rdV
+
+rdW      ply                              shift significand (precision+1)*4 bits right
+rdX      ldx   #14
+         clc
+rdXa     ror   ~sig,X
+         dex
+         dex
+         bpl   rdXa
+         dey
+         bne   rdX
+
+         lsr   ~sig+8                     handle carry out from rounding
+         bcc   pd1
+         ldx   #6
+rdYa     ror   ~sig,X
+         dex
+         dex
+         bpl   rdYa
+         inc   ~exp
+;
+;  Compute amount of padding
+;
+pd1      lda   ~fieldWidth              subtract off precision from field width
+         sec
+         sbc   ~precision
+         sec                            subtract off minimal extra chars
+         sbc   #6
+         sta   ~fieldWidth
+         lda   ~sign                    if there is a sign character then
+         beq   pd2
+         dec   ~fieldWidth                decrement field width
+pd2      lda   ~precision               if precision != 0 or # flag used then
+         ora   ~altForm
+         beq   pd2a
+         sta   ~altForm                   flag this
+         dec   ~fieldWidth                decrement field width
+pd2a     lda   ~exp                     get exponent
+         bpl   pd3                      compute absolute value of exponent
+         eor   #$FFFF
+         inc   a
+pd3      cmp   #10                      if |exponent| >= 10 then
+         blt   pd4
+         dec   ~fieldWidth                decrement field width
+         cmp   #100                       if |exponent| >= 100 then
+         blt   pd4
+         dec   ~fieldWidth                  decrement field width
+         cmp   #1000                        if |exponent| >= 1000 then
+         blt   pd4
+         dec   ~fieldWidth                    decrement field width
+         cmp   #10000                         if |exponent| >= 10000 then
+         blt   pd4
+         dec   ~fieldWidth                      decrement field width
+pd4      lda   ~paddChar                if we are not padding with zeros then
+         cmp   #'0'
+         beq   pn1
+         jsr   ~RightJustify              handle right justification
+;
+;  Print the number
+;
+pn1      lda   ~sign                    if there is a sign character then
+         beq   pn2
+         pha                              print it
+         jsl   ~putchar
+pn2      pea   '0'                      print hex prefix
+         jsl   ~putchar
+         lda   #'X'
+         ora   orVal
+         pha
+         jsl   ~putchar
+pn3      lda   ~paddChar                if the number needs 0 padding then
+         cmp   #'0'
+         bne   pn5
+         lda   ~fieldWidth
+         bmi   pn5
+         beq   pn5
+pn4      ph2   ~paddChar                  print padd zeros
+         jsl   ~putchar
+         dec   ~fieldWidth
+         bne   pn4
+
+pn5      lda   #0                       print the digits
+         ldy   #4
+pn6      asl   ~sig
+         rol   ~sig+2
+         rol   ~sig+4
+         rol   ~sig+6
+         rol   a
+         dey
+         bne   pn6
+;        clc                            (already clear)
+         adc   #'0'
+         cmp   #'9'+1
+         blt   pn7
+         adc   #6
+         ora   orVal
+pn7      pha
+         jsl   ~putchar
+         lda   ~altForm                 print '.' after first digit if needed
+         beq   pn8
+         ph2   #'.'
+         jsl   ~putchar
+         stz   ~altForm
+pn8      dec   ~precision
+         bpl   pn5
+;
+;  Print exponent
+;
+         lda   #'P'                     print 'P' or 'p' exponent prefix
+         ora   orVal
+         pha
+         jsl   ~putchar
+         
+         lda   ~exp                     adjust exponent to reflect 4 bits
+         dec   a                          in integer part (before '.')
+         dec   a
+         dec   a
+         pha                            push exponent
+         bmi   pe1                      print '+' if exponent is positive
+         ph2   #'+'
+         jsl   ~putchar
+pe1      ph4   #~str                    push the string addr
+         ph2   #6                       push the string buffer length
+         ph2   #1                       do a signed conversion
+         _Int2Dec                       convert exponent to string
+         ldx   #0                       print the exponent
+pe2      lda   ~str,x
+         and   #$00FF
+         cmp   #' '+1
+         blt   pe3
+         phx
+         pha
+         jsl   ~putchar
+         plx
+pe3      inx
+         cpx   #6
+         blt   pe2
+;
+;  Remove the number from the argument list
+;
+         lda   argp                     remove the parameter
+         adc   #10-1                    (carry is set)
+         sta   argp
+;
+;  Handle left justification
+;
+         brl   ~LeftJustify             handle left justification
+
+;
+;  Local data
+;
+orVal    ds    2                        for setting the case of characters
+         end
+
+
+****************************************************************
+*
 *  ~Format_c - format a '%' character
 *
 *  Inputs:
@@ -4813,6 +5111,7 @@ lb3      creturn 4:ptr
 *  f,F   Signed decimal floating point.
 *  e,E   Exponential format floating point.
 *  g,G   Use f,e or E, as appropriate.
+*  a,A   Hexadecimal format floating point.
 *  %     Write a '%' character.
 *
 ****************************************************************
@@ -5028,8 +5327,8 @@ val      ds    2                        value
 ;  List of format specifiers and the equivalent subroutines
 ;
 fList    dc    c'%',a'~Format_Percent'  %
-         dc    c'a',a'~Format_e'        a (not formatted correctly)
-         dc    c'A',a'~Format_E'        A (not formatted correctly)
+         dc    c'a',a'~Format_a'        a
+         dc    c'A',a'~Format_A'        A
          dc    c'f',a'~Format_f'        f
          dc    c'F',a'~Format_f'        F
          dc    c'e',a'~Format_e'        e
