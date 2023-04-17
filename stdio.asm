@@ -3854,11 +3854,11 @@ argp     equ   7                        argument pointer
 ;  Set the "or" value; this is used to set the case of character results
 ;
          lda   #$20
-         sta   orVal
+         sta   ~orVal
          bra   in1
 
 ~Format_A entry
-         stz   orVal
+         stz   ~orVal
 ;
 ;  Check for infinities or nans
 ;
@@ -3871,7 +3871,7 @@ in1      ldy   #8                       load exponent/sign word
          lda   #' '                       do not use '0' padding
          sta   ~paddChar
 ; Always format like %e for now, because %E code messes up padding for INF/NAN.
-;        lda   orVal                      if doing %A format
+;        lda   ~orVal                     if doing %A format
 ;        bne   in2
 ;        brl   ~Format_E                    format like %E
 in2      brl   ~Format_e                  else format like %e
@@ -4040,19 +4040,10 @@ pn1      lda   ~sign                    if there is a sign character then
 pn2      pea   '0'                      print hex prefix
          jsl   ~putchar
          lda   #'X'
-         ora   orVal
+         ora   ~orVal
          pha
          jsl   ~putchar
-pn3      lda   ~paddChar                if the number needs 0 padding then
-         cmp   #'0'
-         bne   pn5
-         lda   ~fieldWidth
-         bmi   pn5
-         beq   pn5
-pn4      ph2   ~paddChar                  print padd zeros
-         jsl   ~putchar
-         dec   ~fieldWidth
-         bne   pn4
+         jsr   ~ZeroPad                 pad with '0's if needed
 
 pn5      lda   #0                       print the digits
          ldy   #4
@@ -4068,7 +4059,7 @@ pn6      asl   ~sig
          cmp   #'9'+1
          blt   pn7
          adc   #6
-         ora   orVal
+         ora   ~orVal
 pn7      pha
          jsl   ~putchar
          lda   ~altForm                 print '.' after first digit if needed
@@ -4082,7 +4073,7 @@ pn8      dec   ~precision
 ;  Print exponent
 ;
          lda   #'P'                     print 'P' or 'p' exponent prefix
-         ora   orVal
+         ora   ~orVal
          pha
          jsl   ~putchar
          
@@ -4120,11 +4111,6 @@ pe3      inx
 ;  Handle left justification
 ;
          brl   ~LeftJustify             handle left justification
-
-;
-;  Local data
-;
-orVal    ds    2                        for setting the case of characters
          end
 
 
@@ -4185,21 +4171,22 @@ argp     equ   7                        argument pointer
          lda   [argp],Y
          bpl   cn0
          sec
-         lda   #0
+         ldx   #0
+         txa
          sbc   [argp]
          sta   [argp]
          ldy   #2
-         lda   #0
+         txa
          sbc   [argp],Y
          sta   [argp],Y
          iny
          iny
-         lda   #0
+         txa
          sbc   [argp],Y
          sta   [argp],Y
          iny
          iny
-         lda   #0
+         txa
          sbc   [argp],Y
          sta   [argp],Y
          bra   sn2
@@ -4355,17 +4342,8 @@ pn1      lda   ~hexPrefix               if there is a hex prefix then
          jsl   ~putchar
          ph2   ~hexPrefix+1
          jsl   ~putchar
-pn1a     lda   ~paddChar                if the number needs 0 padding then
-         cmp   #'0'
-         bne   pn1c
-         lda   ~fieldWidth
-         bmi   pn1c
-         beq   pn1c
-pn1b     ph2   ~paddChar                  print padd zeros
-         jsl   ~putchar
-         dec   ~fieldWidth
-         bne   pn1b
-pn1c     lda   ~precision               if the number needs more padding then
+pn1a     jsr   ~ZeroPad                 pad with '0's if needed
+         lda   ~precision               if the number needs more padding then
          beq   pn3
 pn2      ph2   #'0'                       print padd characters
          jsl   ~putchar
@@ -4393,10 +4371,10 @@ pn5      cpy   #l:~str                  quit if we're at the end of the ~str
 ;
 rn1      lda   ~isLongLong
          beq   rn2
-         inc   argp
-         inc   argp
-         inc   argp
-         inc   argp
+         lda   argp
+         clc
+         adc   #4
+         sta   argp
 rn2      lda   ~isLong
          beq   rn3
          inc   argp
@@ -4738,14 +4716,14 @@ argp     equ   7                        argument pointer
 ;  Set the "or" value; this is used to set the case of character results
 ;
          lda   #$20
-         sta   orVal
+         sta   ~orVal
          bra   cn0
 
 ~Format_p entry
          lda   #1
          sta   ~isLong
 ~Format_X entry
-         stz   orVal
+         stz   ~orVal
 ;
 ;  Initialization
 ;
@@ -4807,7 +4785,7 @@ cn4      lsr   ~num+7
          cmp   #'9'+1                   if the character should be alpha,
          blt   cn5                       adjust it
          adc   #6
-         ora   orVal
+         ora   ~orVal
 cn5      sta   ~str,Y                   save the character
          dey
          lda   ~num+7                   loop if the number is not zero
@@ -4825,7 +4803,7 @@ cn5      sta   ~str,Y                   save the character
          lda   ~altForm                 branch if no leading '0x' is required
          beq   al3
 al2      lda   #'X'                     insert leading '0x'
-         ora   orVal
+         ora   ~orVal
          sta   ~hexPrefix+1
          lda   #'0'
          sta   ~hexPrefix
@@ -4834,10 +4812,6 @@ al3      long  I,M
 ;  Piggy back off of ~Format_d for output
 ;
          brl   ~Format_IntOut
-;
-;  Local data
-;
-orVal    ds    2                        for setting the case of characters
          end
 
 ****************************************************************
@@ -4967,10 +4941,12 @@ stream   equ   3                        input stream
 *
 *  ~LeftJustify - print padd characters for left justification
 *  ~RightJustify - print padd characters for right justification
+*  ~ZeroPad - print zeros to pad to field width
 *
 *  Inputs:
 *        ~fieldWidth - # chars to print ( <= 0 prints none)
 *        ~leftJustify - left justify the output?
+*        ~paddChar - padding character
 *
 ****************************************************************
 *
@@ -4993,6 +4969,19 @@ lb1      ph2   #' '                     write the proper # of padd characters
          dec   ~fieldWidth
          bne   lb1
          rts
+
+~ZeroPad entry
+         lda   ~paddChar                if the number needs 0 padding then
+         cmp   #'0'
+         bne   zp2
+         lda   ~fieldWidth
+         bmi   zp2
+         beq   zp2
+zp1      ph2   ~paddChar                  print padd zeros
+         jsl   ~putchar
+         dec   ~fieldWidth
+         bne   zp1
+zp2      rts
          end
 
 ****************************************************************
@@ -5240,8 +5229,7 @@ Flag     lda   [format]                 get the character
          and   #$00FF
          cmp   #'-'                     if it is a '-' then
          bne   fl1
-         lda   #1                         left justify the output
-         sta   ~leftJustify
+         sta   ~leftJustify               left justify the output
          lda   #' '                       pad with spaces (ignore any '0' flag)
          sta   ~paddChar
          bra   fl5
@@ -5257,10 +5245,7 @@ fl2      cmp   #'+'                     if it is a '+' or ' ' then
          beq   fl3
          cmp   #' '
          bne   fl4
-         ldx   ~sign
-         cpx   #'+'
-         beq   fl5
-fl3      sta   ~sign                      set the sign flag
+fl3      tsb   ~sign                      set the sign flag ('+' overrides ' ')
          bra   fl5
 
 fl4      cmp   #'#'                     if it is a '#' then
@@ -5290,7 +5275,7 @@ GetSize  stz   val                      assume a value of 0
          bne   fv0
          eor   #$ffff                       negative field width is like
          inc   a                              positive with - flag
-         ldx   #1
+         ldx   #'-'
          stx   ~leftJustify
          ldx   #' '
          stx   ~paddChar
@@ -5382,6 +5367,7 @@ fListEnd anop
 ;
 ~num     ds    8                        long long integer
 ~numChars ds   2                        number of characters printed with this printf
+~orVal   ds    2                        value to 'or' with to set case of characters
 ~str     ds    83                       string buffer
 ;
 ;  Real formatting
