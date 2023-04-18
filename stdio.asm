@@ -4566,53 +4566,46 @@ cn2a     sta   ~num
 ;
 ;  Convert the number to an ASCII string
 ;
-         short I,M
          ldy   #l:~str-1                set up the character index
-cn3      lda   ~num+7                   quit if the number is zero
-         ora   ~num+6
-         ora   ~num+5
+cn3      lda   ~num+6                   quit if the number is zero
          ora   ~num+4
-         ora   ~num+3
          ora   ~num+2
-         ora   ~num+1
          ora   ~num
          beq   al1
-         lda   #0                       roll off 3 bits
+         lda   #'0'                     roll off 3 bits
          ldx   #3
-cn4      lsr   ~num+7
-         ror   ~num+6
-         ror   ~num+5
+cn4      lsr   ~num+6
          ror   ~num+4
-         ror   ~num+3
          ror   ~num+2
-         ror   ~num+1
          ror   ~num
          ror   A
          dex
          bne   cn4
-         lsr   A                        form a character
-         lsr   A
-         lsr   A
-         lsr   A
-         lsr   A
-         ora   #'0'
-         sta   ~str,Y                   save the character
+         xba
+         asl   A                        form a character
+         asl   A
+         asl   A
          dey
+         ora   #' '
+         sta   ~str,Y                   save the character
          bra   cn3
 ;
 ;  If a leading zero is required, be sure we include one
 ;
-al1      cpy   #l:~str-1                include a zero if no characters have
-         beq   al2                       been placed in the string
-         lda   ~altForm                 branch if no leading zero is required
-         beq   al3
-al2      lda   #'0'
-         sta   ~str,Y
-al3      long  I,M
+al1      lda   ~altForm                 if alt form has been selected then
+         beq   al2
+         lda   ~precision                 make sure precision is non-zero
+         bne   al3
+         inc   ~precision
+         bra   al3                        include a zero in the string
+al2      cpy   #l:~str-1                else if string has no characters then
+         bne   al4
+al3      lda   #'0 '                      include a zero in the string
+         sta   ~str-1,Y
 ;
 ;  Piggy back off of ~Format_d for output
 ;
-         stz   ~hexPrefix               don't lead with 0x
+al4      stz   ~hexPrefix               don't lead with 0x
          brl   ~Format_IntOut
          end
 
@@ -4720,8 +4713,7 @@ argp     equ   7                        argument pointer
          bra   cn0
 
 ~Format_p entry
-         lda   #1
-         sta   ~isLong
+         inc   ~isLong
 ~Format_X entry
          stz   ~orVal
 ;
@@ -4762,39 +4754,32 @@ cn2b     stz   ~hexPrefix               assume we won't lead with 0x
 ;
 ;  Convert the number to an ASCII string
 ;
-         short I,M
          ldy   #l:~str-1                set up the character index
-cn3      lda   #0                       roll off 4 bits
+cn3      lda   #'0'                     roll off 4 bits
          ldx   #4
-cn4      lsr   ~num+7
-         ror   ~num+6
-         ror   ~num+5
+cn4      lsr   ~num+6
          ror   ~num+4
-         ror   ~num+3
          ror   ~num+2
-         ror   ~num+1
          ror   ~num
          ror   A
          dex
          bne   cn4
-         lsr   A                        form a character
+         xba                            form a character
          lsr   A
          lsr   A
          lsr   A
-         ora   #'0'
+         lsr   A
          cmp   #'9'+1                   if the character should be alpha,
          blt   cn5                       adjust it
          adc   #6
          ora   ~orVal
-cn5      sta   ~str,Y                   save the character
+cn5      xba
          dey
-         lda   ~num+7                   loop if the number is not zero
-         ora   ~num+6
-         ora   ~num+5
+         ora   #' '
+         sta   ~str,Y                   save the character
+         lda   ~num+6                   loop if the number is not zero
          ora   ~num+4
-         ora   ~num+3
          ora   ~num+2
-         ora   ~num+1
          ora   ~num
          bne   cn3
 ;
@@ -4802,16 +4787,14 @@ cn5      sta   ~str,Y                   save the character
 ;
          lda   ~altForm                 branch if no leading '0x' is required
          beq   al3
-al2      lda   #'X'                     insert leading '0x'
+         lda   #'0X'                    insert leading '0x'
          ora   ~orVal
-         sta   ~hexPrefix+1
-         lda   #'0'
+         xba
          sta   ~hexPrefix
-al3      long  I,M
 ;
 ;  Piggy back off of ~Format_d for output
 ;
-         brl   ~Format_IntOut
+al3      brl   ~Format_IntOut
          end
 
 ****************************************************************
