@@ -4520,9 +4520,12 @@ lb1      clc                            restore the original argp+4
 ****************************************************************
 *
 *  ~Format_o - format an octal number
+*  ~Format_x - format a hexadecimal number (lowercase output)
+*  ~Format_X - format a hexadecimal number (uppercase output)
+*  ~Format_p - format a pointer
 *
 *  Inputs:
-*        ~altForm - use a leading '0'?
+*        ~altForm - use a leading '0' (octal) or '0x' (hex)?
 *        ~fieldWidth - output field width
 *        ~paddChar - padd character
 *        ~leftJustify - left justify the output?
@@ -4536,15 +4539,34 @@ lb1      clc                            restore the original argp+4
 ~Format_o private
          using ~printfCommon
 argp     equ   7                        argument pointer
+
+         lda   #3                       use 3 bits per output character
+         bra   cn0
+
+~Format_x entry
+;
+;  Set the "or" value; this is used to set the case of character results
+;
+         lda   #$20*256
+         sta   ~orVal
+         bra   hx0
+
+~Format_p entry
+         inc   ~isLong
+~Format_X entry
+         stz   ~orVal
+hx0      lda   #4                       use 4 bits per output character
+
 ;
 ;  Initialization
 ;
+cn0      sta   bitsPerChar
+         stz   ~hexPrefix               assume we won't lead with 0x
          stz   ~sign                    ignore the sign flag
          lda   #'  '                    initialize the string to blanks
          sta   ~str
          move  ~str,~str+1,#l:~str-1
-         stz   ~num+2                   get the value to convert
-         lda   ~isLongLong
+         lda   ~isLongLong              get the value to convert
          beq   cn1
          ldy   #6
          lda   [argp],Y
@@ -4555,7 +4577,7 @@ argp     equ   7                        argument pointer
          sta   ~num+4
 cn1      lda   ~isLong
          beq   cn2
-cn1a     ldy   #2
+         ldy   #2
          lda   [argp],Y
          sta   ~num+2
 cn2      lda   [argp]
@@ -4563,17 +4585,24 @@ cn2      lda   [argp]
          beq   cn2a
          and   #$00FF
 cn2a     sta   ~num
+         ldx   bitsPerChar              if doing hex format then
+         cpx   #3
+         beq   cn2b
+         ldx   ~altForm                   if alt form has been selected then
+         beq   cn2b
+         ora   ~num+2                       if value is not 0 then
+         ora   ~num+4
+         ora   ~num+6
+         beq   cn2b
+         lda   #'X0'                          set hex prefix to '0X' or '0x'
+         ora   ~orVal
+         sta   ~hexPrefix
 ;
 ;  Convert the number to an ASCII string
 ;
-         ldy   #l:~str-1                set up the character index
-cn3      lda   ~num+6                   quit if the number is zero
-         ora   ~num+4
-         ora   ~num+2
-         ora   ~num
-         beq   al1
-         lda   #'0'                     roll off 3 bits
-         ldx   #3
+cn2b     ldy   #l:~str-1                set up the character index
+cn3      lda   #' 0'                    roll off 4 bits
+         ldx   bitsPerChar
 cn4      lsr   ~num+6
          ror   ~num+4
          ror   ~num+2
@@ -4581,32 +4610,46 @@ cn4      lsr   ~num+6
          ror   A
          dex
          bne   cn4
-         xba
-         asl   A                        form a character
-         asl   A
-         asl   A
-         dey
-         ora   #' '
+         xba                            form a character
+         ldx   bitsPerChar
+cn4a     asl   A
+         dex
+         bne   cn4a
+         cmp   #('9'+1)*256+' '         if the character should be alpha then
+         blt   cn5
+         clc
+         adc   #7*256                     adjust it
+         ora   ~orVal
+cn5      dey
          sta   ~str,Y                   save the character
-         bra   cn3
+         lda   ~num+6                   loop if the number is not zero
+         ora   ~num+4
+         ora   ~num+2
+         ora   ~num
+         bne   cn3
 ;
-;  If a leading zero is required, be sure we include one
+;  If a leading '0x' is required, be sure we include one
 ;
-al1      lda   ~altForm                 if alt form has been selected then
-         beq   al2
-         lda   ~precision                 make sure precision is non-zero
+         lda   bitsPerChar              if doing octal format then
+         cmp   #3
          bne   al3
+         lda   ~altForm                   if alt form has been selected then
+         beq   al3
+         lda   ~precision                   make sure precision is non-zero
+         bne   al2
          inc   ~precision
-         bra   al3                        include a zero in the string
-al2      cpy   #l:~str-1                else if string has no characters then
-         bne   al4
-al3      lda   #'0 '                      include a zero in the string
-         sta   ~str-1,Y
+al2      lda   #'0 '                        if the result is not ' 0' then
+         cmp   ~str+l:~str-2
+         beq   al3        
+         sta   ~str-1,Y                       include a zero in the string
 ;
 ;  Piggy back off of ~Format_d for output
 ;
-al4      stz   ~hexPrefix               don't lead with 0x
-         brl   ~Format_IntOut
+al3      brl   ~Format_IntOut
+;
+;  Local data
+;
+bitsPerChar ds 2                        bits per output character
          end
 
 ****************************************************************
@@ -4682,119 +4725,6 @@ lb4      clc                            restore and increment argp
          pla
          sta   argp+2
          brl   ~LeftJustify             handle left justification
-         end
-
-****************************************************************
-*
-*  ~Format_x - format a hexadecimal number (lowercase output)
-*  ~Format_X - format a hexadecimal number (uppercase output)
-*  ~Format_p - format a pointer
-*
-*  Inputs:
-*        ~altForm - use a leading '0x'?
-*        ~fieldWidth - output field width
-*        ~paddChar - padd character
-*        ~leftJustify - left justify the output?
-*        ~isLong - is the operand long?
-*        ~isLongLong - is the operand long long?
-*        ~precision - precision of output
-*        ~precisionSpecified - was the precision specified?
-*
-****************************************************************
-*
-~Format_x private
-         using ~printfCommon
-argp     equ   7                        argument pointer
-;
-;  Set the "or" value; this is used to set the case of character results
-;
-         lda   #$20
-         sta   ~orVal
-         bra   cn0
-
-~Format_p entry
-         inc   ~isLong
-~Format_X entry
-         stz   ~orVal
-;
-;  Initialization
-;
-cn0      stz   ~sign                    ignore the sign flag
-         lda   #'  '                    initialize the string to blanks
-         sta   ~str
-         move  ~str,~str+1,#l:~str-1
-         stz   ~num+2                   get the value to convert
-         stz   ~num+4
-         stz   ~num+6
-         lda   ~isLongLong
-         beq   cn1
-         ldy   #6
-         lda   [argp],Y
-         sta   ~num+6
-         dey
-         dey
-         lda   [argp],Y
-         sta   ~num+4
-cn1      lda   ~isLong
-         beq   cn2
-         ldy   #2
-         lda   [argp],Y
-         sta   ~num+2
-cn2      lda   [argp]
-         ldx   ~isByte
-         beq   cn2a
-         and   #$00FF
-cn2a     sta   ~num
-         ora   ~num+2
-         ora   ~num+4
-         ora   ~num+6
-         bne   cn2b
-         stz   ~altForm                 if value is 0, do not print hex prefix
-cn2b     stz   ~hexPrefix               assume we won't lead with 0x
-;
-;  Convert the number to an ASCII string
-;
-         ldy   #l:~str-1                set up the character index
-cn3      lda   #'0'                     roll off 4 bits
-         ldx   #4
-cn4      lsr   ~num+6
-         ror   ~num+4
-         ror   ~num+2
-         ror   ~num
-         ror   A
-         dex
-         bne   cn4
-         xba                            form a character
-         lsr   A
-         lsr   A
-         lsr   A
-         lsr   A
-         cmp   #'9'+1                   if the character should be alpha,
-         blt   cn5                       adjust it
-         adc   #6
-         ora   ~orVal
-cn5      xba
-         dey
-         ora   #' '
-         sta   ~str,Y                   save the character
-         lda   ~num+6                   loop if the number is not zero
-         ora   ~num+4
-         ora   ~num+2
-         ora   ~num
-         bne   cn3
-;
-;  If a leading '0x' is required, be sure we include one
-;
-         lda   ~altForm                 branch if no leading '0x' is required
-         beq   al3
-         lda   #'0X'                    insert leading '0x'
-         ora   ~orVal
-         xba
-         sta   ~hexPrefix
-;
-;  Piggy back off of ~Format_d for output
-;
-al3      brl   ~Format_IntOut
          end
 
 ****************************************************************
@@ -5348,7 +5278,7 @@ fListEnd anop
 ;
 ;  Work buffers
 ;
-~num     ds    8                        long long integer
+~num     ds    8                        long long integer (must be 0 after each conversion)
 ~numChars ds   2                        number of characters printed with this printf
 ~orVal   ds    2                        value to 'or' with to set case of characters
 ~str     ds    83                       string buffer
