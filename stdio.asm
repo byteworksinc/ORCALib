@@ -1322,11 +1322,10 @@ fprintf  start
          sta   stream+2
          phy                            restore return address/data bank
          phx
+         ldx   stream
          plb
-         lda   >stream+2                verify that stream exists
-         pha
-         lda   >stream
-         pha
+         pha                            verify that stream exists
+         phx
          jsl   ~VerifyStream
          bcc   lb1
          lda   #EIO
@@ -3327,11 +3326,10 @@ vfprintf start
          sta   stream+2
          phy                            restore return address/data bank
          phx
+         ldx   stream
          plb
-         lda   >stream+2                verify that stream exists
-         pha
-         lda   >stream
-         pha
+         pha                            verify that stream exists
+         phx
          jsl   ~VerifyStream
          bcc   lb1
          lda   #EIO
@@ -4165,10 +4163,13 @@ argp     equ   7                        argument pointer
 ;
 ;  For signed numbers, if the value is negative, use the sign flag
 ;
-         lda   ~isLongLong              handle long long values
+         lda   ~isLong                  handle long and long long values
+         beq   sn0a
+         ldy   #2
+         lda   ~isLongLong
          beq   sn0
          ldy   #6
-         lda   [argp],Y
+sn0      lda   [argp],Y
          bpl   cn0
          sec
          ldx   #0
@@ -4179,6 +4180,8 @@ argp     equ   7                        argument pointer
          txa
          sbc   [argp],Y
          sta   [argp],Y
+         lda   ~isLongLong
+         beq   sn2
          iny
          iny
          txa
@@ -4187,19 +4190,6 @@ argp     equ   7                        argument pointer
          iny
          iny
          txa
-         sbc   [argp],Y
-         sta   [argp],Y
-         bra   sn2
-sn0      lda   ~isLong                  handle long values
-         beq   sn0a
-         ldy   #2
-         lda   [argp],Y
-         bpl   cn0
-         sec
-         lda   #0
-         sbc   [argp]
-         sta   [argp]
-         lda   #0
          sbc   [argp],Y
          sta   [argp],Y
          bra   sn2
@@ -4249,13 +4239,12 @@ cn1      lda   [argp]                     push an int value
 cn1a     pha
 cn2      ph4   #~str                    push the string addr
          ph2   #l:~str                  push the string buffer length
-         ph2   #0                       do an unsigned conversion
          lda   ~isLongLong              do the proper conversion
          beq   cn2a
-         pla
          jsr   ~ULongLong2Dec
          bra   pd1
-cn2a     lda   ~isLong
+cn2a     ph2   #0                       do an unsigned conversion
+         lda   ~isLong
          beq   cn3
          _Long2Dec
          bra   pd1
@@ -4669,36 +4658,36 @@ bitsPerChar ds 2                        bits per output character
          using ~printfCommon
 argp     equ   7                        argument pointer
 
-         ph4   <argp                    save the original argp
-         ldy   #2                       dereference argp
-         lda   [argp],Y
-         tax
-         lda   [argp]
-         sta   argp
-         stx   argp+2
-         short M                        determine the length of the string
-         ldy   #-1
-lb1      iny
-         lda   [argp],Y
-         bne   lb1
-         long  M
-         tya
-         bra   lb1a
+         sec                            set flag for c-string
+         bra   lb0
 
 ~Format_b entry
 ~Format_P entry
-         ph4   <argp                    save the original argp
+         clc                            set flag for p-string
+
+lb0      ph4   <argp                    save the original argp
          ldy   #2                       dereference argp
          lda   [argp],Y
          tax
          lda   [argp]
          sta   argp
          stx   argp+2
-         lda   [argp]                   get the length of the string
+         
+         bcs   lb1                      if formatting a p-string then
+         lda   [argp]                     get the length of the string
          and   #$00FF
          inc4  argp
+         bra   lb1x                     else if formatting a c-string then
+         
+lb1      short M                          compute the length of the string
+         ldy   #-1
+lb1a     iny
+         lda   [argp],Y
+         bne   lb1a
+         long  M
+         tya
 
-lb1a     ldx   ~precisionSpecified      if the precision is specified then
+lb1x     ldx   ~precisionSpecified      if the precision is specified then
          beq   lb2
          cmp   ~precision                 if the precision is smaller then
          blt   lb2
