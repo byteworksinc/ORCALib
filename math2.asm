@@ -1908,6 +1908,363 @@ ret      creturn 2:x                    return it
 
 ****************************************************************
 *
+*  double lgamma(double x);
+*
+*  Computes the natural logarithm of the absolute value of the
+*  gamma function of x.
+*
+*  The rational approximations used near 1 and 2 are from
+*  W. J. Cody and K. E. Hillstrom, "Chebyshev Approximations
+*  for the Natural Logarithm of the Gamma Function".
+*  For other positive x values, a computation based on
+*  Stirling's formula is used.
+*
+****************************************************************
+*
+lgamma   start
+lgammaf  entry
+lgammal  entry
+         using MathCommon2
+
+         csubroutine (10:x),0
+
+         phb
+         phk
+         plb
+
+         pha                            save env & set to default
+         tsc
+         inc   a
+         pea   0
+         pha
+         FPROCENTRY
+
+         stz   z                        z := 0
+         stz   z+2
+         stz   z+4
+         stz   z+6
+         stz   z+8
+         
+         stz   reflect                  assume no reflection
+
+; For x < 0, lgamma(x) = ln(pi) - ln(abs(x*sin(pi*x))) - lgamma(-x)
+         lda   x+8                      if x is negative then
+         jpl   positive
+         
+         lda   x                          if x != -0 and x != -inf then
+         ora   x+2
+         ora   x+4
+         ora   x+6
+         jeq   abs_x
+   
+         inc   reflect                      flag to do reflection
+         
+         tdc                                neg_adj := x REM 2
+         clc
+         adc   #x
+         pea   0
+         pha
+         ph4   #neg_adj
+         FX2X
+         ph4   #two
+         ph4   #neg_adj
+         FREMI
+         
+         ph4   #pi                          neg_adj := sin(neg_adj*pi)
+         ph4   #neg_adj
+         FMULX
+         ph4   #neg_adj
+         FSINX
+         
+         tdc                                neg_adj := neg_adj * x
+         clc
+         adc   #x
+         pea   0
+         pha
+         ph4   #neg_adj
+         FMULX
+         
+         asl   neg_adj+8                    neg_adj := abs(neg_adj)
+         lsr   neg_adj+8
+         
+         ph4   #neg_adj                     neg_adj := ln(neg_adj)
+         FLNX
+         
+         ph4   #ln_pi                       neg_adj := neg_adj - ln(pi)
+         ph4   #neg_adj
+         FSUBX
+         
+         lda   neg_adj+8                    if neg_adj is inf/nan then
+         asl   a
+         cmp   #32767*2
+         jeq   do_reflect                     skip to final reflection
+
+abs_x    asl   x+8                        x := abs(x)
+         lsr   x+8
+
+positive tdc                            t1 := x
+         clc
+         adc   #x
+         pea   0
+         pha
+         ph4   #t1
+         FX2X
+
+         ph4   #rat2_hi                 if x is near 1 or 2 then
+         ph4   #t1
+         FCMPS
+         jvc   not_near_1_or_2
+
+; Rational approximation for x near 2
+         ph4   #rat2_lo                   if x is near 2 then
+         ph4   #t1
+         FCMPS
+         bvs   small
+
+         ph4   #z                           z := P2(t1)
+         pea   7
+         ph4   #P2
+         jsl   poly
+
+         ph4   #y                           y := Q2(t1)
+         pea   7
+         ph4   #Q2
+         jsl   poly
+         
+         ph4   #two                         N := 2
+         bra   finish_rational_approx
+
+; Rational approximation for x near 1
+small    ph4   #rat1_hi                   else if x is near 1 then
+         ph4   #t1
+         FCMPS
+         jvc   not_near_1_or_2
+
+         ph4   #rat1_lo
+         ph4   #t1
+         FCMPS
+         bvs   not_near_1_or_2
+
+         ph4   #z                           z := P1(t1)
+         pea   7
+         ph4   #P1
+         jsl   poly
+
+         ph4   #y                           y := Q1(t1)
+         pea   7
+         ph4   #Q1
+         jsl   poly
+         
+         ph4   #one                         N := 1
+
+finish_rational_approx anop 
+         ph4   #t1                        t1 := x - N
+         FSUBI
+
+         ph4   #y                         z := z/y
+         ph4   #z
+         FDIVX
+         
+         ph4   #t1                        z := z * t1
+         ph4   #z
+         FMULX
+         brl   chk_reflect                goto chk_reflect
+
+; Calculate based on Stirling's formula for other x values
+not_near_1_or_2 anop
+chk_big  ph4   #cutoff                  while x < 7 do
+         tdc
+         clc
+         adc   #x
+         pea   0
+         pha
+         FCMPI
+         bvc   stirling
+
+         tdc                              t1 := ln(x)
+         clc
+         adc   #x
+         pea   0
+         pha
+         ph4   #t1
+         FX2X
+         ph4   #t1
+         FLNX
+         
+         ph4   #t1                        z := z + t1
+         ph4   #z
+         FADDX
+
+         ph4   #one                       x := x + 1
+         tdc
+         clc
+         adc   #x
+         pea   0
+         pha
+         FADDI
+         bra   chk_big
+
+stirling tdc                            (push x arguments for below ops)
+         clc
+         adc   #x
+         ldy   #0
+         phy
+         pha
+         phy
+         pha
+         phy
+         pha
+         phy
+         pha
+
+         ph4   #t1                      t1 := ln(x)
+         FX2X
+         ph4   #t1
+         FLNX
+                                        
+         ph4   #y                       y := x - 1/2
+         FX2X
+         ph4   #one_half
+         ph4   #y
+         FSUBS
+
+         ph4   #t1                      y := t1 * y
+         ph4   #y
+         FMULX
+
+         lda   y+8                      if y is not inf/nan then
+         asl   a
+         cmp   #32767*2
+         beq   stirling_poly
+
+         tdc                              y := y - x
+         clc
+         adc   #x
+         pea   0
+         pha
+         ph4   #y
+         FSUBX
+         
+         ph4   #half_ln_2pi               y := y + 0.5*ln(2pi)
+         ph4   #y
+         FADDX
+         
+         ph4   #z                         y := y - z
+         ph4   #y                         (this adjusts for any scaling up)
+         FSUBX
+
+stirling_poly anop
+         ph4   #t1                      t1 := 1/x^2
+         FX2X
+         pea   -2                       
+         ph4   #t1
+         FXPWRI
+
+         ph4   #z                       z := P_stirling(t1)
+         pea   13
+         ph4   #P_stirling
+         jsl   poly
+
+         ph4   #z                       z := z / x
+         FDIVX
+         
+         ph4   #y                       z := y + z
+         ph4   #z
+         FADDX
+
+chk_reflect anop
+         lda   reflect                  if reflection is needed then
+         beq   done
+
+do_reflect anop
+         ph4   #neg_adj                   z := z + neg_adj
+         ph4   #z
+         FADDX
+         
+         lda   z+8                        z := -z
+         eor   #$8000
+         sta   z+8
+
+done     FPROCEXIT                      restore env & raise any new exceptions
+         plb
+         creturn 10:z                   return a pointer to the result
+
+; constants
+cutoff   dc    i2'7'                    above this, just use Stirling's formula
+;low/high limits for use of rational approximations near 1 and 2
+rat1_lo  dc    f'0.97265625'
+rat1_hi  dc    f'1.02880859375'
+rat2_lo  dc    f'1.77880859375'
+rat2_hi  dc    f'2.1875'
+
+one_half dc    f'0.5'
+half_ln_2pi dc e'0.9189385332046727417803297'
+one      dc    i2'1'
+two      dc    i2'2'
+ln_pi    dc    e'1.14472988584940017414342735'
+pi       dc    e'3.1415926535897932384626433'
+
+; coefficients for rational approximation, 0.5 <= x <= 1.5
+P1       dc    e'4.120843185847770031e00'
+         dc    e'8.568982062831317339e01'
+         dc    e'2.431752435244210223e02'
+         dc    e'-2.617218583856145190e02'
+         dc    e'-9.222613728801521582e02'
+         dc    e'-5.176383498023217924e02'
+         dc    e'-7.741064071332953034e01'
+         dc    e'-2.208843997216182306e00'
+Q1       dc    e'1.000000000000000000e00'
+         dc    e'4.564677187585907957e01'
+         dc    e'3.778372484823942081e02'
+         dc    e'9.513235976797059772e02'
+         dc    e'8.460755362020782006e02'
+         dc    e'2.623083470269460180e02'
+         dc    e'2.443519662506311704e01'
+         dc    e'4.097792921092615065e-01'
+; coefficients for rational approximation, 1.5 <= x <= 4.0
+P2       dc    e'5.1550576176408171704e00'
+         dc    e'3.7751067979721702241e02'
+         dc    e'5.2689832559149812458e03'
+         dc    e'1.9553605540630449846e04'
+         dc    e'1.2043173809871640151e04'
+         dc    e'-2.0648294205325283281e04'
+         dc    e'-1.5086302287667250272e04'
+         dc    e'-1.5138318341150667785e03'
+Q2       dc    e'1.0000000000000000000e00'
+         dc    e'1.2890931890129576873e02'
+         dc    e'3.0399030414394398824e03'
+         dc    e'2.2029562144156636889e04'
+         dc    e'5.7120255396025029854e04'
+         dc    e'5.2622863838411992470e04'
+         dc    e'1.4402090371700852304e04'
+         dc    e'6.9832741405735102159e02'
+; coefficients for Stirling series approximation
+P_stirling anop
+         dc    e'-36108.77125372498935717327'
+         dc    e'2193.103333333333333333333'
+         dc    e'-156.8482846260020173063651'
+         dc    e'13.40286404416839199447895'
+         dc    e'-1.392432216905901116427432'
+         dc    e'0.1796443723688305731649385'
+         dc    e'-0.02955065359477124183006536'
+         dc    e'0.006410256410256410256410256'
+         dc    e'-0.001917526917526917526917527'
+         dc    e'0.0008417508417508417508417508'
+         dc    e'-0.0005952380952380952380952381'
+         dc    e'0.0007936507936507936507936508'
+         dc    e'-0.002777777777777777777777778'
+         dc    e'0.08333333333333333333333333'
+
+; temporaries/return values
+y        ds    10
+z        ds    10
+
+neg_adj  ds    10                       adjustment for negative x
+reflect  ds    2                        reflection flag
+         end
+
+****************************************************************
+*
 *  long long llrint(double x);
 *
 *  Rounds x to an integer using current rounding direction

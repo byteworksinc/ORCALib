@@ -748,3 +748,8 @@
 .c
  ~restm
  mend
+ macro
+&l jvc &bp
+&l bvs *+5
+ brl &bp
+ mend
