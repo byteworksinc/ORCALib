@@ -1938,12 +1938,6 @@ lgammal  entry
          pea   0
          pha
          FPROCENTRY
-
-         stz   z                        z := 0
-         stz   z+2
-         stz   z+4
-         stz   z+6
-         stz   z+8
          
          stz   reflect                  assume no reflection
 
@@ -1959,14 +1953,14 @@ lgammal  entry
    
          inc   reflect                      flag to do reflection
          
-         tdc                                neg_adj := x REM 2
-         clc
-         adc   #x
-         pea   0
-         pha
-         ph4   #neg_adj
-         FX2X
-         ph4   #two
+         ldx   #8                           neg_adj := x
+lp1      lda   x,X
+         sta   neg_adj,X
+         dex
+         dex
+         bpl   lp1
+
+         ph4   #two                         neg_adj := neg_adj REM 2
          ph4   #neg_adj
          FREMI
          
@@ -1997,18 +1991,26 @@ lgammal  entry
          lda   neg_adj+8                    if neg_adj is inf/nan then
          asl   a
          cmp   #32767*2
-         jeq   do_reflect                     skip to final reflection
+         bne   abs_x
+
+         ldx   #8                             z := neg_adj
+lp2      lda   neg_adj,X
+         sta   z,X
+         dex
+         dex
+         bpl   lp2
+         
+         brl   ret_negz                       return -z
 
 abs_x    asl   x+8                        x := abs(x)
          lsr   x+8
 
-positive tdc                            t1 := x
-         clc
-         adc   #x
-         pea   0
-         pha
-         ph4   #t1
-         FX2X
+positive ldx   #8                       t1 := x
+lp3      lda   x,X
+         sta   t1,X
+         dex
+         dex
+         bpl   lp3
 
          ph4   #rat2_hi                 if x is near 1 or 2 then
          ph4   #t1
@@ -2072,28 +2074,34 @@ finish_rational_approx anop
 
 ; Calculate based on Stirling's formula for other x values
 not_near_1_or_2 anop
-chk_big  ph4   #cutoff                  while x < 7 do
+         stz   scaled                   assume no scaling used
+
+         stz   z                        z := 1.0
+         stz   z+2
+         stz   z+4
+         lda   #$8000
+         sta   z+6
+         lda   #16383
+         sta   z+8
+
+chk_big  ph4   #cutoff                  while x < 9.41796875 do
          tdc
          clc
          adc   #x
          pea   0
          pha
-         FCMPI
+         FCMPS
          bvc   stirling
 
-         tdc                              t1 := ln(x)
+         inc   scaled                     flag that scaling was used
+
+         tdc                              z := z * x
          clc
          adc   #x
          pea   0
          pha
-         ph4   #t1
-         FX2X
-         ph4   #t1
-         FLNX
-         
-         ph4   #t1                        z := z + t1
          ph4   #z
-         FADDX
+         FMULX
 
          ph4   #one                       x := x + 1
          tdc
@@ -2104,27 +2112,18 @@ chk_big  ph4   #cutoff                  while x < 7 do
          FADDI
          bra   chk_big
 
-stirling tdc                            (push x arguments for below ops)
-         clc
-         adc   #x
-         ldy   #0
-         phy
-         pha
-         phy
-         pha
-         phy
-         pha
-         phy
-         pha
+stirling ldx   #8                       t1 := x
+lp4      lda   x,X                      y := x
+         sta   t1,X
+         sta   y,X
+         dex
+         dex
+         bpl   lp4
 
-         ph4   #t1                      t1 := ln(x)
-         FX2X
-         ph4   #t1
+         ph4   #t1                      t1 := ln(t1)
          FLNX
-                                        
-         ph4   #y                       y := x - 1/2
-         FX2X
-         ph4   #one_half
+
+         ph4   #one_half                y := y - 1/2
          ph4   #y
          FSUBS
 
@@ -2149,23 +2148,39 @@ stirling tdc                            (push x arguments for below ops)
          ph4   #y
          FADDX
          
-         ph4   #z                         y := y - z
-         ph4   #y                         (this adjusts for any scaling up)
+         lda   scaled                     if scaled then
+         beq   stirling_poly
+
+         ph4   #z                           z := ln(z)
+         FLNX
+         
+         ph4   #z                           y := y - z
+         ph4   #y
          FSUBX
 
 stirling_poly anop
-         ph4   #t1                      t1 := 1/x^2
-         FX2X
-         pea   -2                       
+         ldx   #8                       t1 := x
+lp5      lda   x,X
+         sta   t1,X
+         dex
+         dex
+         bpl   lp5
+
+         pea   -2                       t1 := 1/t1^2
          ph4   #t1
          FXPWRI
 
          ph4   #z                       z := P_stirling(t1)
-         pea   13
+         pea   8
          ph4   #P_stirling
          jsl   poly
 
-         ph4   #z                       z := z / x
+         tdc                            z := z / x
+         clc
+         adc   #x
+         pea   0
+         pha
+         ph4   #z
          FDIVX
          
          ph4   #y                       z := y + z
@@ -2176,12 +2191,11 @@ chk_reflect anop
          lda   reflect                  if reflection is needed then
          beq   done
 
-do_reflect anop
          ph4   #neg_adj                   z := z + neg_adj
          ph4   #z
          FADDX
          
-         lda   z+8                        z := -z
+ret_negz lda   z+8                        z := -z
          eor   #$8000
          sta   z+8
 
@@ -2190,12 +2204,12 @@ done     FPROCEXIT                      restore env & raise any new exceptions
          creturn 10:z                   return a pointer to the result
 
 ; constants
-cutoff   dc    i2'7'                    above this, just use Stirling's formula
+cutoff   dc    f'9.41796875'            above this, just use Stirling's formula
 ;low/high limits for use of rational approximations near 1 and 2
 rat1_lo  dc    f'0.97265625'
 rat1_hi  dc    f'1.02880859375'
-rat2_lo  dc    f'1.77880859375'
-rat2_hi  dc    f'2.1875'
+rat2_lo  dc    f'1.76220703125'
+rat2_hi  dc    f'2.208984375'
 
 one_half dc    f'0.5'
 half_ln_2pi dc e'0.9189385332046727417803297'
@@ -2240,11 +2254,6 @@ Q2       dc    e'1.0000000000000000000e00'
          dc    e'6.9832741405735102159e02'
 ; coefficients for Stirling series approximation
 P_stirling anop
-         dc    e'-36108.77125372498935717327'
-         dc    e'2193.103333333333333333333'
-         dc    e'-156.8482846260020173063651'
-         dc    e'13.40286404416839199447895'
-         dc    e'-1.392432216905901116427432'
          dc    e'0.1796443723688305731649385'
          dc    e'-0.02955065359477124183006536'
          dc    e'0.006410256410256410256410256'
@@ -2261,6 +2270,7 @@ z        ds    10
 
 neg_adj  ds    10                       adjustment for negative x
 reflect  ds    2                        reflection flag
+scaled   ds    2                        scaling flag
          end
 
 ****************************************************************
