@@ -3868,10 +3868,9 @@ in1      ldy   #8                       load exponent/sign word
          bne   sn1                      if number is an infinity or NaN
          lda   #' '                       do not use '0' padding
          sta   ~paddChar
-; Always format like %e for now, because %E code messes up padding for INF/NAN.
-;        lda   ~orVal                     if doing %A format
-;        bne   in2
-;        brl   ~Format_E                    format like %E
+         lda   ~orVal                     if doing %A format
+         bne   in2
+         brl   ~Format_E                    format like %E
 in2      brl   ~Format_e                  else format like %e
 ;
 ;  Determine sign
@@ -5217,7 +5216,7 @@ fList    dc    c'%',a'~Format_Percent'  %
          dc    c'a',a'~Format_a'        a
          dc    c'A',a'~Format_A'        A
          dc    c'f',a'~Format_f'        f
-         dc    c'F',a'~Format_f'        F
+         dc    c'F',a'~Format_F'        F
          dc    c'e',a'~Format_e'        e
          dc    c'E',a'~Format_E'        E
          dc    c'g',a'~Format_g'        g
