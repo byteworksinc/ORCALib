@@ -6153,6 +6153,7 @@ ps       stz   ~assignments             no assignments yet
          stz   ~eofFound                eof was not the first char
 
 ps1      lda   ~scanError               quit if a scan error has occurred
+         ora   ~eofFound
          bne   rm1
          lda   [format]                 get a character
          and   #$00FF
