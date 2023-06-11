@@ -6151,11 +6151,6 @@ ps       stz   ~assignments             no assignments yet
          stz   ~scanCount               no characters scanned
          stz   ~scanError               no scan error so far
          stz   ~eofFound                eof was not the first char
-         jsl   ~getchar                 test for eof
-         cmp   #EOF
-         bne   ps0
-         sta   ~eofFound
-ps0      jsl   ~putback
 
 ps1      lda   ~scanError               quit if a scan error has occurred
          bne   rm1
