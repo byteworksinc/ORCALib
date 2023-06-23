@@ -1,23 +1,4 @@
  macro
-&l negate8 &n1
-&l ~setm
- sec
- ldy #0
- tya
- sbc &n1
- sta &n1
- tya
- sbc &n1+2
- sta &n1+2
- tya
- sbc &n1+4
- sta &n1+4
- tya
- sbc &n1+6
- sta &n1+6
- ~restm
- mend
- macro
 &l move4 &m1,&m2
  lclb &yistwo
 &l ~setm
@@ -140,27 +121,3 @@
 .d
  sta 2+&op
  mend
- MACRO
-&LAB FTINTX
-&LAB PEA $0016
- LDX #$090A
- JSL $E10000
- MEND
- MACRO
-&LAB FX2C
-&LAB PEA $0510
- LDX #$090A
- JSL $E10000
- MEND
- MACRO
-&LAB FCPXX
-&LAB PEA $0A
- LDX #$090A
- JSL $E10000
- MEND
- MACRO
-&LAB FSUBX
-&LAB PEA 2
- LDX #$090A
- JSL $E10000
- MEND
