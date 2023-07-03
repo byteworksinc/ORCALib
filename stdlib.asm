@@ -37,7 +37,7 @@ abort    start
          ph2   #SIGABRT
          jsl   raise
          lda   #-1
-         jmp   ~C_QUIT
+         brl   ~C_QUIT
          end
 
 ****************************************************************
@@ -440,14 +440,14 @@ exit     start
 _exit    entry
 _Exit    entry
          lda   4,S
-         jmp   ~C_QUIT
+         brl   ~C_QUIT
          end
 
 quick_exit start
 
          jsr   ~QUICKEXIT
          lda   4,S
-         jmp   ~C_QUIT
+         brl   ~C_QUIT
          end
 
 ****************************************************************

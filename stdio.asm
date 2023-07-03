@@ -1322,11 +1322,10 @@ fprintf  start
          sta   stream+2
          phy                            restore return address/data bank
          phx
+         ldx   stream
          plb
-         lda   >stream+2                verify that stream exists
-         pha
-         lda   >stream
-         pha
+         pha                            verify that stream exists
+         phx
          jsl   ~VerifyStream
          bcc   lb1
          lda   #EIO
@@ -3327,11 +3326,10 @@ vfprintf start
          sta   stream+2
          phy                            restore return address/data bank
          phx
+         ldx   stream
          plb
-         lda   >stream+2                verify that stream exists
-         pha
-         lda   >stream
-         pha
+         pha                            verify that stream exists
+         phx
          jsl   ~VerifyStream
          bcc   lb1
          lda   #EIO
@@ -3881,40 +3879,33 @@ argp     equ   7                        argument pointer
 ;
 ;  For signed numbers, if the value is negative, use the sign flag
 ;
-         lda   ~isLongLong              handle long long values
-         beq   sn0
-         ldy   #6
-         lda   [argp],Y
-         bpl   cn0
-         sec
-         lda   #0
-         sbc   [argp]
-         sta   [argp]
-         ldy   #2
-         lda   #0
-         sbc   [argp],Y
-         sta   [argp],Y
-         iny
-         iny
-         lda   #0
-         sbc   [argp],Y
-         sta   [argp],Y
-         iny
-         iny
-         lda   #0
-         sbc   [argp],Y
-         sta   [argp],Y
-         bra   sn2
-sn0      lda   ~isLong                  handle long values
+         lda   ~isLong                  handle long and long long values
          beq   sn0a
          ldy   #2
-         lda   [argp],Y
+         lda   ~isLongLong
+         beq   sn0
+         ldy   #6
+sn0      lda   [argp],Y
          bpl   cn0
          sec
-         lda   #0
+         ldx   #0
+         txa
          sbc   [argp]
          sta   [argp]
-         lda   #0
+         ldy   #2
+         txa
+         sbc   [argp],Y
+         sta   [argp],Y
+         lda   ~isLongLong
+         beq   sn2
+         iny
+         iny
+         txa
+         sbc   [argp],Y
+         sta   [argp],Y
+         iny
+         iny
+         txa
          sbc   [argp],Y
          sta   [argp],Y
          bra   sn2
@@ -3964,13 +3955,12 @@ cn1      lda   [argp]                     push an int value
 cn1a     pha
 cn2      ph4   #~str                    push the string addr
          ph2   #l:~str                  push the string buffer length
-         ph2   #0                       do an unsigned conversion
          lda   ~isLongLong              do the proper conversion
          beq   cn2a
-         pla
          jsr   ~ULongLong2Dec
          bra   pd1
-cn2a     lda   ~isLong
+cn2a     ph2   #0                       do an unsigned conversion
+         lda   ~isLong
          beq   cn3
          _Long2Dec
          bra   pd1
@@ -4057,17 +4047,8 @@ pn1      lda   ~hexPrefix               if there is a hex prefix then
          jsl   ~putchar
          ph2   ~hexPrefix+1
          jsl   ~putchar
-pn1a     lda   ~paddChar                if the number needs 0 padding then
-         cmp   #'0'
-         bne   pn1c
-         lda   ~fieldWidth
-         bmi   pn1c
-         beq   pn1c
-pn1b     ph2   ~paddChar                  print padd zeros
-         jsl   ~putchar
-         dec   ~fieldWidth
-         bne   pn1b
-pn1c     lda   ~precision               if the number needs more padding then
+pn1a     jsr   ~ZeroPad                 pad with '0's if needed
+         lda   ~precision               if the number needs more padding then
          beq   pn3
 pn2      ph2   #'0'                       print padd characters
          jsl   ~putchar
@@ -4095,10 +4076,10 @@ pn5      cpy   #l:~str                  quit if we're at the end of the ~str
 ;
 rn1      lda   ~isLongLong
          beq   rn2
-         inc   argp
-         inc   argp
-         inc   argp
-         inc   argp
+         lda   argp
+         clc
+         adc   #4
+         sta   argp
 rn2      lda   ~isLong
          beq   rn3
          inc   argp
@@ -4244,9 +4225,12 @@ lb1      clc                            restore the original argp+4
 ****************************************************************
 *
 *  ~Format_o - format an octal number
+*  ~Format_x - format a hexadecimal number (lowercase output)
+*  ~Format_X - format a hexadecimal number (uppercase output)
+*  ~Format_p - format a pointer
 *
 *  Inputs:
-*        ~altForm - use a leading '0'?
+*        ~altForm - use a leading '0' (octal) or '0x' (hex)?
 *        ~fieldWidth - output field width
 *        ~paddChar - padd character
 *        ~leftJustify - left justify the output?
@@ -4260,15 +4244,34 @@ lb1      clc                            restore the original argp+4
 ~Format_o private
          using ~printfCommon
 argp     equ   7                        argument pointer
+
+         lda   #3                       use 3 bits per output character
+         bra   cn0
+
+~Format_x entry
+;
+;  Set the "or" value; this is used to set the case of character results
+;
+         lda   #$20*256
+         sta   ~orVal
+         bra   hx0
+
+~Format_p entry
+         inc   ~isLong
+~Format_X entry
+         stz   ~orVal
+hx0      lda   #4                       use 4 bits per output character
+
 ;
 ;  Initialization
 ;
+cn0      sta   bitsPerChar
+         stz   ~hexPrefix               assume we won't lead with 0x
          stz   ~sign                    ignore the sign flag
          lda   #'  '                    initialize the string to blanks
          sta   ~str
          move  ~str,~str+1,#l:~str-1
-         stz   ~num+2                   get the value to convert
-         lda   ~isLongLong
+         lda   ~isLongLong              get the value to convert
          beq   cn1
          ldy   #6
          lda   [argp],Y
@@ -4279,7 +4282,7 @@ argp     equ   7                        argument pointer
          sta   ~num+4
 cn1      lda   ~isLong
          beq   cn2
-cn1a     ldy   #2
+         ldy   #2
          lda   [argp],Y
          sta   ~num+2
 cn2      lda   [argp]
@@ -4287,57 +4290,71 @@ cn2      lda   [argp]
          beq   cn2a
          and   #$00FF
 cn2a     sta   ~num
+         ldx   bitsPerChar              if doing hex format then
+         cpx   #3
+         beq   cn2b
+         ldx   ~altForm                   if alt form has been selected then
+         beq   cn2b
+         ora   ~num+2                       if value is not 0 then
+         ora   ~num+4
+         ora   ~num+6
+         beq   cn2b
+         lda   #'X0'                          set hex prefix to '0X' or '0x'
+         ora   ~orVal
+         sta   ~hexPrefix
 ;
 ;  Convert the number to an ASCII string
 ;
-         short I,M
-         ldy   #l:~str-1                set up the character index
-cn3      lda   ~num+7                   quit if the number is zero
-         ora   ~num+6
-         ora   ~num+5
-         ora   ~num+4
-         ora   ~num+3
-         ora   ~num+2
-         ora   ~num+1
-         ora   ~num
-         beq   al1
-         lda   #0                       roll off 3 bits
-         ldx   #3
-cn4      lsr   ~num+7
-         ror   ~num+6
-         ror   ~num+5
+cn2b     ldy   #l:~str-1                set up the character index
+cn3      lda   #' 0'                    roll off 4 bits
+         ldx   bitsPerChar
+cn4      lsr   ~num+6
          ror   ~num+4
-         ror   ~num+3
          ror   ~num+2
-         ror   ~num+1
          ror   ~num
          ror   A
          dex
          bne   cn4
-         lsr   A                        form a character
-         lsr   A
-         lsr   A
-         lsr   A
-         lsr   A
-         ora   #'0'
+         xba                            form a character
+         ldx   bitsPerChar
+cn4a     asl   A
+         dex
+         bne   cn4a
+         cmp   #('9'+1)*256+' '         if the character should be alpha then
+         blt   cn5
+         clc
+         adc   #7*256                     adjust it
+         ora   ~orVal
+cn5      dey
          sta   ~str,Y                   save the character
-         dey
-         bra   cn3
+         lda   ~num+6                   loop if the number is not zero
+         ora   ~num+4
+         ora   ~num+2
+         ora   ~num
+         bne   cn3
 ;
-;  If a leading zero is required, be sure we include one
+;  If a leading '0x' is required, be sure we include one
 ;
-al1      cpy   #l:~str-1                include a zero if no characters have
-         beq   al2                       been placed in the string
-         lda   ~altForm                 branch if no leading zero is required
+         lda   bitsPerChar              if doing octal format then
+         cmp   #3
+         bne   al3
+         lda   ~altForm                   if alt form has been selected then
          beq   al3
-al2      lda   #'0'
-         sta   ~str,Y
-al3      long  I,M
+         lda   ~precision                   make sure precision is non-zero
+         bne   al2
+         inc   ~precision
+al2      lda   #'0 '                        if the result is not ' 0' then
+         cmp   ~str+l:~str-2
+         beq   al3        
+         sta   ~str-1,Y                       include a zero in the string
 ;
 ;  Piggy back off of ~Format_d for output
 ;
-         stz   ~hexPrefix               don't lead with 0x
-         brl   ~Format_IntOut
+al3      brl   ~Format_IntOut
+;
+;  Local data
+;
+bitsPerChar ds 2                        bits per output character
          end
 
 ****************************************************************
@@ -4357,36 +4374,36 @@ al3      long  I,M
          using ~printfCommon
 argp     equ   7                        argument pointer
 
-         ph4   <argp                    save the original argp
-         ldy   #2                       dereference argp
-         lda   [argp],Y
-         tax
-         lda   [argp]
-         sta   argp
-         stx   argp+2
-         short M                        determine the length of the string
-         ldy   #-1
-lb1      iny
-         lda   [argp],Y
-         bne   lb1
-         long  M
-         tya
-         bra   lb1a
+         sec                            set flag for c-string
+         bra   lb0
 
 ~Format_b entry
 ~Format_P entry
-         ph4   <argp                    save the original argp
+         clc                            set flag for p-string
+
+lb0      ph4   <argp                    save the original argp
          ldy   #2                       dereference argp
          lda   [argp],Y
          tax
          lda   [argp]
          sta   argp
          stx   argp+2
-         lda   [argp]                   get the length of the string
+         
+         bcs   lb1                      if formatting a p-string then
+         lda   [argp]                     get the length of the string
          and   #$00FF
          inc4  argp
+         bra   lb1x                     else if formatting a c-string then
+         
+lb1      short M                          compute the length of the string
+         ldy   #-1
+lb1a     iny
+         lda   [argp],Y
+         bne   lb1a
+         long  M
+         tya
 
-lb1a     ldx   ~precisionSpecified      if the precision is specified then
+lb1x     ldx   ~precisionSpecified      if the precision is specified then
          beq   lb2
          cmp   ~precision                 if the precision is smaller then
          blt   lb2
@@ -4413,133 +4430,6 @@ lb4      clc                            restore and increment argp
          pla
          sta   argp+2
          brl   ~LeftJustify             handle left justification
-         end
-
-****************************************************************
-*
-*  ~Format_x - format a hexadecimal number (lowercase output)
-*  ~Format_X - format a hexadecimal number (uppercase output)
-*  ~Format_p - format a pointer
-*
-*  Inputs:
-*        ~altForm - use a leading '0x'?
-*        ~fieldWidth - output field width
-*        ~paddChar - padd character
-*        ~leftJustify - left justify the output?
-*        ~isLong - is the operand long?
-*        ~isLongLong - is the operand long long?
-*        ~precision - precision of output
-*        ~precisionSpecified - was the precision specified?
-*
-****************************************************************
-*
-~Format_x private
-         using ~printfCommon
-argp     equ   7                        argument pointer
-;
-;  Set the "or" value; this is used to set the case of character results
-;
-         lda   #$20
-         sta   orVal
-         bra   cn0
-
-~Format_p entry
-         lda   #1
-         sta   ~isLong
-~Format_X entry
-         stz   orVal
-;
-;  Initialization
-;
-cn0      stz   ~sign                    ignore the sign flag
-         lda   #'  '                    initialize the string to blanks
-         sta   ~str
-         move  ~str,~str+1,#l:~str-1
-         stz   ~num+2                   get the value to convert
-         stz   ~num+4
-         stz   ~num+6
-         lda   ~isLongLong
-         beq   cn1
-         ldy   #6
-         lda   [argp],Y
-         sta   ~num+6
-         dey
-         dey
-         lda   [argp],Y
-         sta   ~num+4
-cn1      lda   ~isLong
-         beq   cn2
-         ldy   #2
-         lda   [argp],Y
-         sta   ~num+2
-cn2      lda   [argp]
-         ldx   ~isByte
-         beq   cn2a
-         and   #$00FF
-cn2a     sta   ~num
-         ora   ~num+2
-         ora   ~num+4
-         ora   ~num+6
-         bne   cn2b
-         stz   ~altForm                 if value is 0, do not print hex prefix
-cn2b     stz   ~hexPrefix               assume we won't lead with 0x
-;
-;  Convert the number to an ASCII string
-;
-         short I,M
-         ldy   #l:~str-1                set up the character index
-cn3      lda   #0                       roll off 4 bits
-         ldx   #4
-cn4      lsr   ~num+7
-         ror   ~num+6
-         ror   ~num+5
-         ror   ~num+4
-         ror   ~num+3
-         ror   ~num+2
-         ror   ~num+1
-         ror   ~num
-         ror   A
-         dex
-         bne   cn4
-         lsr   A                        form a character
-         lsr   A
-         lsr   A
-         lsr   A
-         ora   #'0'
-         cmp   #'9'+1                   if the character should be alpha,
-         blt   cn5                       adjust it
-         adc   #6
-         ora   orVal
-cn5      sta   ~str,Y                   save the character
-         dey
-         lda   ~num+7                   loop if the number is not zero
-         ora   ~num+6
-         ora   ~num+5
-         ora   ~num+4
-         ora   ~num+3
-         ora   ~num+2
-         ora   ~num+1
-         ora   ~num
-         bne   cn3
-;
-;  If a leading '0x' is required, be sure we include one
-;
-         lda   ~altForm                 branch if no leading '0x' is required
-         beq   al3
-al2      lda   #'X'                     insert leading '0x'
-         ora   orVal
-         sta   ~hexPrefix+1
-         lda   #'0'
-         sta   ~hexPrefix
-al3      long  I,M
-;
-;  Piggy back off of ~Format_d for output
-;
-         brl   ~Format_IntOut
-;
-;  Local data
-;
-orVal    ds    2                        for setting the case of characters
          end
 
 ****************************************************************
@@ -4669,10 +4559,12 @@ stream   equ   3                        input stream
 *
 *  ~LeftJustify - print padd characters for left justification
 *  ~RightJustify - print padd characters for right justification
+*  ~ZeroPad - print zeros to pad to field width
 *
 *  Inputs:
 *        ~fieldWidth - # chars to print ( <= 0 prints none)
 *        ~leftJustify - left justify the output?
+*        ~paddChar - padding character
 *
 ****************************************************************
 *
@@ -4695,6 +4587,19 @@ lb1      ph2   #' '                     write the proper # of padd characters
          dec   ~fieldWidth
          bne   lb1
          rts
+
+~ZeroPad entry
+         lda   ~paddChar                if the number needs 0 padding then
+         cmp   #'0'
+         bne   zp2
+         lda   ~fieldWidth
+         bmi   zp2
+         beq   zp2
+zp1      ph2   ~paddChar                  print padd zeros
+         jsl   ~putchar
+         dec   ~fieldWidth
+         bne   zp1
+zp2      rts
          end
 
 ****************************************************************
@@ -4793,7 +4698,7 @@ lb3      creturn 4:ptr
 *  -----------------------
 *
 *  An 'l' indicates that the 'd', 'o', 'u', 'x' or 'X' argument is
-*  long.  'L' and 'u' are also accepted for compliance with ANSI C,
+*  long.  'L' and 'h' are also accepted for compliance with ANSI C,
 *  but have no effect in this implementation.
 *
 *  Conversion Specifier
@@ -4806,12 +4711,14 @@ lb3      creturn 4:ptr
 *        while 'X' generates uppercase hex digits.
 *  c     Character.
 *  s     String.
-*  p     Pascal string.
+*  P,b   Pascal string.
+*  p     Pointer.
 *  n     The argument is (int *); the number of characters written so
 *        far is written to the location.
-*  f     Signed decimal floating point.
+*  f,F   Signed decimal floating point.
 *  e,E   Exponential format floating point.
 *  g,G   Use f,e or E, as appropriate.
+*  a,A   Hexadecimal format floating point.
 *  %     Write a '%' character.
 *
 ****************************************************************
@@ -4940,23 +4847,23 @@ Flag     lda   [format]                 get the character
          and   #$00FF
          cmp   #'-'                     if it is a '-' then
          bne   fl1
-         lda   #1                         left justify the output
-         sta   ~leftJustify
+         sta   ~leftJustify               left justify the output
+         lda   #' '                       pad with spaces (ignore any '0' flag)
+         sta   ~paddChar
          bra   fl5
 
 fl1      cmp   #'0'                     if it is a '0' then
          bne   fl2
-         sta   ~paddChar                  padd with '0' characters
+         ldx   ~leftJustify               if not left justifying then
+         bne   fl5
+         sta   ~paddChar                    padd with '0' characters
          bra   fl5
 
 fl2      cmp   #'+'                     if it is a '+' or ' ' then
          beq   fl3
          cmp   #' '
          bne   fl4
-         ldx   ~sign
-         cpx   #'+'
-         beq   fl5
-fl3      sta   ~sign                      set the sign flag
+fl3      tsb   ~sign                      set the sign flag ('+' overrides ' ')
          bra   fl5
 
 fl4      cmp   #'#'                     if it is a '#' then
@@ -4986,8 +4893,10 @@ GetSize  stz   val                      assume a value of 0
          bne   fv0
          eor   #$ffff                       negative field width is like
          inc   a                              positive with - flag
-         ldx   #1
+         ldx   #'-'
          stx   ~leftJustify
+         ldx   #' '
+         stx   ~paddChar
          bra   fv1
 fv0      lda   #0                           negative precision is ignored
          stz   ~precisionSpecified
@@ -5021,10 +4930,10 @@ val      ds    2                        value
 ;  List of format specifiers and the equivalent subroutines
 ;
 fList    dc    c'%',a'~Format_Percent'  %
-         dc    c'a',a'~Format_e'        a (not formatted correctly)
-         dc    c'A',a'~Format_E'        A (not formatted correctly)
+         dc    c'a',a'~Format_a'        a
+         dc    c'A',a'~Format_A'        A
          dc    c'f',a'~Format_f'        f
-         dc    c'F',a'~Format_f'        F
+         dc    c'F',a'~Format_F'        F
          dc    c'e',a'~Format_e'        e
          dc    c'E',a'~Format_E'        E
          dc    c'g',a'~Format_g'        g
@@ -5074,8 +4983,9 @@ fListEnd anop
 ;
 ;  Work buffers
 ;
-~num     ds    8                        long long integer
+~num     ds    8                        long long integer (must be 0 after each conversion)
 ~numChars ds   2                        number of characters printed with this printf
+~orVal   ds    2                        value to 'or' with to set case of characters
 ~str     ds    83                       string buffer
 ;
 ;  Real formatting
@@ -5958,13 +5868,9 @@ ps       stz   ~assignments             no assignments yet
          stz   ~scanCount               no characters scanned
          stz   ~scanError               no scan error so far
          stz   ~eofFound                eof was not the first char
-         jsl   ~getchar                 test for eof
-         cmp   #EOF
-         bne   ps0
-         sta   ~eofFound
-ps0      jsl   ~putback
 
 ps1      lda   ~scanError               quit if a scan error has occurred
+         ora   ~eofFound
          bne   rm1
          lda   [format]                 get a character
          and   #$00FF

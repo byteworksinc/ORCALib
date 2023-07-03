@@ -53,7 +53,7 @@ lb1      rtl
 *
 enddesk  start
 
-         jmp   ~ENDDESK
+         brl   ~ENDDESK
          end
 
 ****************************************************************
@@ -64,7 +64,7 @@ enddesk  start
 *
 endgraph start
 
-         jmp   ~ENDGRAPH
+         brl   ~ENDGRAPH
          end
 
 ****************************************************************
@@ -119,7 +119,7 @@ id       dc    8c' ',i1'0'
 *
 startdesk start
 
-         jmp   ~STARTDESK
+         brl   ~STARTDESK
          end
 
 ****************************************************************
@@ -130,7 +130,7 @@ startdesk start
 *
 startgraph start
 
-         jmp   ~STARTGRAPH
+         brl   ~STARTGRAPH
          end
 
 ****************************************************************
