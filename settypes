@@ -1,0 +1,10 @@
+filetype -p =.asm src; change -p =.asm asm65816
+filetype -p =.macros src; change -p =.macros asm65816
+filetype m16.int64 src; change m16.int64 exec
+filetype smac src; change smac asm65816
+filetype backup src; change backup exec
+filetype make src; change make exec
+filetype settypes src; change settypes exec
+filetype LICENSE txt
+filetype README.md txt
+filetype obj:README.txt txt
