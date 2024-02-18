@@ -110,11 +110,10 @@ lb1      inc   stdfile
 
 cl0      lla   p,stderr+4               find the file record that points to this
          ldy   #2                        one
-cl1      lda   [p]
-         ora   [p],Y
-         jeq   rts
-         lda   [p],Y
+cl1      lda   [p],Y
          tax
+         ora   [p]
+         jeq   rts
          lda   [p]
          cmp   stream
          bne   cl2

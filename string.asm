@@ -244,8 +244,8 @@ lb3      lda   [p1],Y                   scan until the end of memory is reached
          dex
          bne   lb3
 
-         ldx   #0                       memory matches
-         bra   lb5
+;        ldx   #0
+         bra   lb5                      memory matches
 
 lb4      blt   less                     memory differs - set the result
          ldx   #1
@@ -956,7 +956,7 @@ str      equ   4                        pointer to the string
          tcd
 
          ldy   #0                       advance s1 to point to the terminating
-         ldx   #0                        null
+         tyx                             null
          short M
 lb1      lda   [str],Y
          beq   lb2
@@ -1200,9 +1200,9 @@ lb3      long  I,M                      increment s by Y and load the value
          clc
          adc   s
          tay
-         lda   s+2
-         adc   #0
-         tax
+         ldx   s+2
+         bcc   lb4
+         inx
 
 lb4      lda   rtl+1                    remove the parameters
          sta   set+2
