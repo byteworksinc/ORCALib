@@ -616,7 +616,9 @@ lb2      long  M
          clc
          adc   s1
          sta   s1
-         short M                        copy characters 'til the null is found
+         bcc   lb2a
+         inc   s1+2
+lb2a     short M                        copy characters 'til the null is found
          ldy   #0
 lb3      lda   [s2],Y
          sta   [s1],Y
@@ -1013,7 +1015,9 @@ lb2      long  M
          clc
          adc   s1
          sta   s1
-         short M                        copy characters 'til the null is found
+         bcc   lb2a
+         inc   s1+2
+lb2a     short M                        copy characters 'til the null is found
          ldy   #0
          ldx   n
          beq   lb4
