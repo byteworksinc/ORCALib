@@ -1017,29 +1017,33 @@ lb2      long  M
          sta   s1
          bcc   lb2a
          inc   s1+2
-lb2a     short M                        copy characters 'til the null is found
+lb2a     ldx   n                        copy characters 'til the null is found
+         bne   lb2b
+         lda   n+2
+         beq   lb6
+lb2b     short M
          ldy   #0
-         ldx   n
-         beq   lb4
 lb3      lda   [s2],Y
          sta   [s1],Y
-         beq   lb4
+         beq   lb5
          iny
          bne   lb3a
          inc   s1+2
          inc   s2+2
 lb3a     dex
          bne   lb3
-         lda   n+2
+         ldx   n+2
          beq   lb4
-         dec   n+2
+         dex
+         stx   n+2
+         ldx   #0
          bra   lb3
 
 lb4      lda   #0                       write the terminating null
          sta   [s1],Y
-         long  M                        return to the caller
+lb5      long  M                        return to the caller
 
-         creturn 4:rval
+lb6      creturn 4:rval
          end
 
 ****************************************************************
