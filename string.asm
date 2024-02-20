@@ -1070,7 +1070,6 @@ flag     equ   1                        return flag
 
          ldy   #0                       scan until the end of string is reached
          ldx   n+2                       or a difference is found
-         bmi   equal
          bne   lb0
          ldx   n
          beq   equal
@@ -1082,9 +1081,11 @@ lb1      lda   [s1],Y
          bne   lb3
          dex
          bne   lb1a
-         lda   n+2
+         ldx   n+2
          beq   equal
-         dec   n+2
+         dex
+         stx   n+2
+         ldx   #0
 lb1a     iny
          bne   lb1
          inc   s1+2
