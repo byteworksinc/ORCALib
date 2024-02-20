@@ -83,16 +83,13 @@ stdfile  equ   7                        is this a standard file?
          phk
          plb
 
-         lda   #EOF                     assume we will get an error
-         sta   err
          ph4   <stream                  verify that stream exists
          jsl   ~VerifyStream
-         jcs   rts
+         jcs   rts_err
 
          ph4   <stream                  do any pending I/O
          jsl   fflush
-         tax
-         jne   rts
+         sta   err                      initialize err to fflush result
 
          stz   stdfile                  not a standard file
          lda   stream+2                 bypass file disposal if the file is
@@ -113,7 +110,7 @@ cl0      lla   p,stderr+4               find the file record that points to this
 cl1      lda   [p],Y
          tax
          ora   [p]
-         jeq   rts
+         jeq   rts_err
          lda   [p]
          cmp   stream
          bne   cl2
@@ -188,7 +185,10 @@ cl6      lda   [p],Y
          dey
          cpy   #2
          bne   cl6
-cl7      stz   err                      no error found
+cl7      bra   rts                      no error found
+
+rts_err  lda   #EOF
+         sta   err
 rts      plb
          creturn   2:err
 
