@@ -129,12 +129,18 @@ cl3a     ldy   #FILE_flag               if the file was opened by tmpfile then
          and   #_IOTEMPFILE
          beq   cl3d
          ph4   #nameBuffSize              p = malloc(nameBuffSize)
-         jsl   malloc                     grPathname = p
-         sta   p                          dsPathname = p+2
+         jsl   malloc
+         sta   p
          stx   p+2
-         sta   grPathname
+         ora   p+2                        if p == NULL then
+         bne   cl3aa
+         lda   #EOF                         flag error
+         sta   err
+         bra   cl3d                         just close the file
+cl3aa    lda   p
+         sta   grPathname                 grPathname = p
          stx   grPathname+2
-         clc
+         clc                              dsPathname = p+2
          adc   #2
          bcc   cl3b
          inx
