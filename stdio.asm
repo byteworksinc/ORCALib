@@ -124,52 +124,10 @@ cl3      lda   [stream]                 remove stream from the file list
          sta   [p]
          lda   [stream],Y
          sta   [p],Y
-cl3a     ldy   #FILE_flag               if the file was opened by tmpfile then
-         lda   [stream],Y
-         and   #_IOTEMPFILE
-         beq   cl3d
-         ph4   #nameBuffSize              p = malloc(nameBuffSize)
-         jsl   malloc
-         sta   p
-         stx   p+2
-         ora   p+2                        if p == NULL then
-         bne   cl3aa
-         lda   #EOF                         flag error
-         sta   err
-         bra   cl3d                         just close the file
-cl3aa    lda   p
-         sta   grPathname                 grPathname = p
-         stx   grPathname+2
-         clc                              dsPathname = p+2
-         adc   #2
-         bcc   cl3b
-         inx
-cl3b     sta   dsPathname
-         stx   dsPathname+2
-         lda   #nameBuffSize              p->size = nameBuffSize
-         sta   [p]
-         ldy   #FILE_file                 clRefnum = grRefnum = stream->_file
-         lda   [stream],Y
-         beq   cl3e
-         sta   grRefnum
-         GetRefInfoGS gr                  GetRefInfoGS(gr)
-         bcs   cl3c
-         lda   grRefnum                   OSClose(cl)
-         sta   clRefNum
-         OSClose cl
-         DestroyGS ds                     DestroyGS(ds)
-cl3c     ph4   <p                         free(p)
-         jsl   free
-         bra   cl3e                     else
-cl3d     ldy   #FILE_file                 close the file
-         lda   [stream],Y
-         beq   cl3e
-         sta   clRefNum
-         OSClose cl
-cl3e     ldy   #FILE_flag               if the buffer was allocated by fopen then
+cl3a     ldy   #FILE_flag               if the buffer was allocated by fopen then
          lda   [stream],Y
          and   #_IOMYBUF
-         beq   cl4
+         beq   cl3b
          ldy   #FILE_base+2               dispose of the file buffer
          lda   [stream],Y
          pha
@@ -178,6 +136,47 @@ cl3e     ldy   #FILE_flag               if the buffer was allocated by fopen the
          lda   [stream],Y
          pha
          jsl   free
+cl3b     ldy   #FILE_flag               if the file was opened by tmpfile then
+         lda   [stream],Y
+         and   #_IOTEMPFILE
+         beq   cl3f
+         ph4   #nameBuffSize              p = malloc(nameBuffSize)
+         jsl   malloc
+         sta   p
+         stx   p+2
+         ora   p+2                        if p == NULL then
+         bne   cl3c
+         lda   #EOF                         flag error
+         sta   err
+         bra   cl3f                         just close the file
+cl3c     lda   p
+         sta   grPathname                 grPathname = p
+         stx   grPathname+2
+         clc                              dsPathname = p+2
+         adc   #2
+         bcc   cl3d
+         inx
+cl3d     sta   dsPathname
+         stx   dsPathname+2
+         lda   #nameBuffSize              p->size = nameBuffSize
+         sta   [p]
+         ldy   #FILE_file                 clRefnum = grRefnum = stream->_file
+         lda   [stream],Y
+         beq   cl4
+         sta   grRefnum
+         sta   clRefNum
+         GetRefInfoGS gr                  GetRefInfoGS(gr)
+         bcs   cl3e
+         OSClose cl                       OSClose(cl)
+         DestroyGS ds                     DestroyGS(ds)
+cl3e     ph4   <p                         free(p)
+         jsl   free
+         bra   cl4                      else
+cl3f     ldy   #FILE_file                 close the file
+         lda   [stream],Y
+         beq   cl4
+         sta   clRefNum
+         OSClose cl
 cl4      lda   stdfile                  if this is not a standard file then
          bne   cl5
          ph4   <stream                    dispose of the file buffer
