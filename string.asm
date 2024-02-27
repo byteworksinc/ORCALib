@@ -963,6 +963,9 @@ str      equ   4                        pointer to the string
 lb1      lda   [str],Y
          beq   lb2
          iny
+         lda   [str],Y
+         beq   lb2
+         iny
          bne   lb1
          inx
          inc   str+2
