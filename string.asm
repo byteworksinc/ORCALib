@@ -303,8 +303,8 @@ rtl      equ   1                        return address
          short M                          move 1 byte now
          lda   [p2]
          sta   [p1]
-         long  M
          dec   len
+         long  M
          inc4  p1
          inc4  p2
 lb1      anop                           endif
@@ -482,19 +482,19 @@ rtl      equ   1                        return address
 
          ph4   <p                       save the pointer
 
-         short M
-         lda   val                      form a 2 byte value
-         sta   val+1
+         short I,M
+         ldx   val                      form a 2 byte value
+         stx   val+1
 
          lda   len                      if there are an odd # of bytes then
          lsr   A
          bcc   lb1
-         lda   val                        set 1 byte now
+         txa                              set 1 byte now
          sta   [p]
-         long  M
          dec   len
+         long  I,M
          inc4  p
-lb1      long  M                        endif
+lb1      long  I,M                      endif
 
          lda   val                      set len bytes
          ldx   len+2                    set full banks
