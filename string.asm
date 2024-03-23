@@ -253,9 +253,9 @@ lb4      blt   less                     memory differs - set the result
 
 less     ldx   #-1
 
-lb5      long  M
-         lda   rtl                      remove the parameters from the stack
+lb5      lda   rtl                      remove the parameters from the stack
          sta   len+1
+         long  M
          lda   rtl+1
          sta   len+2
          pld
@@ -436,11 +436,11 @@ lb10     lda   [p2],Y
          dex
          bne   lb9
 
-lb11     long  M
-         ply                            get the original source pointer
+lb11     ply                            get the original source pointer
          plx
          lda   rtl                      remove the parameters from the stack
          sta   len+1
+         long  M
          lda   rtl+1
          sta   len+2
          pld
@@ -629,9 +629,9 @@ lb3      lda   [s2],Y
          inc   s2+2
          bra   lb3
 
-lb4      long  M                        return to the caller
-         lda   rtl
+lb4      lda   rtl                      return to the caller
          sta   s2+1
+         long  M
          lda   rtl+1
          sta   s2+2
          ldx   rval+2
@@ -751,9 +751,9 @@ less     ldx   #-1                      It wasn't, so *s1 < *s2
 lb3      blt   less                     the strings differ - set the result
          ldx   #1
 
-lb4      long  M
-         lda   rtl                      remove the parameters from the stack
+lb4      lda   rtl                      remove the parameters from the stack
          sta   s2+1
+         long  M
          lda   rtl+1
          sta   s2+2
          pld
@@ -830,9 +830,9 @@ lb1      lda   [s2],Y
          inc   s2+2
          bra   lb1
 
-lb2      long  M                        return to the caller
-         lda   rtl
+lb2      lda   rtl                      return to the caller
          sta   s2+1
+         long  M
          lda   rtl+1
          sta   s2+2
          ldx   rval+2
@@ -971,10 +971,10 @@ lb1      lda   [str],Y
          inc   str+2
          bra   lb1
 
-lb2      long  M
-         pld                            remove str from the stack
-         lda   2,S
-         sta   6,S
+lb2      pld                            remove str from the stack
+         lda   3,S
+         sta   7,S
+         long  M
          pla
          sta   3,S
          pla
@@ -1203,14 +1203,13 @@ lb1      lda   [s],Y
          short M
          bra   lb1
 
-lb2      long  I,M                      no match found -> return NULL
-         ldx   #0
+lb2      ldx   #0                       no match found -> return NULL
          txy
+         long  I,M
          bra   lb4
 
 lb3      long  I,M                      increment s by Y and load the value
          tya
-         and   #$00FF
          clc
          adc   s
          tay
@@ -1266,10 +1265,10 @@ lb1      lda   [str],Y
 
 lb2      ldy   #-1                      no match found -> return -1
 
-lb3      long  M
-         pld                            remove parameters from the stack
-         lda   2,S
-         sta   8,S
+lb3      pld                            remove parameters from the stack
+         lda   3,S
+         sta   9,S
+         long  M
          pla
          sta   5,S
          pla
@@ -1377,10 +1376,10 @@ lb2      cmp   #0
          iny
          bpl   lb1
 
-lb3      long  M
-         pld                            remove parameters from the stack
-         lda   2,S
-         sta   8,S
+lb3      pld                            remove parameters from the stack
+         lda   3,S
+         sta   9,S
+         long  M
          pla
          sta   5,S
          pla
