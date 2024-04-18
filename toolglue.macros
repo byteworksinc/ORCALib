@@ -384,3 +384,8 @@
 &lab ldx #$1F23
  jsl $E10000
  MEND
+ MACRO
+&lab _ReadMouse2
+&lab ldx #$3303
+ jsl $E10000
+ MEND
