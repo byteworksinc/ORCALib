@@ -244,8 +244,8 @@ lb3      lda   [p1],Y                   scan until the end of memory is reached
          dex
          bne   lb3
 
-         ldx   #0                       memory matches
-         bra   lb5
+;        ldx   #0
+         bra   lb5                      memory matches
 
 lb4      blt   less                     memory differs - set the result
          ldx   #1
@@ -253,9 +253,9 @@ lb4      blt   less                     memory differs - set the result
 
 less     ldx   #-1
 
-lb5      long  M
-         lda   rtl                      remove the parameters from the stack
+lb5      lda   rtl                      remove the parameters from the stack
          sta   len+1
+         long  M
          lda   rtl+1
          sta   len+2
          pld
@@ -303,8 +303,8 @@ rtl      equ   1                        return address
          short M                          move 1 byte now
          lda   [p2]
          sta   [p1]
-         long  M
          dec   len
+         long  M
          inc4  p1
          inc4  p2
 lb1      anop                           endif
@@ -436,11 +436,11 @@ lb10     lda   [p2],Y
          dex
          bne   lb9
 
-lb11     long  M
-         ply                            get the original source pointer
+lb11     ply                            get the original source pointer
          plx
          lda   rtl                      remove the parameters from the stack
          sta   len+1
+         long  M
          lda   rtl+1
          sta   len+2
          pld
@@ -482,19 +482,19 @@ rtl      equ   1                        return address
 
          ph4   <p                       save the pointer
 
-         short M
-         lda   val                      form a 2 byte value
-         sta   val+1
+         short I,M
+         ldx   val                      form a 2 byte value
+         stx   val+1
 
          lda   len                      if there are an odd # of bytes then
          lsr   A
          bcc   lb1
-         lda   val                        set 1 byte now
+         txa                              set 1 byte now
          sta   [p]
-         long  M
          dec   len
+         long  I,M
          inc4  p
-lb1      long  M                        endif
+lb1      long  I,M                      endif
 
          lda   val                      set len bytes
          ldx   len+2                    set full banks
@@ -616,7 +616,9 @@ lb2      long  M
          clc
          adc   s1
          sta   s1
-         short M                        copy characters 'til the null is found
+         bcc   lb2a
+         inc   s1+2
+lb2a     short M                        copy characters 'til the null is found
          ldy   #0
 lb3      lda   [s2],Y
          sta   [s1],Y
@@ -627,9 +629,9 @@ lb3      lda   [s2],Y
          inc   s2+2
          bra   lb3
 
-lb4      long  M                        return to the caller
-         lda   rtl
+lb4      lda   rtl                      return to the caller
          sta   s2+1
+         long  M
          lda   rtl+1
          sta   s2+2
          ldx   rval+2
@@ -749,9 +751,9 @@ less     ldx   #-1                      It wasn't, so *s1 < *s2
 lb3      blt   less                     the strings differ - set the result
          ldx   #1
 
-lb4      long  M
-         lda   rtl                      remove the parameters from the stack
+lb4      lda   rtl                      remove the parameters from the stack
          sta   s2+1
+         long  M
          lda   rtl+1
          sta   s2+2
          pld
@@ -828,9 +830,9 @@ lb1      lda   [s2],Y
          inc   s2+2
          bra   lb1
 
-lb2      long  M                        return to the caller
-         lda   rtl
+lb2      lda   rtl                      return to the caller
          sta   s2+1
+         long  M
          lda   rtl+1
          sta   s2+2
          ldx   rval+2
@@ -924,9 +926,12 @@ str      equ   4                        pointer to the string
          tcd
 
          ldy   #0                       advance s1 to point to the terminating
-         ldx   #0                        null
+         tyx                             null
          short M
 lb1      lda   [str],Y
+         beq   lb2
+         iny
+         lda   [str],Y
          beq   lb2
          iny
          bne   lb1
@@ -934,10 +939,10 @@ lb1      lda   [str],Y
          inc   str+2
          bra   lb1
 
-lb2      long  M
-         pld                            remove str from the stack
-         lda   2,S
-         sta   6,S
+lb2      pld                            remove str from the stack
+         lda   3,S
+         sta   7,S
+         long  M
          pla
          sta   3,S
          pla
@@ -981,27 +986,35 @@ lb2      long  M
          clc
          adc   s1
          sta   s1
-         short M                        copy characters 'til the null is found
+         bcc   lb2a
+         inc   s1+2
+lb2a     ldx   n                        copy characters 'til the null is found
+         bne   lb2b
+         lda   n+2
+         beq   lb6
+lb2b     short M
          ldy   #0
-         ldx   n
-         beq   lb4
-         bmi   lb4
 lb3      lda   [s2],Y
          sta   [s1],Y
-         beq   lb4
+         beq   lb5
          iny
-         dex
+         bne   lb3a
+         inc   s1+2
+         inc   s2+2
+lb3a     dex
          bne   lb3
-         lda   n+2
+         ldx   n+2
          beq   lb4
-         dec   n+2
+         dex
+         stx   n+2
+         ldx   #0
          bra   lb3
 
 lb4      lda   #0                       write the terminating null
          sta   [s1],Y
-         long  M                        return to the caller
+lb5      long  M                        return to the caller
 
-         creturn 4:rval
+lb6      creturn 4:rval
          end
 
 ****************************************************************
@@ -1028,7 +1041,6 @@ flag     equ   1                        return flag
 
          ldy   #0                       scan until the end of string is reached
          ldx   n+2                       or a difference is found
-         bmi   equal
          bne   lb0
          ldx   n
          beq   equal
@@ -1040,9 +1052,11 @@ lb1      lda   [s1],Y
          bne   lb3
          dex
          bne   lb1a
-         lda   n+2
+         ldx   n+2
          beq   equal
-         dec   n+2
+         dex
+         stx   n+2
+         ldx   #0
 lb1a     iny
          bne   lb1
          inc   s1+2
@@ -1157,20 +1171,19 @@ lb1      lda   [s],Y
          short M
          bra   lb1
 
-lb2      long  I,M                      no match found -> return NULL
-         ldx   #0
+lb2      ldx   #0                       no match found -> return NULL
          txy
+         long  I,M
          bra   lb4
 
 lb3      long  I,M                      increment s by Y and load the value
          tya
-         and   #$00FF
          clc
          adc   s
          tay
-         lda   s+2
-         adc   #0
-         tax
+         ldx   s+2
+         bcc   lb4
+         inx
 
 lb4      lda   rtl+1                    remove the parameters
          sta   set+2
@@ -1220,10 +1233,10 @@ lb1      lda   [str],Y
 
 lb2      ldy   #-1                      no match found -> return -1
 
-lb3      long  M
-         pld                            remove parameters from the stack
-         lda   2,S
-         sta   8,S
+lb3      pld                            remove parameters from the stack
+         lda   3,S
+         sta   9,S
+         long  M
          pla
          sta   5,S
          pla
@@ -1331,10 +1344,10 @@ lb2      cmp   #0
          iny
          bpl   lb1
 
-lb3      long  M
-         pld                            remove parameters from the stack
-         lda   2,S
-         sta   8,S
+lb3      pld                            remove parameters from the stack
+         lda   3,S
+         sta   9,S
+         long  M
          pla
          sta   5,S
          pla

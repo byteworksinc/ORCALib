@@ -208,6 +208,44 @@ xPos     ds    2
 
 ****************************************************************
 *
+*  ReadMouse2 - return mouse statistics
+*
+*  Outputs:
+*        Returns a pointer to a record with the following
+*        structure:
+*
+*  typedef struct MouseRec  {
+*        char mouseMode;
+*        char mouseStatus;
+*        int  yPos;
+*        int  xPos;
+*        }
+*
+****************************************************************
+*
+ReadMouse2 start
+
+         pha
+         pha
+         pha
+         _ReadMouse2
+         sta   >~TOOLERROR
+         pl2   >mouseMode
+         pl2   >yPos
+         pl2   >xPos
+
+         lda   #mouseMode
+         ldx   #^mouseMode
+         rtl
+
+mouseMode ds   1
+mouseStatus ds 1
+yPos     ds    2
+xPos     ds    2
+         end
+
+****************************************************************
+*
 *  ReadTimeHex - returns the time in hex format
 *
 *  Outputs:

@@ -83,16 +83,13 @@ stdfile  equ   7                        is this a standard file?
          phk
          plb
 
-         lda   #EOF                     assume we will get an error
-         sta   err
          ph4   <stream                  verify that stream exists
          jsl   ~VerifyStream
-         jcs   rts
+         jcs   rts_err
 
          ph4   <stream                  do any pending I/O
          jsl   fflush
-         tax
-         jne   rts
+         sta   err                      initialize err to fflush result
 
          stz   stdfile                  not a standard file
          lda   stream+2                 bypass file disposal if the file is
@@ -110,11 +107,10 @@ lb1      inc   stdfile
 
 cl0      lla   p,stderr+4               find the file record that points to this
          ldy   #2                        one
-cl1      lda   [p]
-         ora   [p],Y
-         jeq   rts
-         lda   [p],Y
+cl1      lda   [p],Y
          tax
+         ora   [p]
+         jeq   rts_err
          lda   [p]
          cmp   stream
          bne   cl2
@@ -128,46 +124,10 @@ cl3      lda   [stream]                 remove stream from the file list
          sta   [p]
          lda   [stream],Y
          sta   [p],Y
-cl3a     ldy   #FILE_flag               if the file was opened by tmpfile then
-         lda   [stream],Y
-         and   #_IOTEMPFILE
-         beq   cl3d
-         ph4   #nameBuffSize              p = malloc(nameBuffSize)
-         jsl   malloc                     grPathname = p
-         sta   p                          dsPathname = p+2
-         stx   p+2
-         sta   grPathname
-         stx   grPathname+2
-         clc
-         adc   #2
-         bcc   cl3b
-         inx
-cl3b     sta   dsPathname
-         stx   dsPathname+2
-         lda   #nameBuffSize              p->size = nameBuffSize
-         sta   [p]
-         ldy   #FILE_file                 clRefnum = grRefnum = stream->_file
-         lda   [stream],Y
-         beq   cl3e
-         sta   grRefnum
-         GetRefInfoGS gr                  GetRefInfoGS(gr)
-         bcs   cl3c
-         lda   grRefnum                   OSClose(cl)
-         sta   clRefNum
-         OSClose cl
-         DestroyGS ds                     DestroyGS(ds)
-cl3c     ph4   <p                         free(p)
-         jsl   free
-         bra   cl3e                     else
-cl3d     ldy   #FILE_file                 close the file
-         lda   [stream],Y
-         beq   cl3e
-         sta   clRefNum
-         OSClose cl
-cl3e     ldy   #FILE_flag               if the buffer was allocated by fopen then
+cl3a     ldy   #FILE_flag               if the buffer was allocated by fopen then
          lda   [stream],Y
          and   #_IOMYBUF
-         beq   cl4
+         beq   cl3b
          ldy   #FILE_base+2               dispose of the file buffer
          lda   [stream],Y
          pha
@@ -176,6 +136,47 @@ cl3e     ldy   #FILE_flag               if the buffer was allocated by fopen the
          lda   [stream],Y
          pha
          jsl   free
+cl3b     ldy   #FILE_flag               if the file was opened by tmpfile then
+         lda   [stream],Y
+         and   #_IOTEMPFILE
+         beq   cl3f
+         ph4   #nameBuffSize              p = malloc(nameBuffSize)
+         jsl   malloc
+         sta   p
+         stx   p+2
+         ora   p+2                        if p == NULL then
+         bne   cl3c
+         lda   #EOF                         flag error
+         sta   err
+         bra   cl3f                         just close the file
+cl3c     lda   p
+         sta   grPathname                 grPathname = p
+         stx   grPathname+2
+         clc                              dsPathname = p+2
+         adc   #2
+         bcc   cl3d
+         inx
+cl3d     sta   dsPathname
+         stx   dsPathname+2
+         lda   #nameBuffSize              p->size = nameBuffSize
+         sta   [p]
+         ldy   #FILE_file                 clRefnum = grRefnum = stream->_file
+         lda   [stream],Y
+         beq   cl4
+         sta   grRefnum
+         sta   clRefNum
+         GetRefInfoGS gr                  GetRefInfoGS(gr)
+         bcs   cl3e
+         OSClose cl                       OSClose(cl)
+         DestroyGS ds                     DestroyGS(ds)
+cl3e     ph4   <p                         free(p)
+         jsl   free
+         bra   cl4                      else
+cl3f     ldy   #FILE_file                 close the file
+         lda   [stream],Y
+         beq   cl4
+         sta   clRefNum
+         OSClose cl
 cl4      lda   stdfile                  if this is not a standard file then
          bne   cl5
          ph4   <stream                    dispose of the file buffer
@@ -189,7 +190,10 @@ cl6      lda   [p],Y
          dey
          cpy   #2
          bne   cl6
-cl7      stz   err                      no error found
+cl7      bra   rts                      no error found
+
+rts_err  lda   #EOF
+         sta   err
 rts      plb
          creturn   2:err
 

@@ -1584,16 +1584,13 @@ cn3      cmp   base                     branch if the digit is too big
 cn3a     clc                            add in the new digit
          adc   val
          sta   val
-         lda   val+2
-         adc   #0
-         sta   val+2
-         lda   val+4
-         adc   #0
-         sta   val+4
-         lda   val+6
-         adc   #0
-         sta   val+6
          bcc   cn4
+         inc   val+2
+         bne   cn4
+         inc   val+4
+         bne   cn4
+         inc   val+6
+         bne   cn4
          stz   rangeOK
 cn4      inc4  str                      next char
          bra   cn1

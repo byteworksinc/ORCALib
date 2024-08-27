@@ -107,9 +107,8 @@ lb2      asl   A                        get the signal handler address
          tay
          lda   >subABRT-2,X
          bmi   lb3                      skip if it is SIG_DFL or SIG_IGN
-         short M                        set up the call address
-         sta   >jsl+3
-         long  M
+         xba                            set up the call address
+         sta   >jsl+2
          tya
          sta   >jsl+1
          ph2   <sig                     call the user signal handler
