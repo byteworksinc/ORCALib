@@ -380,6 +380,55 @@ lb6      creturn 4:addr
 
 ****************************************************************
 *
+*  void call_once(short *flag, void (*func)(void));
+*
+*  Call func once, if flag indicates it has not already been
+*  called.  Do not return until the call to func has completed,
+*  either from this call_once invocation or another one.
+*
+*  Inputs:
+*        flag - indicating if func was called already
+*        func - function to call once
+*
+*  Note: This has synchronization suitable for multithreading,
+*        even though ORCA/C does not currently support it.
+*
+****************************************************************
+*
+call_once start
+         csubroutine (4:flag,4:func)
+rtl_addr equ   after-1
+         
+         php                            test and set flag
+         sei
+         lda   [flag]
+         bne   nocall                   if not already set
+         inc   a                          flag that call is in progress
+         sta   [flag]
+         plp
+         
+         ldy   func                       call func
+         lda   func+2
+         and   #$00ff
+         ora   #rtl_addr|8
+         pea   rtl_addr|-8
+         pha
+         dey
+         phy
+         rtl
+after    lda   #-1                        flag that the call is done
+         sta   [flag]
+         bra   ret                      else
+
+nocall   plp
+wait     lda   [flag]                     wait for any concurrent call to finish
+         bpl   wait
+         
+ret      creturn
+         end
+
+****************************************************************
+*
 *  div_t div(n,d)
 *        int n,d;
 *
