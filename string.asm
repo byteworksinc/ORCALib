@@ -454,7 +454,7 @@ lb11     ply                            get the original source pointer
 
 ****************************************************************
 *
-*  memset - set memory to a value
+*  memset,memset_explicit - set memory to a value
 *
 *  Set len bytes, starting at p, to val.
 *
@@ -466,11 +466,10 @@ lb11     ply                            get the original source pointer
 *  Outputs:
 *        X-A - p
 *
-*  Notes: The memory areas should not overlap
-*
 ****************************************************************
 *
 memset   start
+memset_explicit entry
 p        equ   4                        destination pointer
 val      equ   8                        source pointer
 len      equ   10                       length to compare
