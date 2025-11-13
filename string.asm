@@ -269,6 +269,69 @@ lb5      lda   rtl                      remove the parameters from the stack
 
 ****************************************************************
 *
+*  memccpy - copy up to n bytes, stopping if c is encountered
+*
+*  Copy *s2 to *s1, stopping after (unsigned char)c is copied
+*  or after n bytes
+*
+*  Inputs:
+*        s1 - location to copy to
+*        s2 - location to copy from
+*        c - terminator character
+*        n - max length to copy
+*
+*  Outputs:
+*        X-A - pointer to just after the character c in s1,
+*              or NULL if c was not encountered
+*
+****************************************************************
+*
+memccpy  start
+         csubroutine (4:s1,4:s2,2:c,4:n),0
+
+         ldx   n                        copy characters until c is found
+         bne   lb0                       or we have copied n characters
+         lda   n+2
+         beq   lb3a
+         dec   n+2
+
+lb0      short M
+         ldy   #0
+lb1      lda   [s2],Y
+         sta   [s1],Y
+         cmp   c
+         beq   lb2
+         dex
+         bne   lb1b
+lb1a     ldx   n+2
+         beq   lb3
+         dex
+         stx   n+2
+         ldx   #0
+lb1b     iny
+         bne   lb1
+         inc   s1+2
+         inc   s2+2
+         bra   lb1
+
+lb2      long  M                        c encountered:
+         sec                            return pointer just past c in s1
+         tya
+         adc   s1
+         sta   s1
+         bcc   lb4
+         inc   s1+2
+         bra   lb4
+
+lb3      long  M                        c not encountered:
+lb3a     stz   s1                       return null
+         stz   s1+2
+         
+lb4      creturn 4:s1
+         end
+
+****************************************************************
+*
 *  memcpy - memory copy
 *
 *  Copy len bytes from p1 to p2.
