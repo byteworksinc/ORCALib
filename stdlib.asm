@@ -501,6 +501,52 @@ quick_exit start
 
 ****************************************************************
 *
+*  void free_aligned_sized(void *ptr, size_t alignment, size_t size);
+*
+*  Free an allocation from aligned_alloc, given the pointer
+*  and the requested alignment and allocation size.
+*
+****************************************************************
+*
+free_aligned_sized start
+
+         pla                            remove alignment and size from stack
+         sta   7,s
+         pla
+         sta   7,s
+         plx
+         pla
+         xba
+         sta   6,s
+         txa
+         sta   5,s
+         jml   free                     call free
+         end
+
+****************************************************************
+*
+*  void free_sized(void *ptr, size_t size);
+*
+*  Free an allocation, given the pointer and allocation size.
+*
+****************************************************************
+*
+free_sized start
+
+         lda   6,s                      remove size from stack
+         sta   10,s
+         plx
+         ply
+         pla
+         sta   3,s
+         pla
+         phy
+         phx
+         jml   free                     call free
+         end
+
+****************************************************************
+*
 *  char *getenv(const char *name)
 *
 *  Returns a pointer to a shell variable.  If the shell variable
