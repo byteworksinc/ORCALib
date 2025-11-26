@@ -43,8 +43,6 @@ __assert start
          jsl   fprintf
          jsl   abort
 
-         creturn
-
 msg      dc    c'Assertion failed: file %s, line %u; assertion: %s',i1'10,0'
          end
 
@@ -73,7 +71,33 @@ __assert2 start
          jsl   fprintf
          jsl   abort
 
-         creturn
-
 msg      dc    c'Assertion failed: file %s, line %u, function %s; assertion: %s',i1'10,0'
+         end
+
+****************************************************************
+*
+*  void __assert3 (char *f, unsigned long l, char *fn, char *s)
+*
+*  Inputs:
+*        f - pointer to the file name
+*        l - line number
+*        fn - function name
+*        s - assertion string
+*
+****************************************************************
+*
+__assert3 start
+
+         csubroutine (4:f,4:l,4:fn,4:s),0
+
+         ph4   <s
+         ph4   <fn
+         ph4   <l
+         ph4   <f
+         ph4   #msg
+         ph4   >stderr
+         jsl   fprintf
+         jsl   abort
+
+msg      dc    c'Assertion failed: file %s, line %lu, function %s; assertion: %s',i1'10,0'
          end
