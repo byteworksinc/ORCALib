@@ -4232,9 +4232,10 @@ lb1      clc                            restore the original argp+4
 *  ~Format_x - format a hexadecimal number (lowercase output)
 *  ~Format_X - format a hexadecimal number (uppercase output)
 *  ~Format_p - format a pointer
+*  ~Format_B - format a binary number (uppercase prefix, if any)
 *
 *  Inputs:
-*        ~altForm - use a leading '0' (octal) or '0x' (hex)?
+*        ~altForm - use a leading '0' (octal), '0x' (hex), or '0b' (bin)?
 *        ~fieldWidth - output field width
 *        ~paddChar - padd character
 *        ~leftJustify - left justify the output?
@@ -4250,26 +4251,31 @@ lb1      clc                            restore the original argp+4
 argp     equ   7                        argument pointer
 
          lda   #3                       use 3 bits per output character
+         bra   cn0a
+
+~Format_B entry
+         ldx   #0
+bn0      lda   #1                       use 1 bit per output character
          bra   cn0
 
 ~Format_x entry
 ;
 ;  Set the "or" value; this is used to set the case of character results
 ;
-         lda   #$20*256
-         sta   ~orVal
+         ldx   #$20*256
          bra   hx0
 
 ~Format_p entry
          inc   ~isLong
 ~Format_X entry
-         stz   ~orVal
+         ldx   #0
 hx0      lda   #4                       use 4 bits per output character
 
 ;
 ;  Initialization
 ;
-cn0      sta   bitsPerChar
+cn0      stx   ~orVal
+cn0a     sta   bitsPerChar
          stz   ~hexPrefix               assume we won't lead with 0x
          stz   ~sign                    ignore the sign flag
          lda   #'  '                    initialize the string to blanks
@@ -4294,22 +4300,26 @@ cn2      lda   [argp]
          beq   cn2a
          and   #$00FF
 cn2a     sta   ~num
-         ldx   bitsPerChar              if doing hex format then
-         cpx   #3
-         beq   cn2b
+         ldy   bitsPerChar              if doing hex or bin format then
+         cpy   #3
+         beq   cn2d
          ldx   ~altForm                   if alt form has been selected then
-         beq   cn2b
+         beq   cn2d
          ora   ~num+2                       if value is not 0 then
          ora   ~num+4
          ora   ~num+6
-         beq   cn2b
-         lda   #'X0'                          set hex prefix to '0X' or '0x'
-         ora   ~orVal
+         beq   cn2d
+         dey                                  if doing bin format than
+         bne   cn2b
+         lda   #'B0'                            set bin prefix to '0B' or '0b'
+         bra   cn2c                           else
+cn2b     lda   #'X0'                            set hex prefix to '0X' or '0x'
+cn2c     ora   ~orVal
          sta   ~hexPrefix
 ;
 ;  Convert the number to an ASCII string
 ;
-cn2b     ldy   #l:~str-1                set up the character index
+cn2d     ldy   #l:~str-1                set up the character index
 cn3      lda   #' 0'                    roll off 4 bits
          ldx   bitsPerChar
 cn4      lsr   ~num+6
@@ -4337,7 +4347,7 @@ cn5      dey
          ora   ~num
          bne   cn3
 ;
-;  If a leading '0x' is required, be sure we include one
+;  If a leading '0' is required, be sure we include one
 ;
          lda   bitsPerChar              if doing octal format then
          cmp   #3
@@ -4943,6 +4953,7 @@ fList    dc    c'%',a'~Format_Percent'  %
          dc    c'g',a'~Format_g'        g
          dc    c'G',a'~Format_G'        G
          dc    c'n',a'~Format_n'        n
+         dc    c'B',a'~Format_B'        B
          dc    c's',a'~Format_s'        s
          dc    c'b',a'~Format_b'        b
          dc    c'P',a'~Format_P'        P
