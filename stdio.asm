@@ -4232,6 +4232,7 @@ lb1      clc                            restore the original argp+4
 *  ~Format_x - format a hexadecimal number (lowercase output)
 *  ~Format_X - format a hexadecimal number (uppercase output)
 *  ~Format_p - format a pointer
+*  ~Format_b_C23 - format a binary number (lowercase prefix, if any)
 *  ~Format_B - format a binary number (uppercase prefix, if any)
 *
 *  Inputs:
@@ -4252,6 +4253,10 @@ argp     equ   7                        argument pointer
 
          lda   #3                       use 3 bits per output character
          bra   cn0a
+
+~Format_b_C23 entry
+         ldx   #$20*256                 set the "or" value for case of '0b'
+         bra   bn0
 
 ~Format_B entry
          ldx   #0
@@ -4392,6 +4397,11 @@ argp     equ   7                        argument pointer
          bra   lb0
 
 ~Format_b entry
+         dc    i1'$A9'                  lda #~C23orLater (if linked in) or #0
+         dc    s2'~C23ORLATER'            (this must be on a separate line)
+         beq   ~Format_P                if doing C23 or later then
+         brl   ~Format_b_C23              use C23 version of 'b' format
+
 ~Format_P entry
          clc                            set flag for p-string
 

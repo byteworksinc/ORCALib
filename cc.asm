@@ -18,6 +18,27 @@ CC       start                          dummy routine
 
 ****************************************************************
 *
+*  ~C23orLater - Flag indicating use of C23 or later standards
+*
+*  Notes:
+*        If a program is compiled in C23 mode (or later),
+*        ORCA/C will include a reference to ~C23orLater in its
+*        object code, causing this segment to be linked in.
+*        Library code should include only soft references to it.
+*        "lda #~C23orLater(soft reference)" will give 0 for
+*        pre-C23 modes, or nonzero for C23+, so library code
+*        can detect the language mode and behave accordingly.
+*
+****************************************************************
+*
+~C23Flag start
+         ds    1                        padding to ensure ~C23orLater ...
+~C23orLater entry
+         ds    1                        ... is not at start of a bank
+         end
+
+****************************************************************
+*
 *  ~CopyBF - Copy a bit field
 *  ~SaveBF - Save a bit field
 *
