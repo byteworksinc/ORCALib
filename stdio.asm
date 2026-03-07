@@ -5146,180 +5146,6 @@ didOne   ds    2                        non-zero if we have scanned a character
 
 ****************************************************************
 *
-*  ~Scan_d - read an integer
-*  ~Scan_i - read a based integer
-*
-*  Inputs:
-*        ~scanError - has a scan error occurred?
-*        ~scanWidth - max input length
-*        ~suppress - suppress save?
-*        ~size - size specifier
-*
-****************************************************************
-*
-~Scan_d  private
-         using ~scanfCommon
-arg      equ   11                       argument
-
-         stz   based                    always use base 10
-         bra   bs1
-~Scan_i  entry
-         lda   #1                       allow base 8, 10, 16
-         sta   based
-
-bs1      stz   read                     no digits read
-         lda   #10                      assume base 10
-         sta   base
-         stz   val                      initialize the value to 0
-         stz   val+2
-         stz   val+4
-         stz   val+6
-lb1      jsl   ~getchar                 skip leading whitespace...
-         cmp   #EOF                     if EOF then
-         bne   ef1
-         sta   ~eofFound                   ~eofFound = EOF
-         lda   ~suppress                   if input is not suppressed then
-         bne   lb6l
-         dec   ~assignments                   no assignment made
-lb6l     brl   lb6                         bail out
-ef1      tax                            {...back to skipping whitespace}
-         lda   __ctype+1,X
-         and   #_space
-         bne   lb1
-         txa
-         stz   minus                    assume positive number
-         cmp   #'+'                     skip leading +
-         beq   sg1
-         cmp   #'-'                     if - then set minus flag
-         bne   sg3
-         inc   minus
-sg1      dec   ~scanWidth
-         jeq   lb4a
-         bpl   sg2
-         stz   ~scanWidth
-sg2      jsl   ~getchar
-sg3      inc   read
-         ldx   based                    if base 8, 16 are allowed then
-         beq   lb2
-         cmp   #'0'                       if the digit is '0' then
-         bne   lb2
-         lda   #8                           assume base 8
-         sta   base
-         dec   ~scanWidth                   get the next character
-         jeq   lb4a
-         bpl   lb1a
-         stz   ~scanWidth
-lb1a     jsl   ~getchar
-         inc   read
-         cmp   #'X'                         if it is X then
-         beq   lb1b
-         cmp   #'x'
-         bne   lb2
-lb1b     asl   base                           use base 16
-         stz   read                           '0x' alone should not match
-         dec   ~scanWidth                     get the next character
-         jeq   lb4a
-         bpl   lb1c
-         stz   ~scanWidth
-lb1c     jsl   ~getchar
-         inc   read
-
-lb2      cmp   #'0'                     if the char is a digit then
-         blt   lb4
-         cmp   #'7'+1
-         blt   lb2a
-         ldx   base
-         cpx   #8
-         beq   lb4
-         cmp   #'9'+1
-         blt   lb2a
-         cpx   #16
-         bne   lb4
-         and   #$00DF
-         cmp   #'A'
-         blt   lb4
-         cmp   #'F'+1
-         bge   lb4
-         sbc   #6
-lb2a     and   #$000F                     convert it to a value
-         pha                              save the value
-         ph8   val                        update the old value
-         ldx   #0
-         phx
-         phx
-         phx
-         lda   base
-         pha
-         jsl   ~UMUL8
-         pl8   val
-         pla                              add in the new digit
-         clc
-         adc   val
-         sta   val
-         bcc   lb3
-         inc   val+2
-         bne   lb3
-         inc   val+4
-         bne   lb3
-         inc   val+6
-lb3      dec   ~scanWidth                 quit if the max # chars have been
-         beq   lb4a                         scanned
-         bpl   lb3a                       make sure 0 stays a 0
-         stz   ~scanWidth
-lb3a     jsl   ~getchar                   next char
-         inc   read
-         brl   lb2
-
-lb4      jsl   ~putback                 put the last character back
-         dec   read
-lb4a     lda   read                     if no chars read then
-         bne   lb4b
-         inc   ~scanError                 ~scanError = true
-         lda   ~suppress                  if input is not suppressed then
-         bne   lb6
-         dec   ~assignments                 no assignment made
-         bra   lb6                        skip the save
-lb4b     lda   ~suppress                if input is not suppressed then
-         bne   lb7
-         lda   minus                      if minus then
-         beq   lb4c
-         negate8 val                        negate the value
-lb4c     lda   val                        save the value
-         ldx   ~size
-         bpl   lb4d
-         sep   #$20
-lb4d     sta   [arg]
-         rep   #$20
-         dex
-         bmi   lb6
-         ldy   #2
-         lda   val+2
-         sta   [arg],Y
-         dex
-         bmi   lb6
-         iny
-         iny
-         lda   val+4
-         sta   [arg],Y
-         iny
-         iny
-         lda   val+6
-         sta   [arg],Y
-lb6      lda   ~suppress                if input is not suppressed then
-         bne   lb7
-         ldy   #2                         remove the parameter from the stack
-         jsr   ~RemoveWord
-lb7      rts
-
-val      ds    8                        value
-base     dc    i2'10'                   number base
-based    ds    2                        based conversion?
-minus    ds    2                        is the value negative?
-read     ds    2                        # of digits read
-         end
-
-****************************************************************
-*
 *  ~Scan_lbrack - read character in a set
 *
 *  Inputs:
@@ -5609,6 +5435,8 @@ lb3      rts
 
 ****************************************************************
 *
+*  ~Scan_i - read a based integer
+*  ~Scan_d - read an integer
 *  ~Scan_u - read an unsigned integer
 *  ~Scan_o - read an unsigned octal integer
 *  ~Scan_b_C23 - read an unsigned binary integer
@@ -5622,18 +5450,50 @@ lb3      rts
 *
 ****************************************************************
 *
-~Scan_u  private
+~Scan_i  private
          using ~scanfCommon
 arg      equ   11                       argument
 
-         ldx   #10                      base 10
+         ldx   #10                      assume base 10
          jsr   Init
+         jsl   ~getchar
+         inc   read
+         cmp   #'0'                     if the digit is '0' then
+         jne   lb2a
+         lda   #8                         assume base 8
+         sta   base
+         dec   ~scanWidth                 get the next character
+         jeq   lb4a
+         bpl   si1
+         stz   ~scanWidth
+si1      jsl   ~getchar
+         inc   read
+         cmp   #'X'                       if it is X then
+         beq   si2
+         cmp   #'x'
+         bne   si3
+si2      ldy   #16                          use base 16
+         bra   si5                       else
+si3      dc    i1'$A2'                      ldx #~C23orLater(soft reference)
+         dc    s2'~C23ORLATER'
+         jeq   lb2a                         if in C23 or later mode then
+         cmp   #'B'                           if character is B then
+         beq   si4
+         cmp   #'b'
+         bne   lb2a
+si4      ldy   #2                               use base 2
+si5      sty   base
+         bra   hx1a
+
+~Scan_d  entry
+~Scan_u  entry
+         ldx   #10                      base 10
+sd1      jsr   Init
          bra   lb2
 
 ~Scan_o  entry
          ldx   #8                       base 8
-         jsr   Init
-         bra   lb2
+         bra   sd1
 
 ~Scan_b_C23 entry
          ldx   #2                       base 2
@@ -5765,11 +5625,7 @@ in1      jsl   ~getchar                 skip leading whitespace...
          cmp   #EOF                     if at EOF then
          bne   in2
          sta   ~eofFound                   eofFound = EOF
-         lda   ~suppress                   if input is not suppressed then
-         bne   in1a
-         dec   ~assignments                   no assignment made
-in1a     pla                               pop stack
-         bra   lb6                         bail out
+         bra   in6a                        no assignment made: bail out
 in2      tax                            ...back to skipping whitespace
          lda   __ctype+1,X
          and   #_space
@@ -5791,7 +5647,7 @@ in5      jsl   ~putback
          rts
 
 in6      inc   ~scanError               ~scanError = true
-         lda   ~suppress                if input is not suppressed then
+in6a     lda   ~suppress                if input is not suppressed then
          bne   in7
          dec   ~assignments               no assignment made
 in7      pla                            pop stack
