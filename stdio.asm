@@ -5457,9 +5457,9 @@ arg      equ   11                       argument
          ldx   #10                      assume base 10
          jsr   Init
          jsl   ~getchar
-         inc   read
          cmp   #'0'                     if the digit is '0' then
-         jne   lb2a
+         bne   bne_lb2a
+         sta   gotDigit                   we read a digit
          lda   #8                         assume base 8
          sta   base
          dec   ~scanWidth                 get the next character
@@ -5467,7 +5467,6 @@ arg      equ   11                       argument
          bpl   si1
          stz   ~scanWidth
 si1      jsl   ~getchar
-         inc   read
          cmp   #'X'                       if it is X then
          beq   si2
          cmp   #'x'
@@ -5476,11 +5475,11 @@ si2      ldy   #16                          use base 16
          bra   si5                       else
 si3      dc    i1'$A2'                      ldx #~C23orLater(soft reference)
          dc    s2'~C23ORLATER'
-         jeq   lb2a                         if in C23 or later mode then
+         beq   lb2a                         if in C23 or later mode then
          cmp   #'B'                           if character is B then
          beq   si4
          cmp   #'b'
-         bne   lb2a
+bne_lb2a bne   lb2a
 si4      ldy   #2                               use base 2
 si5      sty   base
          bra   hx1a
@@ -5511,27 +5510,25 @@ hx0      sta   pfx1
          sta   pfx2
          jsr   Init
          jsl   ~getchar                 if the initial char is a '0' then
-         inc   read
          cmp   #'0'
          bne   lb2a
+         sta   gotDigit                   we read a digit
          dec   ~scanWidth                 get the next character
          jeq   lb4a
          bpl   hx1
          stz   ~scanWidth
 hx1      jsl   ~getchar
-         inc   read
          cmp   pfx1                       if it is an 'x'/'X' (or 'b'/'B') then
          beq   hx1a
          cmp   pfx2
          bne   lb2a
-hx1a     stz   read                         ('0x' alone should not match)
+hx1a     stz   gotDigit                     ('0x'/'0b' alone should not match)
          dec   ~scanWidth                   accept the character
          jeq   lb4a
          bpl   lb2
          stz   ~scanWidth
 
 lb2      jsl   ~getchar                 if the char is a digit then
-         inc   read
 lb2a     sta   ch
          ldy   base
          sec                              convert it to a value, checking range
@@ -5546,6 +5543,7 @@ lb2a     sta   ch
          sbc   #7
 lb2b     cmp   base
          bge   lb4
+         sty   gotDigit                   we read a digit
          pha                              save the value
          ph8   val                        update the old value
          ldx   #0                         push base
@@ -5573,8 +5571,7 @@ lb3      dec   ~scanWidth                 quit if the max # chars have been
 
 lb4      lda   ch                       put the last character back
          jsl   ~putback
-         dec   read
-lb4a     lda   read                     if no chars read then
+lb4a     lda   gotDigit                 if no digits read then
          bne   lb4b
          inc   ~scanError                 ~scanError = true
          lda   ~suppress                  if input is not suppressed then
@@ -5616,7 +5613,7 @@ lb7      rts
 ;  Initialization
 ;
 Init     stx   base                     set base
-         stz   read                     no chars read
+         stz   gotDigit                 no digits read
          stz   val                      initialize the value to 0
          stz   val+2
          stz   val+4
@@ -5657,7 +5654,7 @@ ch       ds    2                        char buffer
 val      ds    8                        value
 base     dc    i2'10'                   number base
 minus    ds    2                        is there a minus sign?
-read     ds    2                        # of digits read
+gotDigit ds    2                        any digits read?
 pfx1     ds    2                        prefix letters
 pfx2     ds    2
          end
