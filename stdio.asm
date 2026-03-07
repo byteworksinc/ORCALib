@@ -5489,6 +5489,11 @@ lb1      ldy   #2                       remove the parameter from the stack
 ****************************************************************
 *
 ~Scan_b  private
+         dc    i1'$A9'                  lda #~C23orLater (if linked in) or #0
+         dc    s2'~C23ORLATER'            (this must be on a separate line)
+         beq   ~Scan_P                  if doing C23 or later then
+         brl   ~Scan_b_C23                use C23 version of 'b' format
+
 ~Scan_P  entry
          using ~scanfCommon
 arg      equ   11                       argument
@@ -5606,6 +5611,7 @@ lb3      rts
 *
 *  ~Scan_u - read an unsigned integer
 *  ~Scan_o - read an unsigned octal integer
+*  ~Scan_b_C23 - read an unsigned binary integer
 *  ~Scan_x - read an unsigned hexadecimal integer
 *  ~Scan_p - read a pointer
 *
@@ -5620,77 +5626,73 @@ lb3      rts
          using ~scanfCommon
 arg      equ   11                       argument
 
+         ldx   #10                      base 10
          jsr   Init
-         lda   #10                      base 10
-         bra   bs1
+         bra   lb2
 
 ~Scan_o  entry
+         ldx   #8                       base 8
          jsr   Init
-         lda   #8                       base 8
-         bra   bs1
+         bra   lb2
+
+~Scan_b_C23 entry
+         ldx   #2                       base 2
+         lda   #'B'                     prefix letters 'B'/'b'
+         bra   hx0
 
 ~Scan_p  entry
          lda   #1
          sta   ~size
 ~Scan_x  entry
+         ldx   #16                      base 16
+         lda   #'X'                     prefix letters 'X'/'x'
+hx0      sta   pfx1
+         eor   #$20
+         sta   pfx2
          jsr   Init
          jsl   ~getchar                 if the initial char is a '0' then
          inc   read
-         sta   ch
          cmp   #'0'
-         bne   hx2
+         bne   lb2a
          dec   ~scanWidth                 get the next character
          jeq   lb4a
          bpl   hx1
          stz   ~scanWidth
 hx1      jsl   ~getchar
          inc   read
-         sta   ch
-         cmp   #'x'                       if it is an 'x' or 'X' then
+         cmp   pfx1                       if it is an 'x'/'X' (or 'b'/'B') then
          beq   hx1a
-         cmp   #'X'
-         bne   hx2
+         cmp   pfx2
+         bne   lb2a
 hx1a     stz   read                         ('0x' alone should not match)
          dec   ~scanWidth                   accept the character
          jeq   lb4a
-         bpl   hx3
+         bpl   lb2
          stz   ~scanWidth
-         bra   hx3
-hx2      jsl   ~putback                 put back the character
-         dec   read
-hx3      lda   #16                      base 16
-
-bs1      sta   base                     set the base
 
 lb2      jsl   ~getchar                 if the char is a digit then
          inc   read
-         sta   ch
-         cmp   #'0'
-         blt   lb4
-         cmp   #'7'+1
-         blt   lb2a
-         ldx   base
-         cpx   #8
-         beq   lb4
-         cmp   #'9'+1
-         blt   lb2a
-         cpx   #16
+lb2a     sta   ch
+         ldy   base
+         sec                              convert it to a value, checking range
+         sbc   #'0'
+         cmp   #9+1
+         blt   lb2b
+         cpy   #16
          bne   lb4
-         and   #$00DF
-         cmp   #'A'
+         and   #$FFDF
+         cmp   #'A'-'0'
          blt   lb4
-         cmp   #'F'+1
+         sbc   #7
+lb2b     cmp   base
          bge   lb4
-         sbc   #6
-lb2a     and   #$000F                     convert it to a value
          pha                              save the value
          ph8   val                        update the old value
-         ldx   #0
+         ldx   #0                         push base
          phx
          phx
          phx
-         lda   base
-         pha
+         phy
          jsl   ~UMUL8
          pl8   val
          pla                              add in the new digit
@@ -5707,7 +5709,7 @@ lb3      dec   ~scanWidth                 quit if the max # chars have been
          beq   lb4a                         scanned
          jpl   lb2                        make sure 0 stays a 0
          stz   ~scanWidth
-         brl   lb2
+         bra   lb2
 
 lb4      lda   ch                       put the last character back
          jsl   ~putback
@@ -5753,7 +5755,8 @@ lb7      rts
 ;
 ;  Initialization
 ;
-Init     stz   read                     no chars read
+Init     stx   base                     set base
+         stz   read                     no chars read
          stz   val                      initialize the value to 0
          stz   val+2
          stz   val+4
@@ -5797,9 +5800,10 @@ in7      pla                            pop stack
 ch       ds    2                        char buffer
 val      ds    8                        value
 base     dc    i2'10'                   number base
-based    ds    2                        based conversion?
 minus    ds    2                        is there a minus sign?
 read     ds    2                        # of digits read
+pfx1     ds    2                        prefix letters
+pfx2     ds    2
          end
 
 ****************************************************************
