@@ -4824,7 +4824,7 @@ fm3      cmp   #'l'
          cmp   #'l'
          beq   fm3a
          inc   ~isLong
-         bra   fm6
+         brl   fm6
 fm3a     inc   ~isLongLong
          bra   fm3c
 fm3b     cmp   #'j'
@@ -4838,13 +4838,49 @@ fm3c     inc   ~isLong
 fm4      cmp   #'L'                     else if *format in ['L','h'] then
          beq   fm5
          cmp   #'h'
-         bne   fm6
+         bne   fm4a
          inc4  format                     check for 'hh'
          lda   [format]                 
          and   #$00FF
          cmp   #'h'
          bne   fm6
          inc   ~isByte
+         bra   fm5                        ++format
+
+fm4a     cmp   #'w'                     else if *format = 'w' then
+         bne   fm6
+         inc4  format                     ++format
+         lda   [format]
+         cmp   #'8f'                      if *format = 'f8' then
+         beq   fm4f                         (ok)
+         and   #$00FF
+         cmp   #'8'                       else if *format = '8' then
+         bne   fm4b
+         inc   ~isByte                      ~isByte = true
+         bra   fm4g                       else
+fm4b     cmp   #'f'                         if *format = 'f' then
+         bne   fm4c
+         inc4  format                         ++format
+fm4c     lda   [format]
+         cmp   #'61'                        if *format = '16' then
+         beq   fm4f                           (ok)
+         cmp   #'46'                        else if *format = '64' then
+         bne   fm4d
+         inc   ~isLongLong                    ~isLongLong = true
+         bra   fm4e                           ~isLong = true
+fm4d     cmp   #'23'                        else if *format = '32' then
+         bne   fm4h
+fm4e     inc   ~isLong                        ~isLong = true
+fm4f     inc4  format                     if format was recognized then
+fm4g     lda   [format]                     ++format (unless it was '8')
+         cmp   #'0'*256                     if next character is a digit then
+         blt   fm5                            return a negative number
+         cmp   #('9'+1)*256
+         bge   fm5                        else
+fm4h     sec                                return a negative number
+         ror   ~numChars
+         brl   rt1
+
 fm5      inc4  format                     ++format
          lda   [format]                 find the proper format character
 fm6      inc4  format
