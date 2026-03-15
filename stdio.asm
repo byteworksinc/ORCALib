@@ -5934,7 +5934,7 @@ fm2      jsr   GetSize                  get the field width specifier
          lda   [format]
          and   #$00FF
          cmp   #'l'
-         bne   fm6
+         bne   bne_fm6
          bra   fm2c
 fm2a     cmp   #'z'                     'z' specifies size_t (long int)
          beq   fm2c
@@ -5948,15 +5948,54 @@ fm2b     inc   ~size
 fm2c     inc   ~size
          bra   fm4
 fm3      cmp   #'h'                     'h' specifies short int
-         bne   fm6
+         bne   fm3a
          inc4  format                     unless it is 'hh' for char types
          lda   [format]
          and   #$00FF
          cmp   #'h'
-         bne   fm6
+bne_fm6  bne   fm6
          dec   ~size
-fm4      inc4  format                     ignore the character
+         bra   fm4
 
+fm3a     cmp   #'w'                     else if *format = 'w' then
+         bne   fm6
+         inc4  format                     ++format
+         lda   [format]
+         cmp   #'8f'                      if *format = 'f8' then
+         beq   fm3f                         (ok)
+         and   #$00FF
+         cmp   #'8'                       else if *format = '8' then
+         bne   fm3b
+         dec   ~size                         ~size := -1
+         bra   fm3g                       else
+fm3b     cmp   #'f'                         if *format = 'f' then
+         bne   fm3c
+         inc4  format                         ++format
+fm3c     lda   [format]
+         cmp   #'61'                        if *format = '16' then
+         beq   fm3f                           (ok)
+         cmp   #'46'                        else if *format = '64' then
+         bne   fm3d
+         inc   ~size                          ~size := 2
+         bra   fm3e
+fm3d     cmp   #'23'                        else if *format = '32' then
+         bne   fm3h
+fm3e     inc   ~size                          size := 1
+fm3f     inc4  format                     if format was recognized then
+fm3g     lda   [format]                     ++format (unless it was '8')
+         cmp   #'0'*256                     if next character is a digit then
+         blt   fm4                            treat it like a matching failure
+         cmp   #('9'+1)*256
+         bge   fm4                        else treat it like a matching failure:
+fm3h     ldy   #0
+         ldx   ~suppress                    if input is not suppressed then
+         bne   fm3i
+         dec   ~assignments                   no assignment made
+         iny                                  2 parameter words to remove
+         iny
+fm3i     brl   rm3                          remove remaining parameters
+
+fm4      inc4  format
          lda   [format]                 find the proper format character
 fm6      inc4  format
          short M,I
