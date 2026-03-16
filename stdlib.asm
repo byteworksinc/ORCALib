@@ -1279,16 +1279,31 @@ db1c     lda   base                     if the base is zero then
          lda   [str],Y
          and   #$00DF
          cmp   #'X'
-         bne   cn1
+         bne   db1d
          asl   base                           base 16
+         bra   db3                          else
+db1d     dc    i1'$A2'                        ldx #~C23orLater(soft reference)
+         dc    s2'~C23ORLATER'
+         beq   cn1                            if in C23 or later mode
+         cmp   #'B'                             if second char is 'B' or 'b' then
+         bne   cn1
+         lda   #2                                 base 2
+         sta   base
          bra   db3
 db2      cmp   #16                      if the base is 16 then
+         bne   db2a
+         lda   #'X0'                      if first two chars are 0x or 0X then
+         bra   db2b                         skip them
+db2a     cmp   #2                       else if the base is 2 then
          bne   db4
-         lda   [str]                      if the first two chars are 0x or 0X then
+         dc    i1'$A2'                    ldx #~C23orLater(soft reference)
+         dc    s2'~C23ORLATER'
+         beq   cn1                        if in C23 or later mode
+         lda   #'B0'                        if first two chars are 0b or 0B then
+db2b     eor   [str]
          and   #$DFFF
-         cmp   #'X0'
          bne   cn1
-db3      add4  str,#2                       skip them
+db3      add4  str,#2                         skip them
          dec   foundOne
          bra   cn1
 db4      cmp   #37                      check for invalid base value
@@ -1629,16 +1644,31 @@ db1c     lda   base                     if the base is zero then
          lda   [str],Y
          and   #$00DF
          cmp   #'X'
-         bne   cn1
+         bne   db1d
          asl   base                           base 16
+         bra   db3                          else
+db1d     dc    i1'$A2'                        ldx #~C23orLater(soft reference)
+         dc    s2'~C23ORLATER'
+         beq   cn1                            if in C23 or later mode
+         cmp   #'B'                             if second char is 'B' or 'b' then
+         bne   cn1
+         lda   #2                                 base 2
+         sta   base
          bra   db3
 db2      cmp   #16                      if the base is 16 then
+         bne   db2a
+         lda   #'X0'                      if first two chars are 0x or 0X then
+         bra   db2b                         skip them
+db2a     cmp   #2                       else if the base is 2 then
          bne   db4
-         lda   [str]                      if the first two chars are 0x or 0X then
+         dc    i1'$A2'                    ldx #~C23orLater(soft reference)
+         dc    s2'~C23ORLATER'
+         beq   cn1                        if in C23 or later mode
+         lda   #'B0'                        if first two chars are 0b or 0B then
+db2b     eor   [str]
          and   #$DFFF
-         cmp   #'X0'
          bne   cn1
-db3      add4  str,#2                       skip them
+db3      add4  str,#2                         skip them
          dec   foundOne
          bra   cn1
 db4      cmp   #37                      check for invalid base value
