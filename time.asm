@@ -880,6 +880,52 @@ ret      creturn 2:base
 
 ****************************************************************
 *
+*  int timespec_getres(struct timespec *ts, int base);
+*
+*  Inputs:
+*        ts - pointer to structure for result
+*        base - requested time base
+*
+*  Outputs:
+*        *ts - the resolution of the time base (if successful)
+*        returns base if successful, or 0 otherwise
+*
+****************************************************************
+*
+timespec_getres start
+TIME_UTC equ   1                        UTC time base
+
+tv_sec   equ   0                        struct timespec members
+tv_nsec  equ   4
+
+         csubroutine (4:ts,2:base),8
+         
+         lda   base
+         cmp   #TIME_UTC
+         bne   err
+
+         ldy   #tv_sec                  ts->tv_sec = 1
+         lda   #1
+         sta   [ts],y
+         iny
+         iny
+         dec   a
+         sta   [ts],y
+
+         ldy   #tv_nsec                 ts->tv_nsec = 0
+         sta   [ts],y
+         iny
+         iny
+         sta   [ts],y
+         bra   ret
+
+err      stz   base                     unsupported base: return 0
+
+ret      creturn 2:base
+         end
+
+****************************************************************
+*
 *  size_t strftime(
 *        char * restrict s,
 *        size_t maxsize,
