@@ -1289,6 +1289,7 @@ db2      cmp   #16                      if the base is 16 then
          cmp   #'X0'
          bne   cn1
 db3      add4  str,#2                       skip them
+         dec   foundOne
          bra   cn1
 db4      cmp   #37                      check for invalid base value
          bge   cn6
@@ -1346,10 +1347,12 @@ cn4      inc4  str                      next char
          bra   cn1
 
 cn5      lda   foundOne                 if no digits were found, flag the error
-         bne   rt1
+         bne   cn7
 cn6      lda   #EINVAL
          sta   >errno
          bra   rt2a
+cn7      bpl   rt1                      if we got a prefix but no more digits
+         dec4  str                        the subject sequence ends with the 0
 ;
 ;  return the results
 ;
@@ -1636,6 +1639,7 @@ db2      cmp   #16                      if the base is 16 then
          cmp   #'X0'
          bne   cn1
 db3      add4  str,#2                       skip them
+         dec   foundOne
          bra   cn1
 db4      cmp   #37                      check for invalid base value
          jge   cn6
@@ -1691,10 +1695,12 @@ cn4      inc4  str                      next char
          bra   cn1
 
 cn5      lda   foundOne                 if no digits were found, flag the error
-         bne   rt1
+         bne   cn7
 cn6      lda   #EINVAL
          sta   >errno
          bra   rt2a
+cn7      bpl   rt1                      if we got a prefix but no more digits
+         dec4  str                        the subject sequence ends with the 0
 ;
 ;  return the results
 ;
