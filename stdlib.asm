@@ -1672,9 +1672,9 @@ db3      add4  str,#2                         skip them
          dec   foundOne
          bra   cn1
 db4      cmp   #37                      check for invalid base value
-         jge   cn6
+         bge   cn6
          dec   a
-         jeq   cn6
+         beq   cn6
 ;
 ;  Convert the number
 ;
@@ -1700,9 +1700,10 @@ cn3      cmp   base                     branch if the digit is too big
          stx   foundOne
          pha                            save the digit
          ph8   <val                     val = val*base
-         pea   0
-         pea   0
-         pea   0
+         dex
+         phx
+         phx
+         phx
          ph2   <base
          jsl   ~UMUL8
          pl8   val
