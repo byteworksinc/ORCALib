@@ -519,6 +519,8 @@ t        equ   6
          pld
          
          phb
+         phk
+         plb
          pla                            move return address
          sta   3,s
          pla
