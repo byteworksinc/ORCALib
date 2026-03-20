@@ -819,6 +819,80 @@ lb1      plb
 
 ****************************************************************
 *
+*  time_t timegm(struct tm *tmptr);
+*
+*  Inputs:
+*        tmptr - pointer to a time record representing UTC time
+*
+*  Outputs:
+*        all fields of *tmptr adjusted to their normal ranges
+*        tmptr->wday - day of week
+*        tmptr->yday - day of year
+*        returns the time in seconds since 13 Nov 1969 local time
+*
+****************************************************************
+*
+timegm   start
+         using TimeCommon
+temp     equ   1                        temp variable
+
+         csubroutine (4:tmptr),8
+         phb
+         phk
+         plb
+
+         ldy   #tm_year                 set time parameters
+         lda   [tmptr],Y
+         sta   year
+         dey
+         dey
+         lda   [tmptr],Y
+         sta   month
+         dey
+         dey
+         lda   [tmptr],Y
+         sta   day
+         dey
+         dey
+         lda   [tmptr],Y
+         sta   hour
+         dey
+         dey
+         lda   [tmptr],Y
+         sta   minute
+         lda   [tmptr]
+         sta   second
+         jsr   factor                   compute seconds since 13 Nov 1969 UTC
+         lda   count+4                  if UTC time is unrepresentable
+         ora   count+6
+         bne   err                        return -1
+lb0      jsr   ~get_tz_offset           convert to local time and save value
+         clc
+         adc   count
+         sta   temp
+         txa
+         adc   count+2
+         sta   temp+2
+         txa                            if local time is unrepresentable
+         bmi   lb0a
+         bcc   lb1
+         clc
+lb0a     bcs   lb1
+err      lda   #-1                        return -1
+         sta   temp
+         sta   temp+2
+         bra   lb2
+lb1      ph4   <tmptr                   recompute struct tm values
+         pea   0
+         ph4   count
+         ph4   #0
+         jsl   ~gmlocaltime
+lb2      plb
+         creturn 4:temp
+         end
+
+****************************************************************
+*
 *  time_t time(tptr)
 *        time_t *tptr;
 *
