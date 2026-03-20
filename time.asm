@@ -493,6 +493,44 @@ doit     jsl   ~gmlocaltime             use common gmtime/localtime code
 
 ****************************************************************
 *
+*  struct tm *gmtime_r(time_t *t, struct tm *tm);
+*
+*  Inputs:
+*        t - pointer to # of seconds since 13 Nov 1969
+*        tm - pointer to structure to hold result (UTC time)
+*
+*  Outputs:
+*        returns the pointer tm
+*
+****************************************************************
+*
+gmtime_r start
+         using TimeCommon
+
+         csubroutine (4:t,4:tm),0
+
+         ldy   #2                       dereference the pointer to time_t
+         lda   [t],Y
+         tax
+         lda   [t]
+         tay
+
+         ph4   <tm                      push address of struct tm to use
+         pea   0                        push tm_isdst value         
+         phx                            push time_t value to convert
+         phy
+
+         jsr   ~get_tz_offset           push time zone offset
+         phx
+         pha
+
+         jsl   ~gmlocaltime             use common gmtime/localtime code
+
+         creturn 4:tm
+         end
+
+****************************************************************
+*
 *  struct tm *localtime(t)
 *        time_t *t;
 *
@@ -542,6 +580,52 @@ lb1      plb
          pea   0
          jsl   ~gmlocaltime             use common gmtime/localtime code
          rtl
+         end
+
+****************************************************************
+*
+*  struct tm *localtime_r(time_t *t, struct tm *tm);
+*
+*  Inputs:
+*        t - pointer to # of seconds since 13 Nov 1969
+*        tm - pointer to structure to hold result (local time)
+*
+*  Outputs:
+*        returns the pointer tm
+*
+****************************************************************
+*
+localtime_r start
+         using TimeCommon
+
+         csubroutine (4:t,4:tm),0
+         phb
+         phk
+         plb
+
+         ldy   #2                       dereference the pointer to time_t
+         lda   [t],Y
+         tax
+         lda   [t]
+         tay
+
+         lda   #-1                      default DST setting = -1 (unknown)
+         cpy   lasttime                 determine DST setting, if we can
+         bne   lb1
+         cpx   lasttime+2
+         bne   lb1
+         lda   lastDST
+lb1      plb
+
+         ph4   <tm                      push address of struct tm to use
+         pha                            push tm_isdst value         
+         phx                            push time_t value to convert
+         phy
+         pea   0                        no time zone offset
+         pea   0
+         jsl   ~gmlocaltime             use common gmtime/localtime code
+
+         creturn 4:tm
          end
 
 ****************************************************************
