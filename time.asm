@@ -645,14 +645,14 @@ lb1      plb
 *
 ~gmlocaltime private
          using TimeCommon
+;                                       seconds per year (long-term average)
+secsPerYear equ 86400*365+86400/4-86400/100+86400/400
 
          csubroutine (4:tz_offset,4:t,2:isdst,4:tm),0
          phb
          phk
          plb
 
-         lda   #69                      find the year
-         sta   year
          lda   #1
          sta   day
          stz   month
@@ -662,8 +662,16 @@ lb1      plb
          sta   second
          lda   tz_offset+2
          sta   second+2
-lb1      inc   year
-         jsr   factor_second32
+         ph4   <t                       estimate year (may be 1 too high)
+         lda   #secsPerYear
+         ldx   #secsPerYear|-16
+         jsl   ~UDIV4
+         pla
+         plx
+         clc
+         adc   #69+1
+         sta   year
+         jsr   factor_second32          find the year
          lda   count+4
          bne   lb1b
          lda   count+2
@@ -671,7 +679,7 @@ lb1      inc   year
          bne   lb1a
          lda   count
          cmp   t
-lb1a     ble   lb1
+lb1a     ble   lb2
 lb1b     dec   year
 lb2      inc   month                    find the month
          jsr   factor_second32
