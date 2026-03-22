@@ -746,30 +746,33 @@ lb2c     lda   year                     set the year
          sta   [tm],y
          ph4   <t                       save original t value
          sub4  t,count                  find the number of seconds
-         move4 t,t1
-         div4  t,#60
-         mul4  t,#60,t2
-         sub4  t1,t2
-         lda   t1
+         ph4   <t
+         ph4   #60
+         jsl   ~DIV4
+         pl4   <t
+         pla
+         plx
          ldy   #tm_sec
          sta   [tm],y
-         move4 t,t1                     find the number of minutes
-         div4  t,#60
-         mul4  t,#60,t2
-         sub4  t1,t2
-         lda   t1
+         ph4   <t                       find the number of minutes
+         ph4   #60
+         jsl   ~DIV4
+         pl4   <t
+         pla
+         plx
          ldy   #tm_min
          sta   [tm],y
-         move4 t,t1                     find the number of hours
-         div4  t,#24
-         mul4  t,#24,t2
-         sub4  t1,t2
-         lda   t1
-         ldy   #tm_hour
-         sta   [tm],y
-         lda   t                        set the day
-         inc   A
+         ph4   <t                       find the number of hours and days
+         ph4   #24
+         jsl   ~DIV4
+         pla
+         plx
+         inc   a                        set the day
          ldy   #tm_mday
+         sta   [tm],y
+         pla
+         plx
+         ldy   #tm_hour                 set the hours
          sta   [tm],y
          pl4   t                        restore original t value
          pl4   count                    compute the days since the start of the
