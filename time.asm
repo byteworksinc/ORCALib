@@ -720,6 +720,7 @@ lb1a     ble   lb2
 lb1b     dec   year
          jsr   factor_second32
 lb2      sub4  t,count,month            estimate month (may be 1 too high)
+         ph4   month                    save seconds past start of year
          div4  month,#secsPerMonth
          lda   month                    shortcuts where correct month is known
          beq   lb2c
@@ -771,10 +772,8 @@ lb2c     lda   year                     set the year
          ldy   #tm_mday
          sta   [tm],y
          pl4   t                        restore original t value
-         stz   month                    compute the days since the start of the
-         jsr   factor_second32           year (in desired time zone)
-         sub4  t,count,count
-         div4  count,#60*60*24
+         pl4   count                    compute the days since the start of the
+         div4  count,#60*60*24           year (in desired time zone)
          ldy   #tm_yday                 set the day of year
          lda   count
          sta   [tm],y
