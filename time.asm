@@ -645,8 +645,11 @@ lb1      plb
 *
 ~gmlocaltime private
          using TimeCommon
-;                                       seconds per year (long-term average)
-secsPerYear equ 86400*365+86400/4-86400/100+86400/400
+;                                       seconds per year (average + 8 hours)
+;                                       Note: +8 hours is OK and improves year
+;                                       estimates within ORCA/C's 32-bit time_t
+;                                       range.  Remove it if range is extended.
+secsPerYear equ 86400*365+86400/4-86400/100+86400/400+86400/3
 secsPerMonth equ 86400*29               seconds per month (approx)
 
          csubroutine (4:tz_offset,4:t,2:isdst,4:tm),0
