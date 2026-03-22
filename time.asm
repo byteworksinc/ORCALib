@@ -257,7 +257,7 @@ factor   private
          using TimeCommon
          
 ;
-;  sign-extend time components to 4 bytes
+;  sign-extend time components (except month) to 4 bytes
 ;
 
          stz  second+2
@@ -269,8 +269,7 @@ lb0      stz  year+2
          lda  year
          bpl  lb0a
          dec  year+2
-lb0a     stz  month+2
-         stz  day+2
+lb0a     stz  day+2
          lda  day
          bpl  lb0b
          dec  day+2
@@ -303,7 +302,16 @@ lb0f     sec
 ;
 lb0x     mul4  year,#365,count          count := 365*year + day + 31*month
          add4  count,day
-         mul4  month,#31,t1
+         lda   month
+         asl   a
+         asl   a
+         asl   a
+         asl   a
+         asl   a
+         sec
+         sbc   month
+         sta   t1
+         stz   t1+2
          add4  count,t1
          add4  year,#32800,t2           t2 := year + 32800 (so it is positive)
          lda   month                    if January or February then
@@ -311,17 +319,42 @@ lb0x     mul4  year,#365,count          count := 365*year + day + 31*month
          bge   lb1
          dec4  t2                         year := year-1
          bra   lb2                      else
-lb1      mul4  month,#4,t1                count := count - (month*4+27) div 10
-         add4  t1,#27
-         div4  t1,#10
+lb1      asl   a                          count := count - (month*4+27) div 10
+         asl   a
+         adc   #27+1                      ( x div 10 ~= (x+1)*$33 div 512 )
+         sta   t1
+         asl   a
+         adc   t1
+         asl   a
+         asl   a
+         asl   a
+         adc   t1
+         asl   a
+         adc   t1
+         lsr   a
+         xba
+         and   #$00ff
+         sta   t1
+         stz   t1+2
          sub4  count,t1
-lb2      div4  t2,#4,t1                 count := count + (year+32800) div 4
+lb2      lda   t2+2                     count := count + (year+32800) div 4
+         lsr   a
+         lda   t2
+         ror   a
+         lsr   a
+         sta   t1
+         stz   t1+2
          add4  count,t1
          add4  t2,#300                  count := count -
          div4  t2,#100                    ((300+year+32800) div 100+1)*3 div 4
-         inc4  t2
-         mul4  t2,#3
-         div4  t2,#4
+         inc   t2
+         lda   t2
+         asl   a
+         adc   t2
+         lsr   a
+         lsr   a
+         sta   t2
+         stz   t2+2
          sub4  count,t2
          sub4  count,#25518-2+7954      subtract off days between 1 Jan 1900
 !                                        and 13 Nov 1969, minus 2 to adjust for
