@@ -647,6 +647,7 @@ lb1      plb
          using TimeCommon
 ;                                       seconds per year (long-term average)
 secsPerYear equ 86400*365+86400/4-86400/100+86400/400
+secsPerMonth equ 86400*29               seconds per month (approx)
 
          csubroutine (4:tz_offset,4:t,2:isdst,4:tm),0
          phb
@@ -681,20 +682,26 @@ secsPerYear equ 86400*365+86400/4-86400/100+86400/400
          cmp   t
 lb1a     ble   lb2
 lb1b     dec   year
-lb2      inc   month                    find the month
          jsr   factor_second32
+lb2      sub4  t,count,month            estimate month (may be 1 too high)
+         div4  month,#secsPerMonth
+         lda   month                    shortcuts where correct month is known
+         beq   lb2c
+         cmp   #12
+         beq   lb2b
+         jsr   factor_second32          find the month
          lda   count+4
-         bmi   lb2
-         bne   lb2b
+         bmi   lb2c
+;        bne   lb2b                     (not needed due to December shortcut)
          lda   count+2
          cmp   t+2
          bne   lb2a
          lda   count
          cmp   t
-lb2a     ble   lb2
+lb2a     ble   lb2c
 lb2b     dec   month
          jsr   factor_second32          recompute the factor
-         lda   year                     set the year
+lb2c     lda   year                     set the year
          ldy   #tm_year
          sta   [tm],y
          lda   month                    set the month
