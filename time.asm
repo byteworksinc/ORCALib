@@ -888,6 +888,7 @@ lb1      plb
 timegm   start
          using TimeCommon
 temp     equ   1                        temp variable
+tz_off   equ   5                        time zone offset
 
          csubroutine (4:tmptr),8
          phb
@@ -913,32 +914,28 @@ temp     equ   1                        temp variable
          dey
          lda   [tmptr],Y
          sta   minute
-         lda   [tmptr]
-         sta   second
-         jsr   factor                   compute seconds since 13 Nov 1969 UTC
-         lda   count+4                  if UTC time is unrepresentable
+         jsr   ~get_tz_offset           adjust for time zone offset
+         sta   tz_off
+         stx   tz_off+2
+         clc
+         adc   [tmptr]
+         bcc   lb0
+         inx
+lb0      sta   second
+         stx   second+2
+         jsr   factor_second32          compute seconds since 13 Nov 1969 local
+         lda   count+4                  if time is unrepresentable
          ora   count+6
-         bne   err                        return -1
-lb0      jsr   ~get_tz_offset           convert to local time and save value
-         clc
-         adc   count
-         sta   temp
-         txa
-         adc   count+2
-         sta   temp+2
-         txa                            if local time is unrepresentable
-         bmi   lb0a
-         bcc   lb1
-         clc
-lb0a     bcs   lb1
-err      lda   #-1                        return -1
+         beq   lb1
+         lda   #-1                        return -1
          sta   temp
          sta   temp+2
          bra   lb2
-lb1      ph4   <tmptr                   recompute struct tm values
+lb1      move4 count,temp               save the value for later return
+         ph4   <tmptr                   recompute struct tm values
          pea   0
-         ph4   count
-         ph4   #0
+         ph4   <temp
+         ph4   <tz_off
          jsl   ~gmlocaltime
 lb2      plb
          creturn 4:temp
