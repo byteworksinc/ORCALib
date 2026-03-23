@@ -822,7 +822,6 @@ lb3a     add4  t,#4*60*60*24
 mktime   start
          using TimeCommon
 temp     equ   1                        temp variable
-temp2    equ   5                        temp variable
 
          csubroutine (4:tmptr),8
          phb
@@ -857,7 +856,7 @@ temp2    equ   5                        temp variable
          lda   #-1                        return -1
          sta   temp
          sta   temp+2
-         brl   lb1
+         bra   lb1
 lb0      move4 count,temp               save the value for later return
          ph4   <tmptr                   recompute struct tm values
          ldy   #tm_isdst
