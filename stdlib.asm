@@ -780,6 +780,40 @@ ret      stx   n
 
 ****************************************************************
 *
+*  size_t memalignment(const void *p)
+*
+*  Inputs:
+*        p - a pointer
+*
+*  Outputs:
+*        The maximum alignment satisfied by p.
+*
+****************************************************************
+*
+memalignment start
+
+         csubroutine (4:p)
+         
+         lda   p                        compute alignment = p & -p
+         beq   lb1
+         eor   #$ffff
+         inc   a
+         and   p
+         sta   p
+         stz   p+2
+         bra   ret
+
+lb1      lda   p+2
+         eor   #$ffff
+         inc   a
+         and   p+2
+         sta   p+2
+
+ret      creturn 4:p
+         end
+
+****************************************************************
+*
 *  void qsort(base, count, size, compar)
 *        void *base;
 *        size_t count, size;
