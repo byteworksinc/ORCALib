@@ -968,6 +968,100 @@ lb2      sty   set                      set the disp past the current disp
 
 ****************************************************************
 *
+*  char *strdup(const char *str)
+*
+*  Inputs:
+*        str - string to copy
+*
+*  Outputs:
+*        Pointer to copy of str (allocated with malloc),
+*        or NULL on allocation failure.
+*
+****************************************************************
+*
+strdup   start
+
+         csubroutine (4:str)
+
+         ph4   <str                     ptr = malloc(strlen(str)+1)
+         jsl   strlen
+         inc   a
+         bne   lb1
+         inx
+lb1      phx
+         pha
+         jsl   malloc
+         tay                            if ptr != NULL
+         bne   lb2
+         txy
+         beq   ret
+lb2      ph4   <str                       ptr = strcpy(ptr, str)
+         phx
+         pha
+         jsl   strcpy
+
+ret      sta   str                      return ptr
+         stx   str+2
+         creturn 4:str
+         end
+
+****************************************************************
+*
+*  char *strndup(const char *str, size_t n)
+*
+*  Inputs:
+*        str - string to copy
+*        n - max # chars to copy
+*
+*  Outputs:
+*        Pointer to copy of str truncated to n or fewer chars
+*        (allocated with malloc), or NULL on allocation failure.
+*
+****************************************************************
+*
+strndup  start
+ptr      equ   1
+
+         csubroutine (4:str,4:n),4
+
+         ph4   <n                       ptr = memchr(str, 0, n)
+         pea   0
+         ph4   <str
+         jsl   memchr
+         sta   ptr
+         stx   ptr+2
+         ora   ptr+2
+         beq   lb0                      if ptr != NULL
+         sub4  ptr,str,n                  n = ptr-str
+
+lb0      lda   n                        ptr = malloc(n+1)
+         ldx   n+2
+         inc   a
+         bne   lb1
+         inx
+lb1      phx
+         pha
+         jsl   malloc
+         sta   ptr
+         stx   ptr+2
+         ora   ptr+2
+         beq   ret                      if ptr != NULL
+
+         ph4   <n                         memcpy(ptr, str, n)
+         ph4   <str
+         ph4   <ptr
+         jsl   memcpy
+         add4  ptr,n,str                  ptr[n] = 0
+         short M
+         lda   #0
+         sta   [str]
+         long  M
+
+ret      creturn 4:ptr                  return ptr
+         end
+
+****************************************************************
+*
 *  strerror - return the addr of an error message
 *
 *  Inputs:
