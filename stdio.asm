@@ -4787,9 +4787,7 @@ rt1      lda   format-2                 move the return address
 ;
 ;  Handle a format specification
 ;
-fm1      inc4  format                   skip the '%'
-
-         stz   ~removeZeros             not a G specifier
+fm1      stz   ~removeZeros             not a G specifier
          stz   ~fieldWidth              use only the space required
          stz   ~precision               use the default precision
          stz   ~precisionSpecified
@@ -4802,9 +4800,37 @@ fm1      inc4  format                   skip the '%'
          stz   ~sign                    don't print the sign unless arg < 0
          stz   ~altForm                 use the primary output format
 
-fm2      jsr   Flag                     read and interpret flag characters
-         bcs   fm2
-         jsr   GetSize                  get the field width (if any)
+fl0      inc4  format                   skip the '%' or last flag character
+         lda   [format]                 get the character
+         and   #$00FF
+         cmp   #'-'                     if it is a '-' then
+         bne   fl1
+         sta   ~leftJustify               left justify the output
+         lda   #' '                       pad with spaces (ignore any '0' flag)
+         sta   ~paddChar
+         bra   fl0
+
+fl1      cmp   #'0'                     if it is a '0' then
+         bne   fl2
+         ldx   ~leftJustify               if not left justifying then
+         bne   fl0
+         sta   ~paddChar                    padd with '0' characters
+         bra   fl0
+
+fl2      cmp   #'+'                     if it is a '+' or ' ' then
+         beq   fl3
+         cmp   #' '
+         bne   fl4
+fl3      tsb   ~sign                      set the sign flag ('+' overrides ' ')
+         bra   fl0
+
+fl4      cmp   #'#'                     if it is a '#' then
+         bne   fm2
+         lda   #1                         use the alternate output form
+         sta   ~altForm
+         bra   fl0                      if a flag was found, check for more
+
+fm2      jsr   GetSize                  get the field width (if any)
          sta   ~fieldWidth
          lda   [format]                 if format == '.' then
          and   #$00FF
@@ -4898,44 +4924,6 @@ fm8      long  M,I
          pea   ps1-1                    push the return address
          inx                            call the subroutine
          jmp   (fList,X)
-;
-;  Flag - Read and process a flag character
-;
-;  If a flag character was found, the carry flag is set.
-;
-Flag     lda   [format]                 get the character
-         and   #$00FF
-         cmp   #'-'                     if it is a '-' then
-         bne   fl1
-         sta   ~leftJustify               left justify the output
-         lda   #' '                       pad with spaces (ignore any '0' flag)
-         sta   ~paddChar
-         bra   fl5
-
-fl1      cmp   #'0'                     if it is a '0' then
-         bne   fl2
-         ldx   ~leftJustify               if not left justifying then
-         bne   fl5
-         sta   ~paddChar                    padd with '0' characters
-         bra   fl5
-
-fl2      cmp   #'+'                     if it is a '+' or ' ' then
-         beq   fl3
-         cmp   #' '
-         bne   fl4
-fl3      tsb   ~sign                      set the sign flag ('+' overrides ' ')
-         bra   fl5
-
-fl4      cmp   #'#'                     if it is a '#' then
-         bne   fl6
-         lda   #1                         use the alternate output form
-         sta   ~altForm
-fl5      inc4  format                     skip the format character
-         sec
-         rts
-
-fl6      clc                            no flag was found
-         rts
 ;
 ;  GetSize - get a numeric value
 ;
