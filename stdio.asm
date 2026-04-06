@@ -2917,6 +2917,9 @@ string   ds    4                        string address
 ****************************************************************
 *
 snprintf start
+strfromd entry
+strfromf entry
+strfroml entry
          using ~printfCommon
 
          phb                            use local addressing
