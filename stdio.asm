@@ -2917,6 +2917,9 @@ string   ds    4                        string address
 ****************************************************************
 *
 snprintf start
+strfromd entry
+strfromf entry
+strfroml entry
          using ~printfCommon
 
          phb                            use local addressing
@@ -4232,9 +4235,11 @@ lb1      clc                            restore the original argp+4
 *  ~Format_x - format a hexadecimal number (lowercase output)
 *  ~Format_X - format a hexadecimal number (uppercase output)
 *  ~Format_p - format a pointer
+*  ~Format_b_C23 - format a binary number (lowercase prefix, if any)
+*  ~Format_B - format a binary number (uppercase prefix, if any)
 *
 *  Inputs:
-*        ~altForm - use a leading '0' (octal) or '0x' (hex)?
+*        ~altForm - use a leading '0' (octal), '0x' (hex), or '0b' (bin)?
 *        ~fieldWidth - output field width
 *        ~paddChar - padd character
 *        ~leftJustify - left justify the output?
@@ -4250,26 +4255,35 @@ lb1      clc                            restore the original argp+4
 argp     equ   7                        argument pointer
 
          lda   #3                       use 3 bits per output character
+         bra   cn0a
+
+~Format_b_C23 entry
+         ldx   #$20*256                 set the "or" value for case of '0b'
+         bra   bn0
+
+~Format_B entry
+         ldx   #0
+bn0      lda   #1                       use 1 bit per output character
          bra   cn0
 
 ~Format_x entry
 ;
 ;  Set the "or" value; this is used to set the case of character results
 ;
-         lda   #$20*256
-         sta   ~orVal
+         ldx   #$20*256
          bra   hx0
 
 ~Format_p entry
          inc   ~isLong
 ~Format_X entry
-         stz   ~orVal
+         ldx   #0
 hx0      lda   #4                       use 4 bits per output character
 
 ;
 ;  Initialization
 ;
-cn0      sta   bitsPerChar
+cn0      stx   ~orVal
+cn0a     sta   bitsPerChar
          stz   ~hexPrefix               assume we won't lead with 0x
          stz   ~sign                    ignore the sign flag
          lda   #'  '                    initialize the string to blanks
@@ -4294,22 +4308,26 @@ cn2      lda   [argp]
          beq   cn2a
          and   #$00FF
 cn2a     sta   ~num
-         ldx   bitsPerChar              if doing hex format then
-         cpx   #3
-         beq   cn2b
+         ldy   bitsPerChar              if doing hex or bin format then
+         cpy   #3
+         beq   cn2d
          ldx   ~altForm                   if alt form has been selected then
-         beq   cn2b
+         beq   cn2d
          ora   ~num+2                       if value is not 0 then
          ora   ~num+4
          ora   ~num+6
-         beq   cn2b
-         lda   #'X0'                          set hex prefix to '0X' or '0x'
-         ora   ~orVal
+         beq   cn2d
+         dey                                  if doing bin format than
+         bne   cn2b
+         lda   #'B0'                            set bin prefix to '0B' or '0b'
+         bra   cn2c                           else
+cn2b     lda   #'X0'                            set hex prefix to '0X' or '0x'
+cn2c     ora   ~orVal
          sta   ~hexPrefix
 ;
 ;  Convert the number to an ASCII string
 ;
-cn2b     ldy   #l:~str-1                set up the character index
+cn2d     ldy   #l:~str-1                set up the character index
 cn3      lda   #' 0'                    roll off 4 bits
          ldx   bitsPerChar
 cn4      lsr   ~num+6
@@ -4337,7 +4355,7 @@ cn5      dey
          ora   ~num
          bne   cn3
 ;
-;  If a leading '0x' is required, be sure we include one
+;  If a leading '0' is required, be sure we include one
 ;
          lda   bitsPerChar              if doing octal format then
          cmp   #3
@@ -4382,6 +4400,11 @@ argp     equ   7                        argument pointer
          bra   lb0
 
 ~Format_b entry
+         dc    i1'$A9'                  lda #~C23orLater (if linked in) or #0
+         dc    s2'~C23ORLATER'            (this must be on a separate line)
+         beq   ~Format_P                if doing C23 or later then
+         brl   ~Format_b_C23              use C23 version of 'b' format
+
 ~Format_P entry
          clc                            set flag for p-string
 
@@ -4767,9 +4790,7 @@ rt1      lda   format-2                 move the return address
 ;
 ;  Handle a format specification
 ;
-fm1      inc4  format                   skip the '%'
-
-         stz   ~removeZeros             not a G specifier
+fm1      stz   ~removeZeros             not a G specifier
          stz   ~fieldWidth              use only the space required
          stz   ~precision               use the default precision
          stz   ~precisionSpecified
@@ -4782,9 +4803,37 @@ fm1      inc4  format                   skip the '%'
          stz   ~sign                    don't print the sign unless arg < 0
          stz   ~altForm                 use the primary output format
 
-fm2      jsr   Flag                     read and interpret flag characters
-         bcs   fm2
-         jsr   GetSize                  get the field width (if any)
+fl0      inc4  format                   skip the '%' or last flag character
+         lda   [format]                 get the character
+         and   #$00FF
+         cmp   #'-'                     if it is a '-' then
+         bne   fl1
+         sta   ~leftJustify               left justify the output
+         lda   #' '                       pad with spaces (ignore any '0' flag)
+         sta   ~paddChar
+         bra   fl0
+
+fl1      cmp   #'0'                     if it is a '0' then
+         bne   fl2
+         ldx   ~leftJustify               if not left justifying then
+         bne   fl0
+         sta   ~paddChar                    padd with '0' characters
+         bra   fl0
+
+fl2      cmp   #'+'                     if it is a '+' or ' ' then
+         beq   fl3
+         cmp   #' '
+         bne   fl4
+fl3      tsb   ~sign                      set the sign flag ('+' overrides ' ')
+         bra   fl0
+
+fl4      cmp   #'#'                     if it is a '#' then
+         bne   fm2
+         lda   #1                         use the alternate output form
+         sta   ~altForm
+         bra   fl0                      if a flag was found, check for more
+
+fm2      jsr   GetSize                  get the field width (if any)
          sta   ~fieldWidth
          lda   [format]                 if format == '.' then
          and   #$00FF
@@ -4804,7 +4853,7 @@ fm3      cmp   #'l'
          cmp   #'l'
          beq   fm3a
          inc   ~isLong
-         bra   fm6
+         brl   fm6
 fm3a     inc   ~isLongLong
          bra   fm3c
 fm3b     cmp   #'j'
@@ -4818,13 +4867,49 @@ fm3c     inc   ~isLong
 fm4      cmp   #'L'                     else if *format in ['L','h'] then
          beq   fm5
          cmp   #'h'
-         bne   fm6
+         bne   fm4a
          inc4  format                     check for 'hh'
          lda   [format]                 
          and   #$00FF
          cmp   #'h'
          bne   fm6
          inc   ~isByte
+         bra   fm5                        ++format
+
+fm4a     cmp   #'w'                     else if *format = 'w' then
+         bne   fm6
+         inc4  format                     ++format
+         lda   [format]
+         cmp   #'8f'                      if *format = 'f8' then
+         beq   fm4f                         (ok)
+         and   #$00FF
+         cmp   #'8'                       else if *format = '8' then
+         bne   fm4b
+         inc   ~isByte                      ~isByte = true
+         bra   fm4g                       else
+fm4b     cmp   #'f'                         if *format = 'f' then
+         bne   fm4c
+         inc4  format                         ++format
+fm4c     lda   [format]
+         cmp   #'61'                        if *format = '16' then
+         beq   fm4f                           (ok)
+         cmp   #'46'                        else if *format = '64' then
+         bne   fm4d
+         inc   ~isLongLong                    ~isLongLong = true
+         bra   fm4e                           ~isLong = true
+fm4d     cmp   #'23'                        else if *format = '32' then
+         bne   fm4h
+fm4e     inc   ~isLong                        ~isLong = true
+fm4f     inc4  format                     if format was recognized then
+fm4g     lda   [format]                     ++format (unless it was '8')
+         cmp   #'0'*256                     if next character is a digit then
+         blt   fm5                            return a negative number
+         cmp   #('9'+1)*256
+         bge   fm5                        else
+fm4h     sec                                return a negative number
+         ror   ~numChars
+         brl   rt1
+
 fm5      inc4  format                     ++format
          lda   [format]                 find the proper format character
 fm6      inc4  format
@@ -4842,44 +4927,6 @@ fm8      long  M,I
          pea   ps1-1                    push the return address
          inx                            call the subroutine
          jmp   (fList,X)
-;
-;  Flag - Read and process a flag character
-;
-;  If a flag character was found, the carry flag is set.
-;
-Flag     lda   [format]                 get the character
-         and   #$00FF
-         cmp   #'-'                     if it is a '-' then
-         bne   fl1
-         sta   ~leftJustify               left justify the output
-         lda   #' '                       pad with spaces (ignore any '0' flag)
-         sta   ~paddChar
-         bra   fl5
-
-fl1      cmp   #'0'                     if it is a '0' then
-         bne   fl2
-         ldx   ~leftJustify               if not left justifying then
-         bne   fl5
-         sta   ~paddChar                    padd with '0' characters
-         bra   fl5
-
-fl2      cmp   #'+'                     if it is a '+' or ' ' then
-         beq   fl3
-         cmp   #' '
-         bne   fl4
-fl3      tsb   ~sign                      set the sign flag ('+' overrides ' ')
-         bra   fl5
-
-fl4      cmp   #'#'                     if it is a '#' then
-         bne   fl6
-         lda   #1                         use the alternate output form
-         sta   ~altForm
-fl5      inc4  format                     skip the format character
-         sec
-         rts
-
-fl6      clc                            no flag was found
-         rts
 ;
 ;  GetSize - get a numeric value
 ;
@@ -4943,6 +4990,7 @@ fList    dc    c'%',a'~Format_Percent'  %
          dc    c'g',a'~Format_g'        g
          dc    c'G',a'~Format_G'        G
          dc    c'n',a'~Format_n'        n
+         dc    c'B',a'~Format_B'        B
          dc    c's',a'~Format_s'        s
          dc    c'b',a'~Format_b'        b
          dc    c'P',a'~Format_P'        P
@@ -5125,180 +5173,6 @@ didOne   ds    2                        non-zero if we have scanned a character
 
 ****************************************************************
 *
-*  ~Scan_d - read an integer
-*  ~Scan_i - read a based integer
-*
-*  Inputs:
-*        ~scanError - has a scan error occurred?
-*        ~scanWidth - max input length
-*        ~suppress - suppress save?
-*        ~size - size specifier
-*
-****************************************************************
-*
-~Scan_d  private
-         using ~scanfCommon
-arg      equ   11                       argument
-
-         stz   based                    always use base 10
-         bra   bs1
-~Scan_i  entry
-         lda   #1                       allow base 8, 10, 16
-         sta   based
-
-bs1      stz   read                     no digits read
-         lda   #10                      assume base 10
-         sta   base
-         stz   val                      initialize the value to 0
-         stz   val+2
-         stz   val+4
-         stz   val+6
-lb1      jsl   ~getchar                 skip leading whitespace...
-         cmp   #EOF                     if EOF then
-         bne   ef1
-         sta   ~eofFound                   ~eofFound = EOF
-         lda   ~suppress                   if input is not suppressed then
-         bne   lb6l
-         dec   ~assignments                   no assignment made
-lb6l     brl   lb6                         bail out
-ef1      tax                            {...back to skipping whitespace}
-         lda   __ctype+1,X
-         and   #_space
-         bne   lb1
-         txa
-         stz   minus                    assume positive number
-         cmp   #'+'                     skip leading +
-         beq   sg1
-         cmp   #'-'                     if - then set minus flag
-         bne   sg3
-         inc   minus
-sg1      dec   ~scanWidth
-         jeq   lb4a
-         bpl   sg2
-         stz   ~scanWidth
-sg2      jsl   ~getchar
-sg3      inc   read
-         ldx   based                    if base 8, 16 are allowed then
-         beq   lb2
-         cmp   #'0'                       if the digit is '0' then
-         bne   lb2
-         lda   #8                           assume base 8
-         sta   base
-         dec   ~scanWidth                   get the next character
-         jeq   lb4a
-         bpl   lb1a
-         stz   ~scanWidth
-lb1a     jsl   ~getchar
-         inc   read
-         cmp   #'X'                         if it is X then
-         beq   lb1b
-         cmp   #'x'
-         bne   lb2
-lb1b     asl   base                           use base 16
-         stz   read                           '0x' alone should not match
-         dec   ~scanWidth                     get the next character
-         jeq   lb4a
-         bpl   lb1c
-         stz   ~scanWidth
-lb1c     jsl   ~getchar
-         inc   read
-
-lb2      cmp   #'0'                     if the char is a digit then
-         blt   lb4
-         cmp   #'7'+1
-         blt   lb2a
-         ldx   base
-         cpx   #8
-         beq   lb4
-         cmp   #'9'+1
-         blt   lb2a
-         cpx   #16
-         bne   lb4
-         and   #$00DF
-         cmp   #'A'
-         blt   lb4
-         cmp   #'F'+1
-         bge   lb4
-         sbc   #6
-lb2a     and   #$000F                     convert it to a value
-         pha                              save the value
-         ph8   val                        update the old value
-         ldx   #0
-         phx
-         phx
-         phx
-         lda   base
-         pha
-         jsl   ~UMUL8
-         pl8   val
-         pla                              add in the new digit
-         clc
-         adc   val
-         sta   val
-         bcc   lb3
-         inc   val+2
-         bne   lb3
-         inc   val+4
-         bne   lb3
-         inc   val+6
-lb3      dec   ~scanWidth                 quit if the max # chars have been
-         beq   lb4a                         scanned
-         bpl   lb3a                       make sure 0 stays a 0
-         stz   ~scanWidth
-lb3a     jsl   ~getchar                   next char
-         inc   read
-         brl   lb2
-
-lb4      jsl   ~putback                 put the last character back
-         dec   read
-lb4a     lda   read                     if no chars read then
-         bne   lb4b
-         inc   ~scanError                 ~scanError = true
-         lda   ~suppress                  if input is not suppressed then
-         bne   lb6
-         dec   ~assignments                 no assignment made
-         bra   lb6                        skip the save
-lb4b     lda   ~suppress                if input is not suppressed then
-         bne   lb7
-         lda   minus                      if minus then
-         beq   lb4c
-         negate8 val                        negate the value
-lb4c     lda   val                        save the value
-         ldx   ~size
-         bpl   lb4d
-         sep   #$20
-lb4d     sta   [arg]
-         rep   #$20
-         dex
-         bmi   lb6
-         ldy   #2
-         lda   val+2
-         sta   [arg],Y
-         dex
-         bmi   lb6
-         iny
-         iny
-         lda   val+4
-         sta   [arg],Y
-         iny
-         iny
-         lda   val+6
-         sta   [arg],Y
-lb6      lda   ~suppress                if input is not suppressed then
-         bne   lb7
-         ldy   #2                         remove the parameter from the stack
-         jsr   ~RemoveWord
-lb7      rts
-
-val      ds    8                        value
-base     dc    i2'10'                   number base
-based    ds    2                        based conversion?
-minus    ds    2                        is the value negative?
-read     ds    2                        # of digits read
-         end
-
-****************************************************************
-*
 *  ~Scan_lbrack - read character in a set
 *
 *  Inputs:
@@ -5468,6 +5342,11 @@ lb1      ldy   #2                       remove the parameter from the stack
 ****************************************************************
 *
 ~Scan_b  private
+         dc    i1'$A9'                  lda #~C23orLater (if linked in) or #0
+         dc    s2'~C23ORLATER'            (this must be on a separate line)
+         beq   ~Scan_P                  if doing C23 or later then
+         brl   ~Scan_b_C23                use C23 version of 'b' format
+
 ~Scan_P  entry
          using ~scanfCommon
 arg      equ   11                       argument
@@ -5583,8 +5462,11 @@ lb3      rts
 
 ****************************************************************
 *
+*  ~Scan_i - read a based integer
+*  ~Scan_d - read an integer
 *  ~Scan_u - read an unsigned integer
 *  ~Scan_o - read an unsigned octal integer
+*  ~Scan_b_C23 - read an unsigned binary integer
 *  ~Scan_x - read an unsigned hexadecimal integer
 *  ~Scan_p - read a pointer
 *
@@ -5595,81 +5477,107 @@ lb3      rts
 *
 ****************************************************************
 *
-~Scan_u  private
+~Scan_i  private
          using ~scanfCommon
 arg      equ   11                       argument
 
+         ldx   #10                      assume base 10
          jsr   Init
-         lda   #10                      base 10
-         bra   bs1
+         jsl   ~getchar
+         cmp   #'0'                     if the digit is '0' then
+         bne   bne_lb2a
+         sta   gotDigit                   we read a digit
+         lda   #8                         assume base 8
+         sta   base
+         dec   ~scanWidth                 get the next character
+         jeq   lb4a
+         bpl   si1
+         stz   ~scanWidth
+si1      jsl   ~getchar
+         cmp   #'X'                       if it is X then
+         beq   si2
+         cmp   #'x'
+         bne   si3
+si2      ldy   #16                          use base 16
+         bra   si5                       else
+si3      dc    i1'$A2'                      ldx #~C23orLater(soft reference)
+         dc    s2'~C23ORLATER'
+         beq   lb2a                         if in C23 or later mode then
+         cmp   #'B'                           if character is B then
+         beq   si4
+         cmp   #'b'
+bne_lb2a bne   lb2a
+si4      ldy   #2                               use base 2
+si5      sty   base
+         bra   hx1a
+
+~Scan_d  entry
+~Scan_u  entry
+         ldx   #10                      base 10
+sd1      jsr   Init
+         bra   lb2
 
 ~Scan_o  entry
-         jsr   Init
-         lda   #8                       base 8
-         bra   bs1
+         ldx   #8                       base 8
+         bra   sd1
+
+~Scan_b_C23 entry
+         ldx   #2                       base 2
+         lda   #'B'                     prefix letters 'B'/'b'
+         bra   hx0
 
 ~Scan_p  entry
          lda   #1
          sta   ~size
 ~Scan_x  entry
+         ldx   #16                      base 16
+         lda   #'X'                     prefix letters 'X'/'x'
+hx0      sta   pfx1
+         eor   #$20
+         sta   pfx2
          jsr   Init
          jsl   ~getchar                 if the initial char is a '0' then
-         inc   read
-         sta   ch
          cmp   #'0'
-         bne   hx2
+         bne   lb2a
+         sta   gotDigit                   we read a digit
          dec   ~scanWidth                 get the next character
          jeq   lb4a
          bpl   hx1
          stz   ~scanWidth
 hx1      jsl   ~getchar
-         inc   read
-         sta   ch
-         cmp   #'x'                       if it is an 'x' or 'X' then
+         cmp   pfx1                       if it is an 'x'/'X' (or 'b'/'B') then
          beq   hx1a
-         cmp   #'X'
-         bne   hx2
-hx1a     stz   read                         ('0x' alone should not match)
+         cmp   pfx2
+         bne   lb2a
+hx1a     stz   gotDigit                     ('0x'/'0b' alone should not match)
          dec   ~scanWidth                   accept the character
          jeq   lb4a
-         bpl   hx3
+         bpl   lb2
          stz   ~scanWidth
-         bra   hx3
-hx2      jsl   ~putback                 put back the character
-         dec   read
-hx3      lda   #16                      base 16
-
-bs1      sta   base                     set the base
 
 lb2      jsl   ~getchar                 if the char is a digit then
-         inc   read
-         sta   ch
-         cmp   #'0'
-         blt   lb4
-         cmp   #'7'+1
-         blt   lb2a
-         ldx   base
-         cpx   #8
-         beq   lb4
-         cmp   #'9'+1
-         blt   lb2a
-         cpx   #16
+lb2a     sta   ch
+         ldy   base
+         sec                              convert it to a value, checking range
+         sbc   #'0'
+         cmp   #9+1
+         blt   lb2b
+         cpy   #16
          bne   lb4
-         and   #$00DF
-         cmp   #'A'
+         and   #$FFDF
+         cmp   #'A'-'0'
          blt   lb4
-         cmp   #'F'+1
+         sbc   #7
+lb2b     cmp   base
          bge   lb4
-         sbc   #6
-lb2a     and   #$000F                     convert it to a value
+         sty   gotDigit                   we read a digit
          pha                              save the value
          ph8   val                        update the old value
-         ldx   #0
+         ldx   #0                         push base
          phx
          phx
          phx
-         lda   base
-         pha
+         phy
          jsl   ~UMUL8
          pl8   val
          pla                              add in the new digit
@@ -5686,12 +5594,11 @@ lb3      dec   ~scanWidth                 quit if the max # chars have been
          beq   lb4a                         scanned
          jpl   lb2                        make sure 0 stays a 0
          stz   ~scanWidth
-         brl   lb2
+         bra   lb2
 
 lb4      lda   ch                       put the last character back
          jsl   ~putback
-         dec   read
-lb4a     lda   read                     if no chars read then
+lb4a     lda   gotDigit                 if no digits read then
          bne   lb4b
          inc   ~scanError                 ~scanError = true
          lda   ~suppress                  if input is not suppressed then
@@ -5732,7 +5639,8 @@ lb7      rts
 ;
 ;  Initialization
 ;
-Init     stz   read                     no chars read
+Init     stx   base                     set base
+         stz   gotDigit                 no digits read
          stz   val                      initialize the value to 0
          stz   val+2
          stz   val+4
@@ -5741,11 +5649,7 @@ in1      jsl   ~getchar                 skip leading whitespace...
          cmp   #EOF                     if at EOF then
          bne   in2
          sta   ~eofFound                   eofFound = EOF
-         lda   ~suppress                   if input is not suppressed then
-         bne   in1a
-         dec   ~assignments                   no assignment made
-in1a     pla                               pop stack
-         bra   lb6                         bail out
+         bra   in6a                        no assignment made: bail out
 in2      tax                            ...back to skipping whitespace
          lda   __ctype+1,X
          and   #_space
@@ -5767,7 +5671,7 @@ in5      jsl   ~putback
          rts
 
 in6      inc   ~scanError               ~scanError = true
-         lda   ~suppress                if input is not suppressed then
+in6a     lda   ~suppress                if input is not suppressed then
          bne   in7
          dec   ~assignments               no assignment made
 in7      pla                            pop stack
@@ -5776,9 +5680,10 @@ in7      pla                            pop stack
 ch       ds    2                        char buffer
 val      ds    8                        value
 base     dc    i2'10'                   number base
-based    ds    2                        based conversion?
 minus    ds    2                        is there a minus sign?
-read     ds    2                        # of digits read
+gotDigit ds    2                        any digits read?
+pfx1     ds    2                        prefix letters
+pfx2     ds    2
          end
 
 ****************************************************************
@@ -6020,7 +5925,7 @@ fm2      jsr   GetSize                  get the field width specifier
          lda   [format]
          and   #$00FF
          cmp   #'l'
-         bne   fm6
+         bne   bne_fm6
          bra   fm2c
 fm2a     cmp   #'z'                     'z' specifies size_t (long int)
          beq   fm2c
@@ -6034,15 +5939,54 @@ fm2b     inc   ~size
 fm2c     inc   ~size
          bra   fm4
 fm3      cmp   #'h'                     'h' specifies short int
-         bne   fm6
+         bne   fm3a
          inc4  format                     unless it is 'hh' for char types
          lda   [format]
          and   #$00FF
          cmp   #'h'
-         bne   fm6
+bne_fm6  bne   fm6
          dec   ~size
-fm4      inc4  format                     ignore the character
+         bra   fm4
 
+fm3a     cmp   #'w'                     else if *format = 'w' then
+         bne   fm6
+         inc4  format                     ++format
+         lda   [format]
+         cmp   #'8f'                      if *format = 'f8' then
+         beq   fm3f                         (ok)
+         and   #$00FF
+         cmp   #'8'                       else if *format = '8' then
+         bne   fm3b
+         dec   ~size                         ~size := -1
+         bra   fm3g                       else
+fm3b     cmp   #'f'                         if *format = 'f' then
+         bne   fm3c
+         inc4  format                         ++format
+fm3c     lda   [format]
+         cmp   #'61'                        if *format = '16' then
+         beq   fm3f                           (ok)
+         cmp   #'46'                        else if *format = '64' then
+         bne   fm3d
+         inc   ~size                          ~size := 2
+         bra   fm3e
+fm3d     cmp   #'23'                        else if *format = '32' then
+         bne   fm3h
+fm3e     inc   ~size                          size := 1
+fm3f     inc4  format                     if format was recognized then
+fm3g     lda   [format]                     ++format (unless it was '8')
+         cmp   #'0'*256                     if next character is a digit then
+         blt   fm4                            treat it like a matching failure
+         cmp   #('9'+1)*256
+         bge   fm4                        else treat it like a matching failure:
+fm3h     ldy   #0
+         ldx   ~suppress                    if input is not suppressed then
+         bne   fm3i
+         dec   ~assignments                   no assignment made
+         iny                                  2 parameter words to remove
+         iny
+fm3i     brl   rm3                          remove remaining parameters
+
+fm4      inc4  format
          lda   [format]                 find the proper format character
 fm6      inc4  format
          short M,I

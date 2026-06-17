@@ -269,6 +269,69 @@ lb5      lda   rtl                      remove the parameters from the stack
 
 ****************************************************************
 *
+*  memccpy - copy up to n bytes, stopping if c is encountered
+*
+*  Copy *s2 to *s1, stopping after (unsigned char)c is copied
+*  or after n bytes
+*
+*  Inputs:
+*        s1 - location to copy to
+*        s2 - location to copy from
+*        c - terminator character
+*        n - max length to copy
+*
+*  Outputs:
+*        X-A - pointer to just after the character c in s1,
+*              or NULL if c was not encountered
+*
+****************************************************************
+*
+memccpy  start
+         csubroutine (4:s1,4:s2,2:c,4:n),0
+
+         ldx   n                        copy characters until c is found
+         bne   lb0                       or we have copied n characters
+         lda   n+2
+         beq   lb3a
+         dec   n+2
+
+lb0      short M
+         ldy   #0
+lb1      lda   [s2],Y
+         sta   [s1],Y
+         cmp   c
+         beq   lb2
+         dex
+         bne   lb1b
+lb1a     ldx   n+2
+         beq   lb3
+         dex
+         stx   n+2
+         ldx   #0
+lb1b     iny
+         bne   lb1
+         inc   s1+2
+         inc   s2+2
+         bra   lb1
+
+lb2      long  M                        c encountered:
+         sec                            return pointer just past c in s1
+         tya
+         adc   s1
+         sta   s1
+         bcc   lb4
+         inc   s1+2
+         bra   lb4
+
+lb3      long  M                        c not encountered:
+lb3a     stz   s1                       return null
+         stz   s1+2
+         
+lb4      creturn 4:s1
+         end
+
+****************************************************************
+*
 *  memcpy - memory copy
 *
 *  Copy len bytes from p1 to p2.
@@ -454,7 +517,7 @@ lb11     ply                            get the original source pointer
 
 ****************************************************************
 *
-*  memset - set memory to a value
+*  memset,memset_explicit - set memory to a value
 *
 *  Set len bytes, starting at p, to val.
 *
@@ -466,11 +529,10 @@ lb11     ply                            get the original source pointer
 *  Outputs:
 *        X-A - p
 *
-*  Notes: The memory areas should not overlap
-*
 ****************************************************************
 *
 memset   start
+memset_explicit entry
 p        equ   4                        destination pointer
 val      equ   8                        source pointer
 len      equ   10                       length to compare
@@ -902,6 +964,100 @@ lb2      sty   set                      set the disp past the current disp
          tcs
          tya                            return the disp
          rtl
+         end
+
+****************************************************************
+*
+*  char *strdup(const char *str)
+*
+*  Inputs:
+*        str - string to copy
+*
+*  Outputs:
+*        Pointer to copy of str (allocated with malloc),
+*        or NULL on allocation failure.
+*
+****************************************************************
+*
+strdup   start
+
+         csubroutine (4:str)
+
+         ph4   <str                     ptr = malloc(strlen(str)+1)
+         jsl   strlen
+         inc   a
+         bne   lb1
+         inx
+lb1      phx
+         pha
+         jsl   malloc
+         tay                            if ptr != NULL
+         bne   lb2
+         txy
+         beq   ret
+lb2      ph4   <str                       ptr = strcpy(ptr, str)
+         phx
+         pha
+         jsl   strcpy
+
+ret      sta   str                      return ptr
+         stx   str+2
+         creturn 4:str
+         end
+
+****************************************************************
+*
+*  char *strndup(const char *str, size_t n)
+*
+*  Inputs:
+*        str - string to copy
+*        n - max # chars to copy
+*
+*  Outputs:
+*        Pointer to copy of str truncated to n or fewer chars
+*        (allocated with malloc), or NULL on allocation failure.
+*
+****************************************************************
+*
+strndup  start
+ptr      equ   1
+
+         csubroutine (4:str,4:n),4
+
+         ph4   <n                       ptr = memchr(str, 0, n)
+         pea   0
+         ph4   <str
+         jsl   memchr
+         sta   ptr
+         stx   ptr+2
+         ora   ptr+2
+         beq   lb0                      if ptr != NULL
+         sub4  ptr,str,n                  n = ptr-str
+
+lb0      lda   n                        ptr = malloc(n+1)
+         ldx   n+2
+         inc   a
+         bne   lb1
+         inx
+lb1      phx
+         pha
+         jsl   malloc
+         sta   ptr
+         stx   ptr+2
+         ora   ptr+2
+         beq   ret                      if ptr != NULL
+
+         ph4   <n                         memcpy(ptr, str, n)
+         ph4   <str
+         ph4   <ptr
+         jsl   memcpy
+         add4  ptr,n,str                  ptr[n] = 0
+         short M
+         lda   #0
+         sta   [str]
+         long  M
+
+ret      creturn 4:ptr                  return ptr
          end
 
 ****************************************************************

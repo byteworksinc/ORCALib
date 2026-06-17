@@ -257,7 +257,7 @@ factor   private
          using TimeCommon
          
 ;
-;  sign-extend time components to 4 bytes
+;  sign-extend time components (except month) to 4 bytes
 ;
 
          stz  second+2
@@ -269,8 +269,7 @@ lb0      stz  year+2
          lda  year
          bpl  lb0a
          dec  year+2
-lb0a     stz  month+2
-         stz  day+2
+lb0a     stz  day+2
          lda  day
          bpl  lb0b
          dec  day+2
@@ -303,7 +302,16 @@ lb0f     sec
 ;
 lb0x     mul4  year,#365,count          count := 365*year + day + 31*month
          add4  count,day
-         mul4  month,#31,t1
+         lda   month
+         asl   a
+         asl   a
+         asl   a
+         asl   a
+         asl   a
+         sec
+         sbc   month
+         sta   t1
+         stz   t1+2
          add4  count,t1
          add4  year,#32800,t2           t2 := year + 32800 (so it is positive)
          lda   month                    if January or February then
@@ -311,17 +319,42 @@ lb0x     mul4  year,#365,count          count := 365*year + day + 31*month
          bge   lb1
          dec4  t2                         year := year-1
          bra   lb2                      else
-lb1      mul4  month,#4,t1                count := count - (month*4+27) div 10
-         add4  t1,#27
-         div4  t1,#10
+lb1      asl   a                          count := count - (month*4+27) div 10
+         asl   a
+         adc   #27+1                      ( x div 10 ~= (x+1)*$33 div 512 )
+         sta   t1
+         asl   a
+         adc   t1
+         asl   a
+         asl   a
+         asl   a
+         adc   t1
+         asl   a
+         adc   t1
+         lsr   a
+         xba
+         and   #$00ff
+         sta   t1
+         stz   t1+2
          sub4  count,t1
-lb2      div4  t2,#4,t1                 count := count + (year+32800) div 4
+lb2      lda   t2+2                     count := count + (year+32800) div 4
+         lsr   a
+         lda   t2
+         ror   a
+         lsr   a
+         sta   t1
+         stz   t1+2
          add4  count,t1
          add4  t2,#300                  count := count -
          div4  t2,#100                    ((300+year+32800) div 100+1)*3 div 4
-         inc4  t2
-         mul4  t2,#3
-         div4  t2,#4
+         inc   t2
+         lda   t2
+         asl   a
+         adc   t2
+         lsr   a
+         lsr   a
+         sta   t2
+         stz   t2+2
          sub4  count,t2
          sub4  count,#25518-2+7954      subtract off days between 1 Jan 1900
 !                                        and 13 Nov 1969, minus 2 to adjust for
@@ -493,6 +526,44 @@ doit     jsl   ~gmlocaltime             use common gmtime/localtime code
 
 ****************************************************************
 *
+*  struct tm *gmtime_r(time_t *t, struct tm *tm);
+*
+*  Inputs:
+*        t - pointer to # of seconds since 13 Nov 1969
+*        tm - pointer to structure to hold result (UTC time)
+*
+*  Outputs:
+*        returns the pointer tm
+*
+****************************************************************
+*
+gmtime_r start
+         using TimeCommon
+
+         csubroutine (4:t,4:tm),0
+
+         ldy   #2                       dereference the pointer to time_t
+         lda   [t],Y
+         tax
+         lda   [t]
+         tay
+
+         ph4   <tm                      push address of struct tm to use
+         pea   0                        push tm_isdst value         
+         phx                            push time_t value to convert
+         phy
+
+         jsr   ~get_tz_offset           push time zone offset
+         phx
+         pha
+
+         jsl   ~gmlocaltime             use common gmtime/localtime code
+
+         creturn 4:tm
+         end
+
+****************************************************************
+*
 *  struct tm *localtime(t)
 *        time_t *t;
 *
@@ -519,6 +590,8 @@ t        equ   6
          pld
          
          phb
+         phk
+         plb
          pla                            move return address
          sta   3,s
          pla
@@ -544,6 +617,52 @@ lb1      plb
 
 ****************************************************************
 *
+*  struct tm *localtime_r(time_t *t, struct tm *tm);
+*
+*  Inputs:
+*        t - pointer to # of seconds since 13 Nov 1969
+*        tm - pointer to structure to hold result (local time)
+*
+*  Outputs:
+*        returns the pointer tm
+*
+****************************************************************
+*
+localtime_r start
+         using TimeCommon
+
+         csubroutine (4:t,4:tm),0
+         phb
+         phk
+         plb
+
+         ldy   #2                       dereference the pointer to time_t
+         lda   [t],Y
+         tax
+         lda   [t]
+         tay
+
+         lda   #-1                      default DST setting = -1 (unknown)
+         cpy   lasttime                 determine DST setting, if we can
+         bne   lb1
+         cpx   lasttime+2
+         bne   lb1
+         lda   lastDST
+lb1      plb
+
+         ph4   <tm                      push address of struct tm to use
+         pha                            push tm_isdst value         
+         phx                            push time_t value to convert
+         phy
+         pea   0                        no time zone offset
+         pea   0
+         jsl   ~gmlocaltime             use common gmtime/localtime code
+
+         creturn 4:tm
+         end
+
+****************************************************************
+*
 *  ~gmlocaltime - common code for gmtime and localtime
 *
 *  Inputs:
@@ -559,14 +678,18 @@ lb1      plb
 *
 ~gmlocaltime private
          using TimeCommon
+;                                       seconds per year (average + 8 hours)
+;                                       Note: +8 hours is OK and improves year
+;                                       estimates within ORCA/C's 32-bit time_t
+;                                       range.  Remove it if range is extended.
+secsPerYear equ 86400*365+86400/4-86400/100+86400/400+86400/3
+secsPerMonth equ 86400*29               seconds per month (approx)
 
          csubroutine (4:tz_offset,4:t,2:isdst,4:tm),0
          phb
          phk
          plb
 
-         lda   #69                      find the year
-         sta   year
          lda   #1
          sta   day
          stz   month
@@ -576,8 +699,16 @@ lb1      plb
          sta   second
          lda   tz_offset+2
          sta   second+2
-lb1      inc   year
-         jsr   factor_second32
+         ph4   <t                       estimate year (may be 1 too high)
+         lda   #secsPerYear
+         ldx   #secsPerYear|-16
+         jsl   ~UDIV4
+         pla
+         plx
+         clc
+         adc   #69+1
+         sta   year
+         jsr   factor_second32          find the year
          lda   count+4
          bne   lb1b
          lda   count+2
@@ -585,22 +716,29 @@ lb1      inc   year
          bne   lb1a
          lda   count
          cmp   t
-lb1a     ble   lb1
+lb1a     ble   lb2
 lb1b     dec   year
-lb2      inc   month                    find the month
          jsr   factor_second32
+lb2      sub4  t,count,month            estimate month (may be 1 too high)
+         ph4   month                    save seconds past start of year
+         div4  month,#secsPerMonth
+         lda   month                    shortcuts where correct month is known
+         beq   lb2c
+         cmp   #12
+         beq   lb2b
+         jsr   factor_second32          find the month
          lda   count+4
-         bmi   lb2
-         bne   lb2b
+         bmi   lb2c
+;        bne   lb2b                     (not needed due to December shortcut)
          lda   count+2
          cmp   t+2
          bne   lb2a
          lda   count
          cmp   t
-lb2a     ble   lb2
+lb2a     ble   lb2c
 lb2b     dec   month
          jsr   factor_second32          recompute the factor
-         lda   year                     set the year
+lb2c     lda   year                     set the year
          ldy   #tm_year
          sta   [tm],y
          lda   month                    set the month
@@ -608,36 +746,37 @@ lb2b     dec   month
          sta   [tm],y
          ph4   <t                       save original t value
          sub4  t,count                  find the number of seconds
-         move4 t,t1
-         div4  t,#60
-         mul4  t,#60,t2
-         sub4  t1,t2
-         lda   t1
+         ph4   <t
+         ph4   #60
+         jsl   ~DIV4
+         pl4   <t
+         pla
+         plx
          ldy   #tm_sec
          sta   [tm],y
-         move4 t,t1                     find the number of minutes
-         div4  t,#60
-         mul4  t,#60,t2
-         sub4  t1,t2
-         lda   t1
+         ph4   <t                       find the number of minutes
+         ph4   #60
+         jsl   ~DIV4
+         pl4   <t
+         pla
+         plx
          ldy   #tm_min
          sta   [tm],y
-         move4 t,t1                     find the number of hours
-         div4  t,#24
-         mul4  t,#24,t2
-         sub4  t1,t2
-         lda   t1
-         ldy   #tm_hour
-         sta   [tm],y
-         lda   t                        set the day
-         inc   A
+         ph4   <t                       find the number of hours and days
+         ph4   #24
+         jsl   ~DIV4
+         pla
+         plx
+         inc   a                        set the day
          ldy   #tm_mday
          sta   [tm],y
+         pla
+         plx
+         ldy   #tm_hour                 set the hours
+         sta   [tm],y
          pl4   t                        restore original t value
-         stz   month                    compute the days since the start of the
-         jsr   factor_second32           year (in desired time zone)
-         sub4  t,count,count
-         div4  count,#60*60*24
+         pl4   count                    compute the days since the start of the
+         div4  count,#60*60*24           year (in desired time zone)
          ldy   #tm_yday                 set the day of year
          lda   count
          sta   [tm],y
@@ -683,7 +822,6 @@ lb3a     add4  t,#4*60*60*24
 mktime   start
          using TimeCommon
 temp     equ   1                        temp variable
-temp2    equ   5                        temp variable
 
          csubroutine (4:tmptr),8
          phb
@@ -718,7 +856,7 @@ temp2    equ   5                        temp variable
          lda   #-1                        return -1
          sta   temp
          sta   temp+2
-         brl   lb1
+         bra   lb1
 lb0      move4 count,temp               save the value for later return
          ph4   <tmptr                   recompute struct tm values
          ldy   #tm_isdst
@@ -728,6 +866,77 @@ lb0      move4 count,temp               save the value for later return
          ph4   #0
          jsl   ~gmlocaltime
 lb1      plb
+         creturn 4:temp
+         end
+
+****************************************************************
+*
+*  time_t timegm(struct tm *tmptr);
+*
+*  Inputs:
+*        tmptr - pointer to a time record representing UTC time
+*
+*  Outputs:
+*        all fields of *tmptr adjusted to their normal ranges
+*        tmptr->wday - day of week
+*        tmptr->yday - day of year
+*        returns the time in seconds since 13 Nov 1969 local time
+*
+****************************************************************
+*
+timegm   start
+         using TimeCommon
+temp     equ   1                        temp variable
+tz_off   equ   5                        time zone offset
+
+         csubroutine (4:tmptr),8
+         phb
+         phk
+         plb
+
+         ldy   #tm_year                 set time parameters
+         lda   [tmptr],Y
+         sta   year
+         dey
+         dey
+         lda   [tmptr],Y
+         sta   month
+         dey
+         dey
+         lda   [tmptr],Y
+         sta   day
+         dey
+         dey
+         lda   [tmptr],Y
+         sta   hour
+         dey
+         dey
+         lda   [tmptr],Y
+         sta   minute
+         jsr   ~get_tz_offset           adjust for time zone offset
+         sta   tz_off
+         stx   tz_off+2
+         clc
+         adc   [tmptr]
+         bcc   lb0
+         inx
+lb0      sta   second
+         stx   second+2
+         jsr   factor_second32          compute seconds since 13 Nov 1969 local
+         lda   count+4                  if time is unrepresentable
+         ora   count+6
+         beq   lb1
+         lda   #-1                        return -1
+         sta   temp
+         sta   temp+2
+         bra   lb2
+lb1      move4 count,temp               save the value for later return
+         ph4   <tmptr                   recompute struct tm values
+         pea   0
+         ph4   <temp
+         ph4   <tz_off
+         jsl   ~gmlocaltime
+lb2      plb
          creturn 4:temp
          end
 
@@ -867,6 +1076,52 @@ tv_nsec  equ   4
 
          ldy   #tv_nsec                 ts->tv_nsec = 0
          lda   #0
+         sta   [ts],y
+         iny
+         iny
+         sta   [ts],y
+         bra   ret
+
+err      stz   base                     unsupported base: return 0
+
+ret      creturn 2:base
+         end
+
+****************************************************************
+*
+*  int timespec_getres(struct timespec *ts, int base);
+*
+*  Inputs:
+*        ts - pointer to structure for result
+*        base - requested time base
+*
+*  Outputs:
+*        *ts - the resolution of the time base (if successful)
+*        returns base if successful, or 0 otherwise
+*
+****************************************************************
+*
+timespec_getres start
+TIME_UTC equ   1                        UTC time base
+
+tv_sec   equ   0                        struct timespec members
+tv_nsec  equ   4
+
+         csubroutine (4:ts,2:base),8
+         
+         lda   base
+         cmp   #TIME_UTC
+         bne   err
+
+         ldy   #tv_sec                  ts->tv_sec = 1
+         lda   #1
+         sta   [ts],y
+         iny
+         iny
+         dec   a
+         sta   [ts],y
+
+         ldy   #tv_nsec                 ts->tv_nsec = 0
          sta   [ts],y
          iny
          iny

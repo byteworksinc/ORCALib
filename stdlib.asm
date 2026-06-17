@@ -380,6 +380,55 @@ lb6      creturn 4:addr
 
 ****************************************************************
 *
+*  void call_once(short *flag, void (*func)(void));
+*
+*  Call func once, if flag indicates it has not already been
+*  called.  Do not return until the call to func has completed,
+*  either from this call_once invocation or another one.
+*
+*  Inputs:
+*        flag - indicating if func was called already
+*        func - function to call once
+*
+*  Note: This has synchronization suitable for multithreading,
+*        even though ORCA/C does not currently support it.
+*
+****************************************************************
+*
+call_once start
+         csubroutine (4:flag,4:func)
+rtl_addr equ   after-1
+         
+         php                            test and set flag
+         sei
+         lda   [flag]
+         bne   nocall                   if not already set
+         inc   a                          flag that call is in progress
+         sta   [flag]
+         plp
+         
+         ldy   func                       call func
+         lda   func+2
+         and   #$00ff
+         ora   #rtl_addr|8
+         pea   rtl_addr|-8
+         pha
+         dey
+         phy
+         rtl
+after    lda   #-1                        flag that the call is done
+         sta   [flag]
+         bra   ret                      else
+
+nocall   plp
+wait     lda   [flag]                     wait for any concurrent call to finish
+         bpl   wait
+         
+ret      creturn
+         end
+
+****************************************************************
+*
 *  div_t div(n,d)
 *        int n,d;
 *
@@ -448,6 +497,52 @@ quick_exit start
          jsr   ~QUICKEXIT
          lda   4,S
          brl   ~C_QUIT
+         end
+
+****************************************************************
+*
+*  void free_aligned_sized(void *ptr, size_t alignment, size_t size);
+*
+*  Free an allocation from aligned_alloc, given the pointer
+*  and the requested alignment and allocation size.
+*
+****************************************************************
+*
+free_aligned_sized start
+
+         pla                            remove alignment and size from stack
+         sta   7,s
+         pla
+         sta   7,s
+         plx
+         pla
+         xba
+         sta   6,s
+         txa
+         sta   5,s
+         jml   free                     call free
+         end
+
+****************************************************************
+*
+*  void free_sized(void *ptr, size_t size);
+*
+*  Free an allocation, given the pointer and allocation size.
+*
+****************************************************************
+*
+free_sized start
+
+         lda   6,s                      remove size from stack
+         sta   10,s
+         plx
+         ply
+         pla
+         sta   3,s
+         pla
+         phy
+         phx
+         jml   free                     call free
          end
 
 ****************************************************************
@@ -681,6 +776,40 @@ readchar lda   [s]                      if *s == '\0'
 
 ret      stx   n
          creturn 2:n
+         end
+
+****************************************************************
+*
+*  size_t memalignment(const void *p)
+*
+*  Inputs:
+*        p - a pointer
+*
+*  Outputs:
+*        The maximum alignment satisfied by p.
+*
+****************************************************************
+*
+memalignment start
+
+         csubroutine (4:p)
+         
+         lda   p                        compute alignment = p & -p
+         beq   lb1
+         eor   #$ffff
+         inc   a
+         and   p
+         sta   p
+         stz   p+2
+         bra   ret
+
+lb1      lda   p+2
+         eor   #$ffff
+         inc   a
+         and   p+2
+         sta   p+2
+
+ret      creturn 4:p
          end
 
 ****************************************************************
@@ -1184,16 +1313,32 @@ db1c     lda   base                     if the base is zero then
          lda   [str],Y
          and   #$00DF
          cmp   #'X'
-         bne   cn1
+         bne   db1d
          asl   base                           base 16
+         bra   db3                          else
+db1d     dc    i1'$A2'                        ldx #~C23orLater(soft reference)
+         dc    s2'~C23ORLATER'
+         beq   cn1                            if in C23 or later mode
+         cmp   #'B'                             if second char is 'B' or 'b' then
+         bne   cn1
+         lda   #2                                 base 2
+         sta   base
          bra   db3
 db2      cmp   #16                      if the base is 16 then
+         bne   db2a
+         lda   #'X0'                      if first two chars are 0x or 0X then
+         bra   db2b                         skip them
+db2a     cmp   #2                       else if the base is 2 then
          bne   db4
-         lda   [str]                      if the first two chars are 0x or 0X then
+         dc    i1'$A2'                    ldx #~C23orLater(soft reference)
+         dc    s2'~C23ORLATER'
+         beq   cn1                        if in C23 or later mode
+         lda   #'B0'                        if first two chars are 0b or 0B then
+db2b     eor   [str]
          and   #$DFFF
-         cmp   #'X0'
          bne   cn1
-db3      add4  str,#2                       skip them
+db3      add4  str,#2                         skip them
+         dec   foundOne
          bra   cn1
 db4      cmp   #37                      check for invalid base value
          bge   cn6
@@ -1251,10 +1396,12 @@ cn4      inc4  str                      next char
          bra   cn1
 
 cn5      lda   foundOne                 if no digits were found, flag the error
-         bne   rt1
+         bne   cn7
 cn6      lda   #EINVAL
          sta   >errno
          bra   rt2a
+cn7      bpl   rt1                      if we got a prefix but no more digits
+         dec4  str                        the subject sequence ends with the 0
 ;
 ;  return the results
 ;
@@ -1531,21 +1678,37 @@ db1c     lda   base                     if the base is zero then
          lda   [str],Y
          and   #$00DF
          cmp   #'X'
-         bne   cn1
+         bne   db1d
          asl   base                           base 16
+         bra   db3                          else
+db1d     dc    i1'$A2'                        ldx #~C23orLater(soft reference)
+         dc    s2'~C23ORLATER'
+         beq   cn1                            if in C23 or later mode
+         cmp   #'B'                             if second char is 'B' or 'b' then
+         bne   cn1
+         lda   #2                                 base 2
+         sta   base
          bra   db3
 db2      cmp   #16                      if the base is 16 then
+         bne   db2a
+         lda   #'X0'                      if first two chars are 0x or 0X then
+         bra   db2b                         skip them
+db2a     cmp   #2                       else if the base is 2 then
          bne   db4
-         lda   [str]                      if the first two chars are 0x or 0X then
+         dc    i1'$A2'                    ldx #~C23orLater(soft reference)
+         dc    s2'~C23ORLATER'
+         beq   cn1                        if in C23 or later mode
+         lda   #'B0'                        if first two chars are 0b or 0B then
+db2b     eor   [str]
          and   #$DFFF
-         cmp   #'X0'
          bne   cn1
-db3      add4  str,#2                       skip them
+db3      add4  str,#2                         skip them
+         dec   foundOne
          bra   cn1
 db4      cmp   #37                      check for invalid base value
-         jge   cn6
+         bge   cn6
          dec   a
-         jeq   cn6
+         beq   cn6
 ;
 ;  Convert the number
 ;
@@ -1571,9 +1734,10 @@ cn3      cmp   base                     branch if the digit is too big
          stx   foundOne
          pha                            save the digit
          ph8   <val                     val = val*base
-         pea   0
-         pea   0
-         pea   0
+         dex
+         phx
+         phx
+         phx
          ph2   <base
          jsl   ~UMUL8
          pl8   val
@@ -1596,10 +1760,12 @@ cn4      inc4  str                      next char
          bra   cn1
 
 cn5      lda   foundOne                 if no digits were found, flag the error
-         bne   rt1
+         bne   cn7
 cn6      lda   #EINVAL
          sta   >errno
          bra   rt2a
+cn7      bpl   rt1                      if we got a prefix but no more digits
+         dec4  str                        the subject sequence ends with the 0
 ;
 ;  return the results
 ;
