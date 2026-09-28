@@ -511,6 +511,7 @@ gc2b     ldy   #FILE_flag                 if input is unbuffered then
          bit   #_IONBF
          beq   gc3
          stz   rdDataBuffer+2               set up to read one char to c
+         stz   c
          tdc
          clc
          adc   #c
