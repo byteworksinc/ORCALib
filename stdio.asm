@@ -516,6 +516,7 @@ gc2b     ldy   #FILE_flag                 if input is unbuffered then
          adc   #c
          sta   rdDataBuffer
          lla   rdRequestCount,1
+         stz   c
          bra   gc4
 gc3      ldy   #FILE_base               else set up to read a buffer full
          lda   [stream],Y
